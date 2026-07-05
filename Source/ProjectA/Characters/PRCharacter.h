@@ -4,6 +4,8 @@
 #include "ProjectACharacter.h"
 #include "PRCharacter.generated.h"
 
+class UTextRenderComponent;
+
 /**
  * Base playable avatar for ProjectRift.
  */
@@ -15,8 +17,19 @@ class PROJECTA_API APRCharacter : public AProjectACharacter
 public:
 	APRCharacter();
 
+	UFUNCTION(BlueprintCallable, Category = "Network|Debug")
+	void RefreshPlayerDebugLabel();
+
+	UTextRenderComponent* GetPlayerDebugLabel() const { return PlayerDebugLabel; }
+
 protected:
+	virtual void BeginPlay() override;
+	virtual void OnRep_PlayerState() override;
+	virtual void PossessedBy(AController* NewController) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Network|Debug")
+	UTextRenderComponent* PlayerDebugLabel;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input|Actions")
 	UInputAction* InteractAction;

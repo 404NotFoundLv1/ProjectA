@@ -1,7 +1,9 @@
 #include "Characters/PRCharacter.h"
 
+#include "Components/TextRenderComponent.h"
 #include "EnhancedInputComponent.h"
 #include "Engine/Engine.h"
+#include "GameFramework/PlayerState.h"
 #include "InputAction.h"
 #include "ProjectA.h"
 #include "UObject/ConstructorHelpers.h"
@@ -21,12 +23,55 @@ void ShowInputDebugMessage(const UObject* Context, const TCHAR* ActionName)
 			FString::Printf(TEXT("Input: %s"), ActionName));
 	}
 }
+
+FColor GetDebugColorForPlayerId(const int32 PlayerId)
+{
+	static const FColor Colors[] = {
+		FColor::Cyan,
+		FColor::Yellow,
+		FColor::Green,
+		FColor::Orange,
+		FColor::Magenta,
+		FColor::Red,
+	};
+
+	if (PlayerId < 0)
+	{
+		return FColor::White;
+	}
+
+	return Colors[PlayerId % UE_ARRAY_COUNT(Colors)];
+}
+
+const TCHAR* NetRoleToText(const ENetRole Role)
+{
+	switch (Role)
+	{
+	case ROLE_Authority:
+		return TEXT("Authority");
+	case ROLE_AutonomousProxy:
+		return TEXT("Autonomous");
+	case ROLE_SimulatedProxy:
+		return TEXT("Simulated");
+	default:
+		return TEXT("None");
+	}
+}
 }
 
 APRCharacter::APRCharacter()
 {
 	bReplicates = true;
-	SetReplicatingMovement(true);
+	SetReplicateMovement(true);
+
+	PlayerDebugLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("PlayerDebugLabel"));
+	PlayerDebugLabel->SetupAttachment(GetRootComponent());
+	PlayerDebugLabel->SetRelativeLocation(FVector(0.0f, 0.0f, 115.0f));
+	PlayerDebugLabel->SetHorizontalAlignment(EHTA_Center);
+	PlayerDebugLabel->SetVerticalAlignment(EVRTA_TextCenter);
+	PlayerDebugLabel->SetTextRenderColor(FColor::White);
+	PlayerDebugLabel->SetWorldSize(24.0f);
+	PlayerDebugLabel->SetText(FText::FromString(TEXT("Player")));
 
 	static ConstructorHelpers::FObjectFinder<UInputAction> JumpActionAsset(TEXT("/Game/ProjectRift/Input/Actions/IA_Jump.IA_Jump"));
 	if (JumpActionAsset.Succeeded())
@@ -95,6 +140,27 @@ APRCharacter::APRCharacter()
 	}
 }
 
+void APRCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+
+	RefreshPlayerDebugLabel();
+}
+
+void APRCharacter::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+
+	RefreshPlayerDebugLabel();
+}
+
+void APRCharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+
+	RefreshPlayerDebugLabel();
+}
+
 void APRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
@@ -139,6 +205,26 @@ void APRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	{
 		EnhancedInputComponent->BindAction(OpenInventoryAction, ETriggerEvent::Started, this, &APRCharacter::DoOpenInventory);
 	}
+}
+
+void APRCharacter::RefreshPlayerDebugLabel()
+{
+	if (!PlayerDebugLabel)
+	{
+		return;
+	}
+
+	const APlayerState* CurrentPlayerState = GetPlayerState();
+	const int32 PlayerId = CurrentPlayerState ? CurrentPlayerState->GetPlayerId() : INDEX_NONE;
+	const FString PlayerName = CurrentPlayerState ? CurrentPlayerState->GetPlayerName() : TEXT("Unassigned");
+	const FString LabelText = FString::Printf(
+		TEXT("%s\nP%d %s"),
+		*PlayerName,
+		PlayerId,
+		NetRoleToText(GetLocalRole()));
+
+	PlayerDebugLabel->SetText(FText::FromString(LabelText));
+	PlayerDebugLabel->SetTextRenderColor(GetDebugColorForPlayerId(PlayerId));
 }
 
 void APRCharacter::DoInteract()
