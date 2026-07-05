@@ -17,6 +17,7 @@ Saved/
 .cursor/
 .gemini/
 .mcp.json
+tmp/
 
 # OS/editor noise
 Thumbs.db
