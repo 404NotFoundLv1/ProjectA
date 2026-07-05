@@ -1,0 +1,9 @@
+*.uasset -text
+*.umap -text
+*.ubulk -text
+*.uexp -text
+*.locres -text
+*.ini text eol=crlf
+*.cs text eol=crlf
+*.cpp text eol=crlf
+*.h text eol=crlf

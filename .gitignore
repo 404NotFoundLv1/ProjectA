@@ -1,0 +1,25 @@
+# Unreal Engine generated folders
+Binaries/
+Build/
+DerivedDataCache/
+Intermediate/
+Saved/
+
+# Visual Studio and IDE state
+.vs/
+.vscode/
+*.sln
+*.slnx
+
+# Local automation and assistant configuration
+.agents/
+.codex/
+.cursor/
+.gemini/
+.mcp.json
+
+# OS/editor noise
+Thumbs.db
+Desktop.ini
+*.tmp
+*.log
