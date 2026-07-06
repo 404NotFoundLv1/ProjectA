@@ -1,8 +1,8 @@
 #include "Abilities/PRAttributeSet.h"
 
 #include "AbilitySystemComponent.h"
+#include "Characters/PRCharacter.h"
 #include "GameplayEffectExtension.h"
-#include "GameplayTagsManager.h"
 #include "Net/UnrealNetwork.h"
 
 UPRAttributeSet::UPRAttributeSet()
@@ -78,10 +78,9 @@ void UPRAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 
 		if (GetHealth() <= 0.0f)
 		{
-			const FGameplayTag DownedStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Downed"), false);
-			if (DownedStateTag.IsValid())
+			if (APRCharacter* TargetCharacter = Cast<APRCharacter>(Data.Target.GetAvatarActor()))
 			{
-				Data.Target.AddLooseGameplayTag(DownedStateTag);
+				TargetCharacter->EnterDownedState();
 			}
 		}
 	}

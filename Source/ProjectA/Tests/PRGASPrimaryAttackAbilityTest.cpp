@@ -18,7 +18,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPRGASPrimaryAttackAbilityTest, "ProjectRift.GA
 
 namespace
 {
-UClass* FindProjectRiftClass(const TCHAR* ClassPath)
+UClass* FindProjectRiftClassForPrimaryAttackTest(const TCHAR* ClassPath)
 {
 	return FindObject<UClass>(nullptr, ClassPath);
 }
@@ -44,9 +44,9 @@ bool PossessTestCharacter(UWorld* World, APRPlayerState* PlayerState, APRCharact
 
 bool FPRGASPrimaryAttackAbilityTest::RunTest(const FString& Parameters)
 {
-	UClass* GameplayAbilityBaseClass = FindProjectRiftClass(TEXT("/Script/ProjectA.PRGameplayAbility"));
-	UClass* PrimaryAttackAbilityClass = FindProjectRiftClass(TEXT("/Script/ProjectA.GA_PrimaryAttack"));
-	UClass* DamageEffectClass = FindProjectRiftClass(TEXT("/Script/ProjectA.PRDamageGameplayEffect"));
+	UClass* GameplayAbilityBaseClass = FindProjectRiftClassForPrimaryAttackTest(TEXT("/Script/ProjectA.PRGameplayAbility"));
+	UClass* PrimaryAttackAbilityClass = FindProjectRiftClassForPrimaryAttackTest(TEXT("/Script/ProjectA.GA_PrimaryAttack"));
+	UClass* DamageEffectClass = FindProjectRiftClassForPrimaryAttackTest(TEXT("/Script/ProjectA.PRDamageGameplayEffect"));
 
 	TestNotNull(TEXT("UPRGameplayAbility class exists"), GameplayAbilityBaseClass);
 	TestTrue(

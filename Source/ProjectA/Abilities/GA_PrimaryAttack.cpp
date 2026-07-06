@@ -22,6 +22,12 @@ UGA_PrimaryAttack::UGA_PrimaryAttack()
 	{
 		ActivationBlockedTags.AddTag(DeadStateTag);
 	}
+
+	const FGameplayTag DownedStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Downed"), false);
+	if (DownedStateTag.IsValid())
+	{
+		ActivationBlockedTags.AddTag(DownedStateTag);
+	}
 }
 
 bool UGA_PrimaryAttack::CanActivateAbility(
@@ -38,7 +44,13 @@ bool UGA_PrimaryAttack::CanActivateAbility(
 
 	const UAbilitySystemComponent* AbilitySystemComponent = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
 	const FGameplayTag DeadStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Dead"), false);
-	return !DeadStateTag.IsValid() || !AbilitySystemComponent || !AbilitySystemComponent->HasMatchingGameplayTag(DeadStateTag);
+	if (DeadStateTag.IsValid() && AbilitySystemComponent && AbilitySystemComponent->HasMatchingGameplayTag(DeadStateTag))
+	{
+		return false;
+	}
+
+	const FGameplayTag DownedStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Downed"), false);
+	return !DownedStateTag.IsValid() || !AbilitySystemComponent || !AbilitySystemComponent->HasMatchingGameplayTag(DownedStateTag);
 }
 
 void UGA_PrimaryAttack::ActivateAbility(

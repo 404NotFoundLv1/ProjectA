@@ -8,11 +8,14 @@
 #include "Components/TextRenderComponent.h"
 #include "EnhancedInputComponent.h"
 #include "Engine/Engine.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerState.h"
 #include "GameplayAbilitySpec.h"
+#include "GameplayTagsManager.h"
 #include "InputAction.h"
 #include "Player/PRPlayerState.h"
 #include "ProjectA.h"
+#include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -72,6 +75,7 @@ APRCharacter::APRCharacter()
 	SetReplicateMovement(true);
 	DefaultAttributesEffectClass = UPRDefaultAttributesGameplayEffect::StaticClass();
 	DefaultAbilityClasses.Add(UGA_PrimaryAttack::StaticClass());
+	AutoRespawnDelay = 5.0f;
 
 	PlayerDebugLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("PlayerDebugLabel"));
 	PlayerDebugLabel->SetupAttachment(GetRootComponent());
@@ -285,6 +289,130 @@ bool APRCharacter::GrantDefaultAbilities()
 	return bDefaultAbilitiesGranted;
 }
 
+bool APRCharacter::EnterDownedState()
+{
+	if (!HasAuthority())
+	{
+		return false;
+	}
+
+	if (!AbilitySystemComponent)
+	{
+		return false;
+	}
+
+	if (IsDowned())
+	{
+		ScheduleAutoRespawn();
+		return true;
+	}
+
+	const FGameplayTag DownedStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Downed"), false);
+	if (DownedStateTag.IsValid())
+	{
+		AbilitySystemComponent->AddLooseGameplayTag(DownedStateTag, 1, EGameplayTagReplicationState::TagOnly);
+	}
+
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		MovementComponent->StopMovementImmediately();
+		MovementComponent->DisableMovement();
+	}
+
+	ScheduleAutoRespawn();
+
+	UE_LOG(LogProjectA, Log, TEXT("%s entered downed state."), *GetNameSafe(this));
+	return true;
+}
+
+bool APRCharacter::RespawnFromDowned()
+{
+	if (!HasAuthority())
+	{
+		return false;
+	}
+
+	if (!AbilitySystemComponent || !AttributeSet)
+	{
+		return false;
+	}
+
+	ClearAutoRespawnTimer();
+
+	const FGameplayTag DownedStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Downed"), false);
+	const FGameplayTag DeadStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Dead"), false);
+	if (DownedStateTag.IsValid())
+	{
+		AbilitySystemComponent->RemoveLooseGameplayTag(DownedStateTag, 1, EGameplayTagReplicationState::TagOnly);
+	}
+	if (DeadStateTag.IsValid())
+	{
+		AbilitySystemComponent->RemoveLooseGameplayTag(DeadStateTag, 1, EGameplayTagReplicationState::TagOnly);
+	}
+
+	AttributeSet->SetHealth(AttributeSet->GetMaxHealth());
+	AttributeSet->SetShield(AttributeSet->GetMaxShield());
+
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		MovementComponent->SetMovementMode(MOVE_Walking);
+	}
+
+	UE_LOG(LogProjectA, Log, TEXT("%s respawned from downed state."), *GetNameSafe(this));
+	return true;
+}
+
+bool APRCharacter::IsDowned() const
+{
+	if (!AbilitySystemComponent)
+	{
+		return false;
+	}
+
+	const FGameplayTag DownedStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Downed"), false);
+	return DownedStateTag.IsValid() && AbilitySystemComponent->HasMatchingGameplayTag(DownedStateTag);
+}
+
+bool APRCharacter::IsAlive() const
+{
+	return AttributeSet && AttributeSet->GetHealth() > 0.0f && !IsDowned();
+}
+
+bool APRCharacter::IsAutoRespawnScheduled() const
+{
+	const UWorld* World = GetWorld();
+	return World && World->GetTimerManager().IsTimerActive(AutoRespawnTimerHandle);
+}
+
+void APRCharacter::ScheduleAutoRespawn()
+{
+	UWorld* World = GetWorld();
+	if (!World || AutoRespawnDelay <= 0.0f)
+	{
+		return;
+	}
+
+	World->GetTimerManager().SetTimer(
+		AutoRespawnTimerHandle,
+		this,
+		&APRCharacter::HandleAutoRespawnTimer,
+		AutoRespawnDelay,
+		false);
+}
+
+void APRCharacter::HandleAutoRespawnTimer()
+{
+	RespawnFromDowned();
+}
+
+void APRCharacter::ClearAutoRespawnTimer()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(AutoRespawnTimerHandle);
+	}
+}
+
 bool APRCharacter::ApplyDefaultAttributes()
 {
 	if (bDefaultAttributesApplied)
@@ -384,6 +512,11 @@ void APRCharacter::HandleHealthChanged(const FOnAttributeChangeData& Data)
 {
 	UE_LOG(LogProjectA, Log, TEXT("Health changed for %s: %.2f -> %.2f"), *GetNameSafe(this), Data.OldValue, Data.NewValue);
 	OnHealthChanged.Broadcast(Data.OldValue, Data.NewValue);
+
+	if (HasAuthority() && Data.NewValue <= 0.0f)
+	{
+		EnterDownedState();
+	}
 }
 
 void APRCharacter::HandleShieldChanged(const FOnAttributeChangeData& Data)
@@ -472,6 +605,12 @@ void APRCharacter::DoInteract()
 void APRCharacter::DoPrimaryAttack()
 {
 	ShowInputDebugMessage(this, TEXT("PrimaryAttack"));
+
+	if (IsDowned())
+	{
+		UE_LOG(LogProjectA, Log, TEXT("Primary attack rejected for %s: character is downed."), *GetNameSafe(this));
+		return;
+	}
 
 	if (!AbilitySystemComponent)
 	{

@@ -55,6 +55,21 @@ public:
 	UFUNCTION(BlueprintPure, Category = "GAS|Abilities")
 	bool AreDefaultAbilitiesGranted() const { return bDefaultAbilitiesGranted; }
 
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Life State")
+	bool EnterDownedState();
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Life State")
+	bool RespawnFromDowned();
+
+	UFUNCTION(BlueprintPure, Category = "Life State")
+	bool IsDowned() const;
+
+	UFUNCTION(BlueprintPure, Category = "Life State")
+	bool IsAlive() const;
+
+	UFUNCTION(BlueprintPure, Category = "Life State")
+	bool IsAutoRespawnScheduled() const;
+
 	UPROPERTY(BlueprintAssignable, Category = "GAS")
 	FPRAbilitySystemInitializedSignature OnAbilitySystemInitialized;
 
@@ -78,6 +93,9 @@ protected:
 	void HandleHealthChanged(const FOnAttributeChangeData& Data);
 	void HandleShieldChanged(const FOnAttributeChangeData& Data);
 	void HandleEnergyChanged(const FOnAttributeChangeData& Data);
+	void ScheduleAutoRespawn();
+	void HandleAutoRespawnTimer();
+	void ClearAutoRespawnTimer();
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "GAS")
 	TObjectPtr<UPRAbilitySystemComponent> AbilitySystemComponent;
@@ -100,12 +118,16 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Abilities")
 	TArray<TSubclassOf<UGameplayAbility>> DefaultAbilityClasses;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Life State")
+	float AutoRespawnDelay;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Network|Debug")
 	UTextRenderComponent* PlayerDebugLabel;
 
 	FDelegateHandle HealthChangedDelegateHandle;
 	FDelegateHandle ShieldChangedDelegateHandle;
 	FDelegateHandle EnergyChangedDelegateHandle;
+	FTimerHandle AutoRespawnTimerHandle;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input|Actions")
 	UInputAction* InteractAction;

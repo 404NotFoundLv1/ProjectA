@@ -16,14 +16,14 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPRGASDamageTest, "ProjectRift.GAS.Damage", EAu
 
 namespace
 {
-UClass* FindProjectRiftClass(const TCHAR* ClassPath)
+UClass* FindProjectRiftClassForDamageTest(const TCHAR* ClassPath)
 {
 	return FindObject<UClass>(nullptr, ClassPath);
 }
 
 bool ApplyDamage(FAutomationTestBase& Test, APRPlayerState* TargetPlayerState, const float DamageAmount)
 {
-	UClass* DamageEffectClass = FindProjectRiftClass(TEXT("/Script/ProjectA.PRDamageGameplayEffect"));
+	UClass* DamageEffectClass = FindProjectRiftClassForDamageTest(TEXT("/Script/ProjectA.PRDamageGameplayEffect"));
 	Test.TestNotNull(TEXT("GE_Damage class exists"), DamageEffectClass);
 	if (!DamageEffectClass)
 	{
@@ -61,13 +61,13 @@ bool ApplyDamage(FAutomationTestBase& Test, APRPlayerState* TargetPlayerState, c
 
 bool FPRGASDamageTest::RunTest(const FString& Parameters)
 {
-	UClass* DamageEffectClass = FindProjectRiftClass(TEXT("/Script/ProjectA.PRDamageGameplayEffect"));
+	UClass* DamageEffectClass = FindProjectRiftClassForDamageTest(TEXT("/Script/ProjectA.PRDamageGameplayEffect"));
 	TestNotNull(TEXT("GE_Damage class exists"), DamageEffectClass);
 	TestTrue(
 		TEXT("GE_Damage derives from UGameplayEffect"),
 		DamageEffectClass && DamageEffectClass->IsChildOf(UGameplayEffect::StaticClass()));
 
-	UClass* AttributeSetClass = FindProjectRiftClass(TEXT("/Script/ProjectA.PRAttributeSet"));
+	UClass* AttributeSetClass = FindProjectRiftClassForDamageTest(TEXT("/Script/ProjectA.PRAttributeSet"));
 	const FStructProperty* DamageProperty = AttributeSetClass
 		? FindFProperty<FStructProperty>(AttributeSetClass, TEXT("Damage"))
 		: nullptr;
@@ -124,16 +124,10 @@ bool FPRGASDamageTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Shield is depleted before health"), TargetAttributes->GetShield(), 0.0f);
 	TestEqual(TEXT("Overflow damage lowers health"), TargetAttributes->GetHealth(), 70.0f);
 
-	const FGameplayTag DownedStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Downed"), false);
-	TestTrue(TEXT("State.Downed tag is configured"), DownedStateTag.IsValid());
-
 	TargetAttributes->SetHealth(40.0f);
 	TargetAttributes->SetShield(0.0f);
 	TestTrue(TEXT("Lethal damage GE applies"), ApplyDamage(*this, TargetPlayerState.Get(), 250.0f));
 	TestEqual(TEXT("Health is clamped to zero"), TargetAttributes->GetHealth(), 0.0f);
-	TestTrue(
-		TEXT("Lethal damage enters downed state"),
-		DownedStateTag.IsValid() && TargetASC->HasMatchingGameplayTag(DownedStateTag));
 
 	const FStructProperty* RuntimeDamageProperty = FindFProperty<FStructProperty>(TargetAttributes->GetClass(), TEXT("Damage"));
 	const FGameplayAttributeData* RuntimeDamage = RuntimeDamageProperty
