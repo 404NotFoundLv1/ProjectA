@@ -5,6 +5,8 @@
 #include "TimerManager.h"
 #include "PRPlayerController.generated.h"
 
+class UPRGASDebugWidget;
+
 /**
  * Player-owned input and UI entry point for ProjectRift.
  */
@@ -19,11 +21,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Lobby")
 	void ToggleReady();
 
+	UFUNCTION(BlueprintCallable, Category = "Lobby|Role")
+	void SelectAssaultRoleModule();
+
+	UFUNCTION(BlueprintCallable, Category = "Lobby|Role")
+	void SelectRoleModule(FName RoleModule);
+
 	UFUNCTION(BlueprintCallable, Category = "Lobby|Travel")
 	void StartRiftMission();
 
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Lobby")
 	void ServerSetReady(bool bReady);
+
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Lobby|Role")
+	void ServerSetSelectedRoleModule(FName RoleModule);
 
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Lobby|Travel")
 	void ServerStartRiftMission();
@@ -37,5 +48,14 @@ protected:
 	virtual void SetupInputComponent() override;
 
 private:
+	void CreateGASDebugHUD();
+	void DestroyGASDebugHUD();
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Debug")
+	TSubclassOf<UPRGASDebugWidget> GASDebugWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPRGASDebugWidget> GASDebugWidget;
+
 	FTimerHandle LobbyReadyDebugTimerHandle;
 };

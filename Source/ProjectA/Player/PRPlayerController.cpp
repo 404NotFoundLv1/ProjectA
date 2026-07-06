@@ -9,14 +9,18 @@
 #include "InputMappingContext.h"
 #include "Player/PRPlayerState.h"
 #include "ProjectA.h"
+#include "UI/PRGASDebugWidget.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
 {
+const FName AssaultRoleModuleName(TEXT("Ability.Role.Assault"));
+
 FString GetLobbyReadyLine(const APlayerState* PlayerState)
 {
 	const APRPlayerState* ProjectRiftPlayerState = Cast<APRPlayerState>(PlayerState);
 	const bool bReady = ProjectRiftPlayerState && ProjectRiftPlayerState->IsReady();
+	const FName SelectedRoleModule = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetSelectedRoleModule() : NAME_None;
 	FString DisplayName = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetPlayerDisplayName() : FString();
 
 	if (DisplayName.IsEmpty() && PlayerState)
@@ -31,10 +35,11 @@ FString GetLobbyReadyLine(const APlayerState* PlayerState)
 
 	const int32 PlayerId = PlayerState ? PlayerState->GetPlayerId() : INDEX_NONE;
 	return FString::Printf(
-		TEXT("P%d %s: %s"),
+		TEXT("P%d %s: %s | Role: %s"),
 		PlayerId,
 		*DisplayName,
-		bReady ? TEXT("READY") : TEXT("WAITING"));
+		bReady ? TEXT("READY") : TEXT("WAITING"),
+		SelectedRoleModule.IsNone() ? TEXT("None") : *SelectedRoleModule.ToString());
 }
 }
 
@@ -51,6 +56,12 @@ APRPlayerController::APRPlayerController()
 	{
 		MobileExcludedMappingContexts.Add(MouseLookContextAsset.Object);
 	}
+
+	static ConstructorHelpers::FClassFinder<UPRGASDebugWidget> GASDebugWidgetAsset(TEXT("/Game/ProjectRift/UI/WBP_GASDebugHUD"));
+	if (GASDebugWidgetAsset.Succeeded())
+	{
+		GASDebugWidgetClass = GASDebugWidgetAsset.Class;
+	}
 }
 
 void APRPlayerController::BeginPlay()
@@ -66,11 +77,14 @@ void APRPlayerController::BeginPlay()
 			1.0f,
 			true,
 			0.25f);
+
+		CreateGASDebugHUD();
 	}
 }
 
 void APRPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	DestroyGASDebugHUD();
 	GetWorldTimerManager().ClearTimer(LobbyReadyDebugTimerHandle);
 
 	Super::EndPlay(EndPlayReason);
@@ -82,9 +96,20 @@ void APRPlayerController::SetupInputComponent()
 
 	if (InputComponent)
 	{
+		InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APRPlayerController::SelectAssaultRoleModule);
 		InputComponent->BindKey(EKeys::P, IE_Pressed, this, &APRPlayerController::ToggleReady);
 		InputComponent->BindKey(EKeys::O, IE_Pressed, this, &APRPlayerController::StartRiftMission);
 	}
+}
+
+void APRPlayerController::SelectAssaultRoleModule()
+{
+	SelectRoleModule(AssaultRoleModuleName);
+}
+
+void APRPlayerController::SelectRoleModule(const FName RoleModule)
+{
+	ServerSetSelectedRoleModule(RoleModule);
 }
 
 void APRPlayerController::ToggleReady()
@@ -110,6 +135,30 @@ void APRPlayerController::ServerSetReady_Implementation(const bool bReady)
 	}
 
 	ProjectRiftPlayerState->SetReady(bReady);
+}
+
+void APRPlayerController::ServerSetSelectedRoleModule_Implementation(const FName RoleModule)
+{
+	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	if (!ProjectRiftPlayerState)
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("ServerSetSelectedRoleModule failed because APRPlayerState is missing."));
+		return;
+	}
+
+	if (RoleModule.IsNone())
+	{
+		ProjectRiftPlayerState->SetSelectedRoleModule(NAME_None);
+		return;
+	}
+
+	if (RoleModule == AssaultRoleModuleName || RoleModule == FName(TEXT("Role.Assault")))
+	{
+		ProjectRiftPlayerState->SetSelectedRoleModule(AssaultRoleModuleName);
+		return;
+	}
+
+	UE_LOG(LogProjectA, Warning, TEXT("Unsupported role module requested: %s"), *RoleModule.ToString());
 }
 
 void APRPlayerController::ServerStartRiftMission_Implementation()
@@ -140,7 +189,7 @@ void APRPlayerController::RefreshLobbyReadyDebugDisplay()
 	}
 
 	FString ReadyList = TEXT("Lobby Ready\n");
-	ReadyList += TEXT("P: Ready | Host O: Start Rift\n");
+	ReadyList += TEXT("1: Assault | P: Ready | Host O: Start Rift\n");
 	for (const APlayerState* ListedPlayerState : GameState->PlayerArray)
 	{
 		ReadyList += GetLobbyReadyLine(ListedPlayerState);
@@ -149,4 +198,36 @@ void APRPlayerController::RefreshLobbyReadyDebugDisplay()
 
 	const int32 MessageKey = IsLocalController() ? 16016 : 16017;
 	GEngine->AddOnScreenDebugMessage(MessageKey, 1.1f, FColor::Green, ReadyList);
+}
+
+void APRPlayerController::CreateGASDebugHUD()
+{
+	if (!IsLocalPlayerController() || GASDebugWidget)
+	{
+		return;
+	}
+
+	if (!GASDebugWidgetClass)
+	{
+		GASDebugWidgetClass = UPRGASDebugWidget::StaticClass();
+	}
+
+	GASDebugWidget = CreateWidget<UPRGASDebugWidget>(this, GASDebugWidgetClass);
+	if (GASDebugWidget)
+	{
+		GASDebugWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+		GASDebugWidget->AddToPlayerScreen(20);
+		GASDebugWidget->SetAlignmentInViewport(FVector2D::ZeroVector);
+		GASDebugWidget->SetPositionInViewport(FVector2D(16.0, 16.0), false);
+		GASDebugWidget->SetDesiredSizeInViewport(FVector2D(420.0, 220.0));
+	}
+}
+
+void APRPlayerController::DestroyGASDebugHUD()
+{
+	if (GASDebugWidget)
+	{
+		GASDebugWidget->RemoveFromParent();
+		GASDebugWidget = nullptr;
+	}
 }

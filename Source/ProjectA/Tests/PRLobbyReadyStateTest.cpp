@@ -37,10 +37,19 @@ bool FPRLobbyReadyStateTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Server-side display name setter updates state"), MutablePlayerState->GetPlayerDisplayName(), FString(TEXT("Test Pilot")));
 
 	UClass* PlayerControllerClass = APRPlayerController::StaticClass();
+	const FClassProperty* GASDebugWidgetClassProperty = FindFProperty<FClassProperty>(PlayerControllerClass, TEXT("GASDebugWidgetClass"));
+	TestNotNull(TEXT("APRPlayerController exposes GAS debug widget class"), GASDebugWidgetClassProperty);
+
 	UFunction* ServerSetReadyFunction = PlayerControllerClass->FindFunctionByName(TEXT("ServerSetReady"));
 	TestNotNull(TEXT("APRPlayerController exposes ServerSetReady RPC"), ServerSetReadyFunction);
 	TestTrue(TEXT("ServerSetReady is a server RPC"), ServerSetReadyFunction && ServerSetReadyFunction->HasAnyFunctionFlags(FUNC_Net | FUNC_NetServer));
 	TestNotNull(TEXT("APRPlayerController exposes local ready toggle"), PlayerControllerClass->FindFunctionByName(TEXT("ToggleReady")));
+
+	UFunction* ServerSetSelectedRoleModuleFunction = PlayerControllerClass->FindFunctionByName(TEXT("ServerSetSelectedRoleModule"));
+	TestNotNull(TEXT("APRPlayerController exposes ServerSetSelectedRoleModule RPC"), ServerSetSelectedRoleModuleFunction);
+	TestTrue(TEXT("ServerSetSelectedRoleModule is a server RPC"), ServerSetSelectedRoleModuleFunction && ServerSetSelectedRoleModuleFunction->HasAnyFunctionFlags(FUNC_Net | FUNC_NetServer));
+	TestNotNull(TEXT("APRPlayerController exposes local assault role selection entry"), PlayerControllerClass->FindFunctionByName(TEXT("SelectAssaultRoleModule")));
+	TestNotNull(TEXT("APRPlayerController exposes generic role selection entry"), PlayerControllerClass->FindFunctionByName(TEXT("SelectRoleModule")));
 
 	return true;
 }
