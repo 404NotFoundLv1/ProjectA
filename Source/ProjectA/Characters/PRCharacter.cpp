@@ -1,10 +1,13 @@
 #include "Characters/PRCharacter.h"
 
+#include "Abilities/PRAbilitySystemComponent.h"
+#include "Abilities/PRAttributeSet.h"
 #include "Components/TextRenderComponent.h"
 #include "EnhancedInputComponent.h"
 #include "Engine/Engine.h"
 #include "GameFramework/PlayerState.h"
 #include "InputAction.h"
+#include "Player/PRPlayerState.h"
 #include "ProjectA.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -152,6 +155,7 @@ void APRCharacter::OnRep_PlayerState()
 	Super::OnRep_PlayerState();
 
 	RefreshPlayerDebugLabel();
+	InitializeAbilitySystemFromPlayerState(Cast<APRPlayerState>(GetPlayerState()));
 }
 
 void APRCharacter::PossessedBy(AController* NewController)
@@ -159,6 +163,136 @@ void APRCharacter::PossessedBy(AController* NewController)
 	Super::PossessedBy(NewController);
 
 	RefreshPlayerDebugLabel();
+	InitializeAbilitySystemFromPlayerState(Cast<APRPlayerState>(GetPlayerState()));
+}
+
+bool APRCharacter::InitializeAbilitySystemFromPlayerState(APRPlayerState* InPlayerState)
+{
+	if (!InPlayerState)
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("ProjectRift ASC initialization skipped for %s: PlayerState is missing."), *GetNameSafe(this));
+		return false;
+	}
+
+	UPRAbilitySystemComponent* NewAbilitySystemComponent = InPlayerState->GetProjectRiftAbilitySystemComponent();
+	UPRAttributeSet* NewAttributeSet = InPlayerState->GetAttributeSet();
+	if (!NewAbilitySystemComponent || !NewAttributeSet)
+	{
+		UE_LOG(
+			LogProjectA,
+			Warning,
+			TEXT("ProjectRift ASC initialization skipped for %s: ASC=%s AttributeSet=%s."),
+			*GetNameSafe(this),
+			*GetNameSafe(NewAbilitySystemComponent),
+			*GetNameSafe(NewAttributeSet));
+		return false;
+	}
+
+	const bool bAlreadyInitializedForThisAvatar =
+		bAbilitySystemInitialized &&
+		AbilitySystemComponent == NewAbilitySystemComponent &&
+		AttributeSet == NewAttributeSet &&
+		NewAbilitySystemComponent->GetOwnerActor() == InPlayerState &&
+		NewAbilitySystemComponent->GetAvatarActor() == this;
+
+	if (bAlreadyInitializedForThisAvatar)
+	{
+		return true;
+	}
+
+	if (AbilitySystemComponent && AbilitySystemComponent != NewAbilitySystemComponent)
+	{
+		ClearAttributeChangeDelegates();
+	}
+
+	AbilitySystemComponent = NewAbilitySystemComponent;
+	AttributeSet = NewAttributeSet;
+	AbilitySystemComponent->InitAbilityActorInfo(InPlayerState, this);
+
+	BindAttributeChangeDelegates();
+	bAbilitySystemInitialized = true;
+	OnAbilitySystemInitialized.Broadcast(AbilitySystemComponent);
+
+	UE_LOG(
+		LogProjectA,
+		Log,
+		TEXT("ProjectRift ASC initialized for %s. Owner=%s Avatar=%s LocalRole=%s"),
+		*GetNameSafe(this),
+		*GetNameSafe(AbilitySystemComponent->GetOwnerActor()),
+		*GetNameSafe(AbilitySystemComponent->GetAvatarActor()),
+		NetRoleToText(GetLocalRole()));
+
+	return true;
+}
+
+void APRCharacter::BindAttributeChangeDelegates()
+{
+	if (!AbilitySystemComponent || !AttributeSet)
+	{
+		return;
+	}
+
+	ClearAttributeChangeDelegates();
+
+	HealthChangedDelegateHandle = AbilitySystemComponent
+		->GetGameplayAttributeValueChangeDelegate(UPRAttributeSet::GetHealthAttribute())
+		.AddUObject(this, &APRCharacter::HandleHealthChanged);
+	ShieldChangedDelegateHandle = AbilitySystemComponent
+		->GetGameplayAttributeValueChangeDelegate(UPRAttributeSet::GetShieldAttribute())
+		.AddUObject(this, &APRCharacter::HandleShieldChanged);
+	EnergyChangedDelegateHandle = AbilitySystemComponent
+		->GetGameplayAttributeValueChangeDelegate(UPRAttributeSet::GetEnergyAttribute())
+		.AddUObject(this, &APRCharacter::HandleEnergyChanged);
+}
+
+void APRCharacter::ClearAttributeChangeDelegates()
+{
+	if (!AbilitySystemComponent)
+	{
+		HealthChangedDelegateHandle.Reset();
+		ShieldChangedDelegateHandle.Reset();
+		EnergyChangedDelegateHandle.Reset();
+		return;
+	}
+
+	if (HealthChangedDelegateHandle.IsValid())
+	{
+		AbilitySystemComponent
+			->GetGameplayAttributeValueChangeDelegate(UPRAttributeSet::GetHealthAttribute())
+			.Remove(HealthChangedDelegateHandle);
+		HealthChangedDelegateHandle.Reset();
+	}
+
+	if (ShieldChangedDelegateHandle.IsValid())
+	{
+		AbilitySystemComponent
+			->GetGameplayAttributeValueChangeDelegate(UPRAttributeSet::GetShieldAttribute())
+			.Remove(ShieldChangedDelegateHandle);
+		ShieldChangedDelegateHandle.Reset();
+	}
+
+	if (EnergyChangedDelegateHandle.IsValid())
+	{
+		AbilitySystemComponent
+			->GetGameplayAttributeValueChangeDelegate(UPRAttributeSet::GetEnergyAttribute())
+			.Remove(EnergyChangedDelegateHandle);
+		EnergyChangedDelegateHandle.Reset();
+	}
+}
+
+void APRCharacter::HandleHealthChanged(const FOnAttributeChangeData& Data)
+{
+	UE_LOG(LogProjectA, Log, TEXT("Health changed for %s: %.2f -> %.2f"), *GetNameSafe(this), Data.OldValue, Data.NewValue);
+}
+
+void APRCharacter::HandleShieldChanged(const FOnAttributeChangeData& Data)
+{
+	UE_LOG(LogProjectA, Log, TEXT("Shield changed for %s: %.2f -> %.2f"), *GetNameSafe(this), Data.OldValue, Data.NewValue);
+}
+
+void APRCharacter::HandleEnergyChanged(const FOnAttributeChangeData& Data)
+{
+	UE_LOG(LogProjectA, Log, TEXT("Energy changed for %s: %.2f -> %.2f"), *GetNameSafe(this), Data.OldValue, Data.NewValue);
 }
 
 void APRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

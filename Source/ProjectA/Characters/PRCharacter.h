@@ -4,7 +4,13 @@
 #include "ProjectACharacter.h"
 #include "PRCharacter.generated.h"
 
+class APRPlayerState;
+class UPRAbilitySystemComponent;
+class UPRAttributeSet;
 class UTextRenderComponent;
+struct FOnAttributeChangeData;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPRAbilitySystemInitializedSignature, UPRAbilitySystemComponent*, AbilitySystemComponent);
 
 /**
  * Base playable avatar for ProjectRift.
@@ -22,14 +28,48 @@ public:
 
 	UTextRenderComponent* GetPlayerDebugLabel() const { return PlayerDebugLabel; }
 
+	UFUNCTION(BlueprintCallable, Category = "GAS")
+	bool InitializeAbilitySystemFromPlayerState(APRPlayerState* InPlayerState);
+
+	UFUNCTION(BlueprintPure, Category = "GAS")
+	UPRAbilitySystemComponent* GetProjectRiftAbilitySystemComponent() const { return AbilitySystemComponent.Get(); }
+
+	UFUNCTION(BlueprintPure, Category = "GAS")
+	UPRAttributeSet* GetAttributeSet() const { return AttributeSet.Get(); }
+
+	UFUNCTION(BlueprintPure, Category = "GAS")
+	bool IsAbilitySystemInitialized() const { return bAbilitySystemInitialized; }
+
+	UPROPERTY(BlueprintAssignable, Category = "GAS")
+	FPRAbilitySystemInitializedSignature OnAbilitySystemInitialized;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnRep_PlayerState() override;
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+	void BindAttributeChangeDelegates();
+	void ClearAttributeChangeDelegates();
+	void HandleHealthChanged(const FOnAttributeChangeData& Data);
+	void HandleShieldChanged(const FOnAttributeChangeData& Data);
+	void HandleEnergyChanged(const FOnAttributeChangeData& Data);
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "GAS")
+	TObjectPtr<UPRAbilitySystemComponent> AbilitySystemComponent;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "GAS")
+	TObjectPtr<UPRAttributeSet> AttributeSet;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "GAS")
+	bool bAbilitySystemInitialized;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Network|Debug")
 	UTextRenderComponent* PlayerDebugLabel;
+
+	FDelegateHandle HealthChangedDelegateHandle;
+	FDelegateHandle ShieldChangedDelegateHandle;
+	FDelegateHandle EnergyChangedDelegateHandle;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input|Actions")
 	UInputAction* InteractAction;
