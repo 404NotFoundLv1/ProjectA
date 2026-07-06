@@ -5,6 +5,7 @@
 #include "PRCharacter.generated.h"
 
 class APRPlayerState;
+class UGameplayAbility;
 class UGameplayEffect;
 class UPRAbilitySystemComponent;
 class UPRAttributeSet;
@@ -48,6 +49,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "GAS")
 	bool AreDefaultAttributesApplied() const { return bDefaultAttributesApplied; }
 
+	UFUNCTION(BlueprintCallable, Category = "GAS|Abilities")
+	bool GrantDefaultAbilities();
+
+	UFUNCTION(BlueprintPure, Category = "GAS|Abilities")
+	bool AreDefaultAbilitiesGranted() const { return bDefaultAbilitiesGranted; }
+
 	UPROPERTY(BlueprintAssignable, Category = "GAS")
 	FPRAbilitySystemInitializedSignature OnAbilitySystemInitialized;
 
@@ -84,8 +91,14 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "GAS")
 	bool bDefaultAttributesApplied;
 
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "GAS")
+	bool bDefaultAbilitiesGranted;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Defaults")
 	TSubclassOf<UGameplayEffect> DefaultAttributesEffectClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Abilities")
+	TArray<TSubclassOf<UGameplayAbility>> DefaultAbilityClasses;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Network|Debug")
 	UTextRenderComponent* PlayerDebugLabel;

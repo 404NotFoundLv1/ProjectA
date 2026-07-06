@@ -1,5 +1,7 @@
 #include "Characters/PRCharacter.h"
 
+#include "Abilities/GA_PrimaryAttack.h"
+#include "Abilities/GameplayAbility.h"
 #include "Abilities/PRAbilitySystemComponent.h"
 #include "Abilities/PRDefaultAttributesGameplayEffect.h"
 #include "Abilities/PRAttributeSet.h"
@@ -7,6 +9,7 @@
 #include "EnhancedInputComponent.h"
 #include "Engine/Engine.h"
 #include "GameFramework/PlayerState.h"
+#include "GameplayAbilitySpec.h"
 #include "InputAction.h"
 #include "Player/PRPlayerState.h"
 #include "ProjectA.h"
@@ -68,6 +71,7 @@ APRCharacter::APRCharacter()
 	bReplicates = true;
 	SetReplicateMovement(true);
 	DefaultAttributesEffectClass = UPRDefaultAttributesGameplayEffect::StaticClass();
+	DefaultAbilityClasses.Add(UGA_PrimaryAttack::StaticClass());
 
 	PlayerDebugLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("PlayerDebugLabel"));
 	PlayerDebugLabel->SetupAttachment(GetRootComponent());
@@ -214,6 +218,7 @@ bool APRCharacter::InitializeAbilitySystemFromPlayerState(APRPlayerState* InPlay
 	if (HasAuthority())
 	{
 		ApplyDefaultAttributes();
+		GrantDefaultAbilities();
 	}
 
 	BindAttributeChangeDelegates();
@@ -230,6 +235,54 @@ bool APRCharacter::InitializeAbilitySystemFromPlayerState(APRPlayerState* InPlay
 		NetRoleToText(GetLocalRole()));
 
 	return true;
+}
+
+bool APRCharacter::GrantDefaultAbilities()
+{
+	if (bDefaultAbilitiesGranted)
+	{
+		return true;
+	}
+
+	if (!HasAuthority())
+	{
+		return false;
+	}
+
+	if (!AbilitySystemComponent)
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Default abilities skipped for %s: ASC is missing."), *GetNameSafe(this));
+		return false;
+	}
+
+	bool bGrantedAnyAbility = false;
+	for (const TSubclassOf<UGameplayAbility> AbilityClass : DefaultAbilityClasses)
+	{
+		if (!AbilityClass)
+		{
+			continue;
+		}
+
+		if (AbilitySystemComponent->FindAbilitySpecFromClass(AbilityClass))
+		{
+			bGrantedAnyAbility = true;
+			continue;
+		}
+
+		FGameplayAbilitySpec AbilitySpec(AbilityClass, 1, INDEX_NONE, this);
+		AbilitySystemComponent->GiveAbility(AbilitySpec);
+		bGrantedAnyAbility = true;
+
+		UE_LOG(
+			LogProjectA,
+			Log,
+			TEXT("Granted default ability %s to %s."),
+			*GetNameSafe(AbilityClass),
+			*GetNameSafe(this));
+	}
+
+	bDefaultAbilitiesGranted = bGrantedAnyAbility;
+	return bDefaultAbilitiesGranted;
 }
 
 bool APRCharacter::ApplyDefaultAttributes()
@@ -419,6 +472,26 @@ void APRCharacter::DoInteract()
 void APRCharacter::DoPrimaryAttack()
 {
 	ShowInputDebugMessage(this, TEXT("PrimaryAttack"));
+
+	if (!AbilitySystemComponent)
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Primary attack skipped for %s: ASC is missing."), *GetNameSafe(this));
+		return;
+	}
+
+	if (DefaultAbilityClasses.IsEmpty() || !DefaultAbilityClasses[0])
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Primary attack skipped for %s: ability class is missing."), *GetNameSafe(this));
+		return;
+	}
+
+	const bool bActivated = AbilitySystemComponent->TryActivateAbilityByClass(DefaultAbilityClasses[0], true);
+	UE_LOG(
+		LogProjectA,
+		Log,
+		TEXT("Primary attack activation for %s: %s"),
+		*GetNameSafe(this),
+		bActivated ? TEXT("Activated") : TEXT("Rejected"));
 }
 
 void APRCharacter::DoDodge()
