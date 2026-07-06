@@ -266,6 +266,7 @@ bool APRCharacter::GrantDefaultAbilities()
 		return false;
 	}
 
+	const FGameplayTag PrimaryInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Primary"), false);
 	bool bGrantedAnyAbility = false;
 	for (const TSubclassOf<UGameplayAbility> AbilityClass : DefaultAbilityClasses)
 	{
@@ -274,15 +275,8 @@ bool APRCharacter::GrantDefaultAbilities()
 			continue;
 		}
 
-		if (AbilitySystemComponent->FindAbilitySpecFromClass(AbilityClass))
-		{
-			bGrantedAnyAbility = true;
-			continue;
-		}
-
-		FGameplayAbilitySpec AbilitySpec(AbilityClass, 1, INDEX_NONE, this);
-		AbilitySystemComponent->GiveAbility(AbilitySpec);
-		bGrantedAnyAbility = true;
+		const FGameplayTag InputTag = AbilityClass == UGA_PrimaryAttack::StaticClass() ? PrimaryInputTag : FGameplayTag();
+		bGrantedAnyAbility |= GrantAbilityIfMissing(AbilityClass, InputTag);
 
 		UE_LOG(
 			LogProjectA,
@@ -326,28 +320,41 @@ bool APRCharacter::GrantSelectedRoleModuleAbilities()
 		return false;
 	}
 
+	const FGameplayTag QInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.Q"), false);
+	const FGameplayTag EInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.E"), false);
+	const FGameplayTag RInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.R"), false);
+
 	bool bGrantedAllAbilities = true;
-	bGrantedAllAbilities &= GrantAbilityIfMissing(AssaultChargeAbilityClass);
-	bGrantedAllAbilities &= GrantAbilityIfMissing(AssaultBlastAbilityClass);
-	bGrantedAllAbilities &= GrantAbilityIfMissing(AssaultShieldAbilityClass);
+	bGrantedAllAbilities &= GrantAbilityIfMissing(AssaultChargeAbilityClass, QInputTag);
+	bGrantedAllAbilities &= GrantAbilityIfMissing(AssaultBlastAbilityClass, EInputTag);
+	bGrantedAllAbilities &= GrantAbilityIfMissing(AssaultShieldAbilityClass, RInputTag);
 
 	bRoleModuleAbilitiesGranted = bGrantedAllAbilities;
 	return bRoleModuleAbilitiesGranted;
 }
 
-bool APRCharacter::GrantAbilityIfMissing(const TSubclassOf<UGameplayAbility> AbilityClass)
+bool APRCharacter::GrantAbilityIfMissing(const TSubclassOf<UGameplayAbility> AbilityClass, const FGameplayTag InputTag)
 {
 	if (!HasAuthority() || !AbilitySystemComponent || !AbilityClass)
 	{
 		return false;
 	}
 
-	if (AbilitySystemComponent->FindAbilitySpecFromClass(AbilityClass))
+	if (FGameplayAbilitySpec* ExistingSpec = AbilitySystemComponent->FindAbilitySpecFromClass(AbilityClass))
 	{
+		if (InputTag.IsValid() && !ExistingSpec->GetDynamicSpecSourceTags().HasTagExact(InputTag))
+		{
+			ExistingSpec->GetDynamicSpecSourceTags().AddTag(InputTag);
+			AbilitySystemComponent->MarkAbilitySpecDirty(*ExistingSpec);
+		}
 		return true;
 	}
 
 	FGameplayAbilitySpec AbilitySpec(AbilityClass, 1, INDEX_NONE, this);
+	if (InputTag.IsValid())
+	{
+		AbilitySpec.GetDynamicSpecSourceTags().AddTag(InputTag);
+	}
 	AbilitySystemComponent->GiveAbility(AbilitySpec);
 
 	UE_LOG(
@@ -619,6 +626,8 @@ void APRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	if (PrimaryAttackAction)
 	{
 		EnhancedInputComponent->BindAction(PrimaryAttackAction, ETriggerEvent::Started, this, &APRCharacter::DoPrimaryAttack);
+		EnhancedInputComponent->BindAction(PrimaryAttackAction, ETriggerEvent::Completed, this, &APRCharacter::DoPrimaryAttackReleased);
+		EnhancedInputComponent->BindAction(PrimaryAttackAction, ETriggerEvent::Canceled, this, &APRCharacter::DoPrimaryAttackReleased);
 	}
 
 	if (DodgeAction)
@@ -629,16 +638,22 @@ void APRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	if (SkillQAction)
 	{
 		EnhancedInputComponent->BindAction(SkillQAction, ETriggerEvent::Started, this, &APRCharacter::DoSkillQ);
+		EnhancedInputComponent->BindAction(SkillQAction, ETriggerEvent::Completed, this, &APRCharacter::DoSkillQReleased);
+		EnhancedInputComponent->BindAction(SkillQAction, ETriggerEvent::Canceled, this, &APRCharacter::DoSkillQReleased);
 	}
 
 	if (SkillEAction)
 	{
 		EnhancedInputComponent->BindAction(SkillEAction, ETriggerEvent::Started, this, &APRCharacter::DoSkillE);
+		EnhancedInputComponent->BindAction(SkillEAction, ETriggerEvent::Completed, this, &APRCharacter::DoSkillEReleased);
+		EnhancedInputComponent->BindAction(SkillEAction, ETriggerEvent::Canceled, this, &APRCharacter::DoSkillEReleased);
 	}
 
 	if (SkillRAction)
 	{
 		EnhancedInputComponent->BindAction(SkillRAction, ETriggerEvent::Started, this, &APRCharacter::DoSkillR);
+		EnhancedInputComponent->BindAction(SkillRAction, ETriggerEvent::Completed, this, &APRCharacter::DoSkillRReleased);
+		EnhancedInputComponent->BindAction(SkillRAction, ETriggerEvent::Canceled, this, &APRCharacter::DoSkillRReleased);
 	}
 
 	if (OpenInventoryAction)
@@ -676,31 +691,14 @@ void APRCharacter::DoPrimaryAttack()
 {
 	ShowInputDebugMessage(this, TEXT("PrimaryAttack"));
 
-	if (IsDowned())
-	{
-		UE_LOG(LogProjectA, Log, TEXT("Primary attack rejected for %s: character is downed."), *GetNameSafe(this));
-		return;
-	}
+	const FGameplayTag PrimaryInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Primary"), false);
+	ActivateAbilityInputTag(PrimaryInputTag, TEXT("PrimaryAttack"));
+}
 
-	if (!AbilitySystemComponent)
-	{
-		UE_LOG(LogProjectA, Warning, TEXT("Primary attack skipped for %s: ASC is missing."), *GetNameSafe(this));
-		return;
-	}
-
-	if (DefaultAbilityClasses.IsEmpty() || !DefaultAbilityClasses[0])
-	{
-		UE_LOG(LogProjectA, Warning, TEXT("Primary attack skipped for %s: ability class is missing."), *GetNameSafe(this));
-		return;
-	}
-
-	const bool bActivated = AbilitySystemComponent->TryActivateAbilityByClass(DefaultAbilityClasses[0], true);
-	UE_LOG(
-		LogProjectA,
-		Log,
-		TEXT("Primary attack activation for %s: %s"),
-		*GetNameSafe(this),
-		bActivated ? TEXT("Activated") : TEXT("Rejected"));
+void APRCharacter::DoPrimaryAttackReleased()
+{
+	const FGameplayTag PrimaryInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Primary"), false);
+	ReleaseAbilityInputTag(PrimaryInputTag, TEXT("PrimaryAttack"));
 }
 
 void APRCharacter::DoDodge()
@@ -711,19 +709,40 @@ void APRCharacter::DoDodge()
 void APRCharacter::DoSkillQ()
 {
 	ShowInputDebugMessage(this, TEXT("Skill Q"));
-	TryActivateGrantedAbility(AssaultChargeAbilityClass, TEXT("Skill Q"));
+	const FGameplayTag QInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.Q"), false);
+	ActivateAbilityInputTag(QInputTag, TEXT("Skill Q"));
+}
+
+void APRCharacter::DoSkillQReleased()
+{
+	const FGameplayTag QInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.Q"), false);
+	ReleaseAbilityInputTag(QInputTag, TEXT("Skill Q"));
 }
 
 void APRCharacter::DoSkillE()
 {
 	ShowInputDebugMessage(this, TEXT("Skill E"));
-	TryActivateGrantedAbility(AssaultBlastAbilityClass, TEXT("Skill E"));
+	const FGameplayTag EInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.E"), false);
+	ActivateAbilityInputTag(EInputTag, TEXT("Skill E"));
+}
+
+void APRCharacter::DoSkillEReleased()
+{
+	const FGameplayTag EInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.E"), false);
+	ReleaseAbilityInputTag(EInputTag, TEXT("Skill E"));
 }
 
 void APRCharacter::DoSkillR()
 {
 	ShowInputDebugMessage(this, TEXT("Skill R"));
-	TryActivateGrantedAbility(AssaultShieldAbilityClass, TEXT("Skill R"));
+	const FGameplayTag RInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.R"), false);
+	ActivateAbilityInputTag(RInputTag, TEXT("Skill R"));
+}
+
+void APRCharacter::DoSkillRReleased()
+{
+	const FGameplayTag RInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.R"), false);
+	ReleaseAbilityInputTag(RInputTag, TEXT("Skill R"));
 }
 
 void APRCharacter::DoOpenInventory()
@@ -731,7 +750,7 @@ void APRCharacter::DoOpenInventory()
 	ShowInputDebugMessage(this, TEXT("OpenInventory"));
 }
 
-bool APRCharacter::TryActivateGrantedAbility(const TSubclassOf<UGameplayAbility> AbilityClass, const TCHAR* ActionName)
+bool APRCharacter::ActivateAbilityInputTag(const FGameplayTag InputTag, const TCHAR* ActionName)
 {
 	if (IsDowned())
 	{
@@ -745,9 +764,9 @@ bool APRCharacter::TryActivateGrantedAbility(const TSubclassOf<UGameplayAbility>
 		return false;
 	}
 
-	if (!AbilityClass)
+	if (!InputTag.IsValid())
 	{
-		UE_LOG(LogProjectA, Warning, TEXT("%s skipped for %s: ability class is missing."), ActionName, *GetNameSafe(this));
+		UE_LOG(LogProjectA, Warning, TEXT("%s skipped for %s: input tag is missing."), ActionName, *GetNameSafe(this));
 		return false;
 	}
 
@@ -756,7 +775,7 @@ bool APRCharacter::TryActivateGrantedAbility(const TSubclassOf<UGameplayAbility>
 		GrantSelectedRoleModuleAbilities();
 	}
 
-	const bool bActivated = AbilitySystemComponent->TryActivateAbilityByClass(AbilityClass, true);
+	const bool bActivated = AbilitySystemComponent->AbilityInputTagPressed(InputTag);
 	UE_LOG(
 		LogProjectA,
 		Log,
@@ -765,4 +784,27 @@ bool APRCharacter::TryActivateGrantedAbility(const TSubclassOf<UGameplayAbility>
 		*GetNameSafe(this),
 		bActivated ? TEXT("Activated") : TEXT("Rejected"));
 	return bActivated;
+}
+
+bool APRCharacter::ReleaseAbilityInputTag(const FGameplayTag InputTag, const TCHAR* ActionName)
+{
+	if (!AbilitySystemComponent)
+	{
+		return false;
+	}
+
+	if (!InputTag.IsValid())
+	{
+		return false;
+	}
+
+	const bool bReleased = AbilitySystemComponent->AbilityInputTagReleased(InputTag);
+	UE_LOG(
+		LogProjectA,
+		Log,
+		TEXT("%s release for %s: %s"),
+		ActionName,
+		*GetNameSafe(this),
+		bReleased ? TEXT("Handled") : TEXT("Ignored"));
+	return bReleased;
 }

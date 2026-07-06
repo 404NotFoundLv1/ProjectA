@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 #include "ProjectACharacter.h"
 #include "PRCharacter.generated.h"
 
@@ -102,8 +103,9 @@ protected:
 	void ScheduleAutoRespawn();
 	void HandleAutoRespawnTimer();
 	void ClearAutoRespawnTimer();
-	bool GrantAbilityIfMissing(TSubclassOf<UGameplayAbility> AbilityClass);
-	bool TryActivateGrantedAbility(TSubclassOf<UGameplayAbility> AbilityClass, const TCHAR* ActionName);
+	bool GrantAbilityIfMissing(TSubclassOf<UGameplayAbility> AbilityClass, FGameplayTag InputTag);
+	bool ActivateAbilityInputTag(FGameplayTag InputTag, const TCHAR* ActionName);
+	bool ReleaseAbilityInputTag(FGameplayTag InputTag, const TCHAR* ActionName);
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "GAS")
 	TObjectPtr<UPRAbilitySystemComponent> AbilitySystemComponent;
@@ -178,16 +180,28 @@ public:
 	void DoPrimaryAttack();
 
 	UFUNCTION(BlueprintCallable, Category = "Input")
+	void DoPrimaryAttackReleased();
+
+	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoDodge();
 
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoSkillQ();
 
 	UFUNCTION(BlueprintCallable, Category = "Input")
+	void DoSkillQReleased();
+
+	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoSkillE();
 
 	UFUNCTION(BlueprintCallable, Category = "Input")
+	void DoSkillEReleased();
+
+	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoSkillR();
+
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	void DoSkillRReleased();
 
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoOpenInventory();

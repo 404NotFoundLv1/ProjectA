@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystemComponent.h"
+#include "GameplayTagContainer.h"
 #include "PRAbilitySystemComponent.generated.h"
 
 /**
@@ -14,4 +15,13 @@ class PROJECTA_API UPRAbilitySystemComponent : public UAbilitySystemComponent
 
 public:
 	UPRAbilitySystemComponent();
+
+	UFUNCTION(BlueprintCallable, Category = "ProjectRift|GAS|Input")
+	bool AbilityInputTagPressed(FGameplayTag InputTag);
+
+	UFUNCTION(BlueprintCallable, Category = "ProjectRift|GAS|Input")
+	bool AbilityInputTagReleased(FGameplayTag InputTag);
+
+	UFUNCTION(BlueprintCallable, Category = "ProjectRift|GAS|Input")
+	bool TryActivateAbilityByInputTag(FGameplayTag InputTag);
 };
