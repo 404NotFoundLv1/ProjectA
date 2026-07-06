@@ -5,6 +5,7 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
 #include "AttributeSet.h"
+#include "Characters/PRCharacter.h"
 #include "Player/PRPlayerState.h"
 #include "UObject/UnrealType.h"
 
@@ -17,7 +18,12 @@ UClass* FindProjectRiftClass(const TCHAR* ClassPath)
 	return FindObject<UClass>(nullptr, ClassPath);
 }
 
-bool TestGameplayAttributeProperty(FAutomationTestBase& Test, UClass* AttributeSetClass, const TCHAR* PropertyName, const float ExpectedDefaultValue)
+bool TestGameplayAttributeProperty(
+	FAutomationTestBase& Test,
+	UClass* AttributeSetClass,
+	const TCHAR* PropertyName,
+	const TCHAR* RepNotifyFunctionName,
+	const float ExpectedDefaultValue)
 {
 	if (!AttributeSetClass)
 	{
@@ -33,6 +39,13 @@ bool TestGameplayAttributeProperty(FAutomationTestBase& Test, UClass* AttributeS
 	Test.TestTrue(
 		FString::Printf(TEXT("%s is replicated"), PropertyName),
 		AttributeProperty && AttributeProperty->HasAnyPropertyFlags(CPF_Net));
+	Test.TestEqual(
+		FString::Printf(TEXT("%s uses GAS RepNotify"), PropertyName),
+		AttributeProperty ? AttributeProperty->RepNotifyFunc : NAME_None,
+		FName(RepNotifyFunctionName));
+	Test.TestNotNull(
+		FString::Printf(TEXT("%s RepNotify function exists"), PropertyName),
+		AttributeSetClass->FindFunctionByName(FName(RepNotifyFunctionName)));
 
 	const UObject* AttributeDefaults = AttributeSetClass->GetDefaultObject();
 	const FGameplayAttributeData* AttributeData = AttributeProperty && AttributeDefaults
@@ -52,6 +65,17 @@ bool TestGameplayAttributeProperty(FAutomationTestBase& Test, UClass* AttributeS
 	}
 
 	return AttributeProperty && AttributeData;
+}
+
+bool TestBlueprintAssignableDelegate(FAutomationTestBase& Test, UClass* Class, const TCHAR* PropertyName)
+{
+	const FMulticastInlineDelegateProperty* DelegateProperty = FindFProperty<FMulticastInlineDelegateProperty>(Class, PropertyName);
+	Test.TestNotNull(FString::Printf(TEXT("%s delegate exists"), PropertyName), DelegateProperty);
+	Test.TestTrue(
+		FString::Printf(TEXT("%s is BlueprintAssignable"), PropertyName),
+		DelegateProperty && DelegateProperty->HasAnyPropertyFlags(CPF_BlueprintAssignable));
+
+	return DelegateProperty != nullptr;
 }
 }
 
@@ -100,17 +124,22 @@ bool FPRGASCoreTest::RunTest(const FString& Parameters)
 		TEXT("APRPlayerState owns the ProjectRift AttributeSet subclass"),
 		AttributeSet && AttributeSetClass && AttributeSet->IsA(AttributeSetClass));
 
-	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("Health"), 100.0f);
-	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("MaxHealth"), 100.0f);
-	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("Shield"), 50.0f);
-	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("MaxShield"), 50.0f);
-	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("Energy"), 100.0f);
-	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("MaxEnergy"), 100.0f);
-	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("AttackPower"), 10.0f);
-	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("MoveSpeed"), 600.0f);
-	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("CooldownReduction"), 0.0f);
-	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("HealingPower"), 0.0f);
-	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("PollutionResistance"), 0.0f);
+	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("Health"), TEXT("OnRep_Health"), 100.0f);
+	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("MaxHealth"), TEXT("OnRep_MaxHealth"), 100.0f);
+	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("Shield"), TEXT("OnRep_Shield"), 50.0f);
+	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("MaxShield"), TEXT("OnRep_MaxShield"), 50.0f);
+	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("Energy"), TEXT("OnRep_Energy"), 100.0f);
+	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("MaxEnergy"), TEXT("OnRep_MaxEnergy"), 100.0f);
+	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("AttackPower"), TEXT("OnRep_AttackPower"), 10.0f);
+	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("MoveSpeed"), TEXT("OnRep_MoveSpeed"), 600.0f);
+	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("CooldownReduction"), TEXT("OnRep_CooldownReduction"), 0.0f);
+	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("HealingPower"), TEXT("OnRep_HealingPower"), 0.0f);
+	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("PollutionResistance"), TEXT("OnRep_PollutionResistance"), 0.0f);
+
+	UClass* CharacterClass = APRCharacter::StaticClass();
+	TestBlueprintAssignableDelegate(*this, CharacterClass, TEXT("OnHealthChanged"));
+	TestBlueprintAssignableDelegate(*this, CharacterClass, TEXT("OnShieldChanged"));
+	TestBlueprintAssignableDelegate(*this, CharacterClass, TEXT("OnEnergyChanged"));
 
 	return true;
 }

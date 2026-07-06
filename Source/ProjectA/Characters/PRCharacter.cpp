@@ -330,16 +330,19 @@ void APRCharacter::ClearAttributeChangeDelegates()
 void APRCharacter::HandleHealthChanged(const FOnAttributeChangeData& Data)
 {
 	UE_LOG(LogProjectA, Log, TEXT("Health changed for %s: %.2f -> %.2f"), *GetNameSafe(this), Data.OldValue, Data.NewValue);
+	OnHealthChanged.Broadcast(Data.OldValue, Data.NewValue);
 }
 
 void APRCharacter::HandleShieldChanged(const FOnAttributeChangeData& Data)
 {
 	UE_LOG(LogProjectA, Log, TEXT("Shield changed for %s: %.2f -> %.2f"), *GetNameSafe(this), Data.OldValue, Data.NewValue);
+	OnShieldChanged.Broadcast(Data.OldValue, Data.NewValue);
 }
 
 void APRCharacter::HandleEnergyChanged(const FOnAttributeChangeData& Data)
 {
 	UE_LOG(LogProjectA, Log, TEXT("Energy changed for %s: %.2f -> %.2f"), *GetNameSafe(this), Data.OldValue, Data.NewValue);
+	OnEnergyChanged.Broadcast(Data.OldValue, Data.NewValue);
 }
 
 void APRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

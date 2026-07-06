@@ -12,6 +12,7 @@ class UTextRenderComponent;
 struct FOnAttributeChangeData;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPRAbilitySystemInitializedSignature, UPRAbilitySystemComponent*, AbilitySystemComponent);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPRAttributeChangedSignature, float, OldValue, float, NewValue);
 
 /**
  * Base playable avatar for ProjectRift.
@@ -49,6 +50,15 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "GAS")
 	FPRAbilitySystemInitializedSignature OnAbilitySystemInitialized;
+
+	UPROPERTY(BlueprintAssignable, Category = "GAS|Attributes")
+	FPRAttributeChangedSignature OnHealthChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "GAS|Attributes")
+	FPRAttributeChangedSignature OnShieldChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "GAS|Attributes")
+	FPRAttributeChangedSignature OnEnergyChanged;
 
 protected:
 	virtual void BeginPlay() override;
