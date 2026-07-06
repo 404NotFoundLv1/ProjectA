@@ -19,8 +19,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Lobby")
 	void ToggleReady();
 
+	UFUNCTION(BlueprintCallable, Category = "Lobby|Travel")
+	void StartRiftMission();
+
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Lobby")
 	void ServerSetReady(bool bReady);
+
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Lobby|Travel")
+	void ServerStartRiftMission();
 
 	UFUNCTION(BlueprintCallable, Category = "Lobby|Debug")
 	void RefreshLobbyReadyDebugDisplay();

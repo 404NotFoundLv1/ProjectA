@@ -1,6 +1,8 @@
 #include "Player/PRPlayerController.h"
 
+#include "Core/PRShipLobbyGameMode.h"
 #include "Engine/Engine.h"
+#include "Engine/World.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "InputCoreTypes.h"
@@ -81,6 +83,7 @@ void APRPlayerController::SetupInputComponent()
 	if (InputComponent)
 	{
 		InputComponent->BindKey(EKeys::P, IE_Pressed, this, &APRPlayerController::ToggleReady);
+		InputComponent->BindKey(EKeys::O, IE_Pressed, this, &APRPlayerController::StartRiftMission);
 	}
 }
 
@@ -90,6 +93,11 @@ void APRPlayerController::ToggleReady()
 	const bool bNewReadyState = ProjectRiftPlayerState ? !ProjectRiftPlayerState->IsReady() : true;
 
 	ServerSetReady(bNewReadyState);
+}
+
+void APRPlayerController::StartRiftMission()
+{
+	ServerStartRiftMission();
 }
 
 void APRPlayerController::ServerSetReady_Implementation(const bool bReady)
@@ -102,6 +110,19 @@ void APRPlayerController::ServerSetReady_Implementation(const bool bReady)
 	}
 
 	ProjectRiftPlayerState->SetReady(bReady);
+}
+
+void APRPlayerController::ServerStartRiftMission_Implementation()
+{
+	UWorld* World = GetWorld();
+	APRShipLobbyGameMode* LobbyGameMode = World ? Cast<APRShipLobbyGameMode>(World->GetAuthGameMode()) : nullptr;
+	if (!LobbyGameMode)
+	{
+		ClientMessage(TEXT("Rift mission can only be started from the ship lobby."));
+		return;
+	}
+
+	LobbyGameMode->StartRiftMission(this);
 }
 
 void APRPlayerController::RefreshLobbyReadyDebugDisplay()
@@ -119,6 +140,7 @@ void APRPlayerController::RefreshLobbyReadyDebugDisplay()
 	}
 
 	FString ReadyList = TEXT("Lobby Ready\n");
+	ReadyList += TEXT("P: Ready | Host O: Start Rift\n");
 	for (const APlayerState* ListedPlayerState : GameState->PlayerArray)
 	{
 		ReadyList += GetLobbyReadyLine(ListedPlayerState);
