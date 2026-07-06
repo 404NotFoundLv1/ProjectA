@@ -55,6 +55,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "GAS|Abilities")
 	bool AreDefaultAbilitiesGranted() const { return bDefaultAbilitiesGranted; }
 
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "GAS|Abilities")
+	bool GrantSelectedRoleModuleAbilities();
+
+	UFUNCTION(BlueprintPure, Category = "GAS|Abilities")
+	bool AreRoleModuleAbilitiesGranted() const { return bRoleModuleAbilitiesGranted; }
+
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Life State")
 	bool EnterDownedState();
 
@@ -96,6 +102,8 @@ protected:
 	void ScheduleAutoRespawn();
 	void HandleAutoRespawnTimer();
 	void ClearAutoRespawnTimer();
+	bool GrantAbilityIfMissing(TSubclassOf<UGameplayAbility> AbilityClass);
+	bool TryActivateGrantedAbility(TSubclassOf<UGameplayAbility> AbilityClass, const TCHAR* ActionName);
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "GAS")
 	TObjectPtr<UPRAbilitySystemComponent> AbilitySystemComponent;
@@ -112,11 +120,23 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "GAS")
 	bool bDefaultAbilitiesGranted;
 
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "GAS")
+	bool bRoleModuleAbilitiesGranted;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Defaults")
 	TSubclassOf<UGameplayEffect> DefaultAttributesEffectClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Abilities")
 	TArray<TSubclassOf<UGameplayAbility>> DefaultAbilityClasses;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Abilities|Assault")
+	TSubclassOf<UGameplayAbility> AssaultChargeAbilityClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Abilities|Assault")
+	TSubclassOf<UGameplayAbility> AssaultBlastAbilityClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Abilities|Assault")
+	TSubclassOf<UGameplayAbility> AssaultShieldAbilityClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Life State")
 	float AutoRespawnDelay;

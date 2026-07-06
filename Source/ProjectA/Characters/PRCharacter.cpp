@@ -1,5 +1,8 @@
 #include "Characters/PRCharacter.h"
 
+#include "Abilities/GA_AssaultBlast.h"
+#include "Abilities/GA_AssaultCharge.h"
+#include "Abilities/GA_AssaultShield.h"
 #include "Abilities/GA_PrimaryAttack.h"
 #include "Abilities/GameplayAbility.h"
 #include "Abilities/PRAbilitySystemComponent.h"
@@ -75,6 +78,9 @@ APRCharacter::APRCharacter()
 	SetReplicateMovement(true);
 	DefaultAttributesEffectClass = UPRDefaultAttributesGameplayEffect::StaticClass();
 	DefaultAbilityClasses.Add(UGA_PrimaryAttack::StaticClass());
+	AssaultChargeAbilityClass = UGA_AssaultCharge::StaticClass();
+	AssaultBlastAbilityClass = UGA_AssaultBlast::StaticClass();
+	AssaultShieldAbilityClass = UGA_AssaultShield::StaticClass();
 	AutoRespawnDelay = 5.0f;
 
 	PlayerDebugLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("PlayerDebugLabel"));
@@ -223,6 +229,7 @@ bool APRCharacter::InitializeAbilitySystemFromPlayerState(APRPlayerState* InPlay
 	{
 		ApplyDefaultAttributes();
 		GrantDefaultAbilities();
+		GrantSelectedRoleModuleAbilities();
 	}
 
 	BindAttributeChangeDelegates();
@@ -287,6 +294,69 @@ bool APRCharacter::GrantDefaultAbilities()
 
 	bDefaultAbilitiesGranted = bGrantedAnyAbility;
 	return bDefaultAbilitiesGranted;
+}
+
+bool APRCharacter::GrantSelectedRoleModuleAbilities()
+{
+	if (bRoleModuleAbilitiesGranted)
+	{
+		return true;
+	}
+
+	if (!HasAuthority())
+	{
+		return false;
+	}
+
+	if (!AbilitySystemComponent)
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Role module abilities skipped for %s: ASC is missing."), *GetNameSafe(this));
+		return false;
+	}
+
+	const APRPlayerState* ProjectRiftPlayerState = Cast<APRPlayerState>(GetPlayerState());
+	if (!ProjectRiftPlayerState)
+	{
+		return false;
+	}
+
+	const FName SelectedRoleModule = ProjectRiftPlayerState->GetSelectedRoleModule();
+	if (SelectedRoleModule != FName(TEXT("Ability.Role.Assault")) && SelectedRoleModule != FName(TEXT("Role.Assault")))
+	{
+		return false;
+	}
+
+	bool bGrantedAllAbilities = true;
+	bGrantedAllAbilities &= GrantAbilityIfMissing(AssaultChargeAbilityClass);
+	bGrantedAllAbilities &= GrantAbilityIfMissing(AssaultBlastAbilityClass);
+	bGrantedAllAbilities &= GrantAbilityIfMissing(AssaultShieldAbilityClass);
+
+	bRoleModuleAbilitiesGranted = bGrantedAllAbilities;
+	return bRoleModuleAbilitiesGranted;
+}
+
+bool APRCharacter::GrantAbilityIfMissing(const TSubclassOf<UGameplayAbility> AbilityClass)
+{
+	if (!HasAuthority() || !AbilitySystemComponent || !AbilityClass)
+	{
+		return false;
+	}
+
+	if (AbilitySystemComponent->FindAbilitySpecFromClass(AbilityClass))
+	{
+		return true;
+	}
+
+	FGameplayAbilitySpec AbilitySpec(AbilityClass, 1, INDEX_NONE, this);
+	AbilitySystemComponent->GiveAbility(AbilitySpec);
+
+	UE_LOG(
+		LogProjectA,
+		Log,
+		TEXT("Granted role module ability %s to %s."),
+		*GetNameSafe(AbilityClass),
+		*GetNameSafe(this));
+	return true;
 }
 
 bool APRCharacter::EnterDownedState()
@@ -641,19 +711,58 @@ void APRCharacter::DoDodge()
 void APRCharacter::DoSkillQ()
 {
 	ShowInputDebugMessage(this, TEXT("Skill Q"));
+	TryActivateGrantedAbility(AssaultChargeAbilityClass, TEXT("Skill Q"));
 }
 
 void APRCharacter::DoSkillE()
 {
 	ShowInputDebugMessage(this, TEXT("Skill E"));
+	TryActivateGrantedAbility(AssaultBlastAbilityClass, TEXT("Skill E"));
 }
 
 void APRCharacter::DoSkillR()
 {
 	ShowInputDebugMessage(this, TEXT("Skill R"));
+	TryActivateGrantedAbility(AssaultShieldAbilityClass, TEXT("Skill R"));
 }
 
 void APRCharacter::DoOpenInventory()
 {
 	ShowInputDebugMessage(this, TEXT("OpenInventory"));
+}
+
+bool APRCharacter::TryActivateGrantedAbility(const TSubclassOf<UGameplayAbility> AbilityClass, const TCHAR* ActionName)
+{
+	if (IsDowned())
+	{
+		UE_LOG(LogProjectA, Log, TEXT("%s rejected for %s: character is downed."), ActionName, *GetNameSafe(this));
+		return false;
+	}
+
+	if (!AbilitySystemComponent)
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("%s skipped for %s: ASC is missing."), ActionName, *GetNameSafe(this));
+		return false;
+	}
+
+	if (!AbilityClass)
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("%s skipped for %s: ability class is missing."), ActionName, *GetNameSafe(this));
+		return false;
+	}
+
+	if (!bRoleModuleAbilitiesGranted && HasAuthority())
+	{
+		GrantSelectedRoleModuleAbilities();
+	}
+
+	const bool bActivated = AbilitySystemComponent->TryActivateAbilityByClass(AbilityClass, true);
+	UE_LOG(
+		LogProjectA,
+		Log,
+		TEXT("%s activation for %s: %s"),
+		ActionName,
+		*GetNameSafe(this),
+		bActivated ? TEXT("Activated") : TEXT("Rejected"));
+	return bActivated;
 }
