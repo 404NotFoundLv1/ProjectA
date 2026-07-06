@@ -1,21 +1,34 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AbilitySystemInterface.h"
 #include "GameFramework/PlayerState.h"
 #include "PRPlayerState.generated.h"
+
+class UPRAbilitySystemComponent;
+class UPRAttributeSet;
+class UAbilitySystemComponent;
 
 /**
  * Player-owned replicated data that should survive pawn replacement.
  */
 UCLASS()
-class PROJECTA_API APRPlayerState : public APlayerState
+class PROJECTA_API APRPlayerState : public APlayerState, public IAbilitySystemInterface
 {
 	GENERATED_BODY()
 
 public:
 	APRPlayerState();
 
+	virtual void BeginPlay() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+
+	UFUNCTION(BlueprintPure, Category = "GAS")
+	UPRAbilitySystemComponent* GetProjectRiftAbilitySystemComponent() const { return AbilitySystemComponent.Get(); }
+
+	UFUNCTION(BlueprintPure, Category = "GAS")
+	UPRAttributeSet* GetAttributeSet() const { return AttributeSet.Get(); }
 
 	UFUNCTION(BlueprintPure, Category = "Lobby")
 	bool IsReady() const { return bIsReady; }
@@ -41,6 +54,12 @@ private:
 
 	UFUNCTION()
 	void OnRep_PlayerDisplayName();
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPRAbilitySystemComponent> AbilitySystemComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPRAttributeSet> AttributeSet;
 
 	UPROPERTY(ReplicatedUsing = OnRep_IsReady, VisibleInstanceOnly, BlueprintReadOnly, Category = "Lobby", meta = (AllowPrivateAccess = "true"))
 	bool bIsReady;

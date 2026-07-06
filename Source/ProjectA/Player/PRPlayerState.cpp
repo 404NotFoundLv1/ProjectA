@@ -1,5 +1,7 @@
 #include "Player/PRPlayerState.h"
 
+#include "Abilities/PRAbilitySystemComponent.h"
+#include "Abilities/PRAttributeSet.h"
 #include "Net/UnrealNetwork.h"
 #include "ProjectA.h"
 
@@ -8,6 +10,33 @@ APRPlayerState::APRPlayerState()
 	, SelectedRoleModule(NAME_None)
 	, PlayerDisplayName(TEXT("Player"))
 {
+	SetNetUpdateFrequency(100.0f);
+
+	AbilitySystemComponent = CreateDefaultSubobject<UPRAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
+	AttributeSet = CreateDefaultSubobject<UPRAttributeSet>(TEXT("AttributeSet"));
+}
+
+void APRPlayerState::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->InitAbilityActorInfo(this, this);
+	}
+
+	UE_LOG(
+		LogProjectA,
+		Log,
+		TEXT("ProjectRift GAS initialized for %s. ASC=%s AttributeSet=%s"),
+		*GetNameSafe(this),
+		*GetNameSafe(AbilitySystemComponent),
+		*GetNameSafe(AttributeSet));
+}
+
+UAbilitySystemComponent* APRPlayerState::GetAbilitySystemComponent() const
+{
+	return AbilitySystemComponent.Get();
 }
 
 void APRPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
