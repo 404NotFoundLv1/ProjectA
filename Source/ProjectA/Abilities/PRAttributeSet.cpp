@@ -1,5 +1,8 @@
 #include "Abilities/PRAttributeSet.h"
 
+#include "AbilitySystemComponent.h"
+#include "GameplayEffectExtension.h"
+#include "GameplayTagsManager.h"
 #include "Net/UnrealNetwork.h"
 
 UPRAttributeSet::UPRAttributeSet()
@@ -15,6 +18,7 @@ UPRAttributeSet::UPRAttributeSet()
 	InitCooldownReduction(0.0f);
 	InitHealingPower(0.0f);
 	InitPollutionResistance(0.0f);
+	InitDamage(0.0f);
 }
 
 void UPRAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -32,6 +36,63 @@ void UPRAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME_CONDITION_NOTIFY(UPRAttributeSet, CooldownReduction, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UPRAttributeSet, HealingPower, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UPRAttributeSet, PollutionResistance, COND_None, REPNOTIFY_Always);
+}
+
+void UPRAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
+{
+	Super::PreAttributeChange(Attribute, NewValue);
+
+	if (Attribute == GetHealthAttribute())
+	{
+		NewValue = FMath::Clamp(NewValue, 0.0f, GetMaxHealth());
+	}
+	else if (Attribute == GetShieldAttribute())
+	{
+		NewValue = FMath::Clamp(NewValue, 0.0f, GetMaxShield());
+	}
+}
+
+void UPRAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
+{
+	Super::PostGameplayEffectExecute(Data);
+
+	if (Data.EvaluatedData.Attribute == GetDamageAttribute())
+	{
+		const float LocalDamageDone = FMath::Max(GetDamage(), 0.0f);
+		SetDamage(0.0f);
+
+		if (LocalDamageDone <= 0.0f)
+		{
+			return;
+		}
+
+		const float OldShield = GetShield();
+		const float DamageAbsorbedByShield = FMath::Min(OldShield, LocalDamageDone);
+		const float DamageToHealth = LocalDamageDone - DamageAbsorbedByShield;
+
+		SetShield(FMath::Clamp(OldShield - DamageAbsorbedByShield, 0.0f, GetMaxShield()));
+		if (DamageToHealth > 0.0f)
+		{
+			SetHealth(FMath::Clamp(GetHealth() - DamageToHealth, 0.0f, GetMaxHealth()));
+		}
+
+		if (GetHealth() <= 0.0f)
+		{
+			const FGameplayTag DownedStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Downed"), false);
+			if (DownedStateTag.IsValid())
+			{
+				Data.Target.AddLooseGameplayTag(DownedStateTag);
+			}
+		}
+	}
+	else if (Data.EvaluatedData.Attribute == GetHealthAttribute())
+	{
+		SetHealth(FMath::Clamp(GetHealth(), 0.0f, GetMaxHealth()));
+	}
+	else if (Data.EvaluatedData.Attribute == GetShieldAttribute())
+	{
+		SetShield(FMath::Clamp(GetShield(), 0.0f, GetMaxShield()));
+	}
 }
 
 void UPRAttributeSet::OnRep_Health(const FGameplayAttributeData& OldHealth)

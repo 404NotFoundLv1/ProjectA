@@ -18,11 +18,13 @@ bool FPRGASSetupTest::RunTest(const FString& Parameters)
 	const FGameplayTag PrimaryInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Primary"), false);
 	const FGameplayTag AssaultRoleTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Ability.Role.Assault"), false);
 	const FGameplayTag DeadStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Dead"), false);
+	const FGameplayTag DamageDataTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Data.Damage"), false);
 	const FGameplayTag SkillQCooldownTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Cooldown.Skill.Q"), false);
 
 	TestTrue(TEXT("Input ability tags are configured"), PrimaryInputTag.IsValid());
 	TestTrue(TEXT("Role ability tags are configured"), AssaultRoleTag.IsValid());
 	TestTrue(TEXT("State tags are configured"), DeadStateTag.IsValid());
+	TestTrue(TEXT("Damage SetByCaller tag is configured"), DamageDataTag.IsValid());
 	TestTrue(TEXT("Cooldown tags are configured"), SkillQCooldownTag.IsValid());
 
 	return true;

@@ -23,6 +23,8 @@ public:
 	UPRAttributeSet();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
+	virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
 
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Health, Category = "Attributes|Vital")
 	FGameplayAttributeData Health;
@@ -67,6 +69,10 @@ public:
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_PollutionResistance, Category = "Attributes|Resistance")
 	FGameplayAttributeData PollutionResistance;
 	ATTRIBUTE_ACCESSORS(UPRAttributeSet, PollutionResistance)
+
+	UPROPERTY(BlueprintReadOnly, Category = "Attributes|Meta")
+	FGameplayAttributeData Damage;
+	ATTRIBUTE_ACCESSORS(UPRAttributeSet, Damage)
 
 protected:
 	UFUNCTION()

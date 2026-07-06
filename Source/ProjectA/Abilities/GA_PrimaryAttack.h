@@ -44,5 +44,8 @@ private:
 	float AttackRadius;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Primary Attack")
+	float DamageAmount;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Primary Attack")
 	TSubclassOf<UGameplayEffect> DamageEffectClass;
 };

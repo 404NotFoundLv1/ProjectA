@@ -46,7 +46,7 @@ bool FPRGASPrimaryAttackAbilityTest::RunTest(const FString& Parameters)
 {
 	UClass* GameplayAbilityBaseClass = FindProjectRiftClass(TEXT("/Script/ProjectA.PRGameplayAbility"));
 	UClass* PrimaryAttackAbilityClass = FindProjectRiftClass(TEXT("/Script/ProjectA.GA_PrimaryAttack"));
-	UClass* PrimaryAttackDamageEffectClass = FindProjectRiftClass(TEXT("/Script/ProjectA.PRPrimaryAttackDamageGameplayEffect"));
+	UClass* DamageEffectClass = FindProjectRiftClass(TEXT("/Script/ProjectA.PRDamageGameplayEffect"));
 
 	TestNotNull(TEXT("UPRGameplayAbility class exists"), GameplayAbilityBaseClass);
 	TestTrue(
@@ -56,10 +56,10 @@ bool FPRGASPrimaryAttackAbilityTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("UGA_PrimaryAttack derives from UPRGameplayAbility"),
 		PrimaryAttackAbilityClass && GameplayAbilityBaseClass && PrimaryAttackAbilityClass->IsChildOf(GameplayAbilityBaseClass));
-	TestNotNull(TEXT("Primary attack damage GameplayEffect exists"), PrimaryAttackDamageEffectClass);
+	TestNotNull(TEXT("GE_Damage GameplayEffect exists"), DamageEffectClass);
 	TestTrue(
-		TEXT("Primary attack damage derives from UGameplayEffect"),
-		PrimaryAttackDamageEffectClass && PrimaryAttackDamageEffectClass->IsChildOf(UGameplayEffect::StaticClass()));
+		TEXT("GE_Damage derives from UGameplayEffect"),
+		DamageEffectClass && DamageEffectClass->IsChildOf(UGameplayEffect::StaticClass()));
 
 	UClass* CharacterClass = APRCharacter::StaticClass();
 	TestNotNull(
@@ -119,8 +119,10 @@ bool FPRGASPrimaryAttackAbilityTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Attacker is granted primary attack ability"), PrimaryAttackSpec);
 
 	TargetAttributes->SetHealth(100.0f);
+	TargetAttributes->SetShield(50.0f);
 	Attacker->DoPrimaryAttack();
-	TestEqual(TEXT("Primary attack lowers target health"), TargetAttributes->GetHealth(), 90.0f);
+	TestEqual(TEXT("Primary attack lowers target shield first"), TargetAttributes->GetShield(), 40.0f);
+	TestEqual(TEXT("Primary attack leaves health while shield absorbs damage"), TargetAttributes->GetHealth(), 100.0f);
 
 	const FGameplayTag DeadStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Dead"), false);
 	TestTrue(TEXT("Dead state tag is configured"), DeadStateTag.IsValid());
@@ -128,8 +130,10 @@ bool FPRGASPrimaryAttackAbilityTest::RunTest(const FString& Parameters)
 	{
 		AttackerASC->AddLooseGameplayTag(DeadStateTag);
 		TargetAttributes->SetHealth(100.0f);
+		TargetAttributes->SetShield(50.0f);
 		Attacker->DoPrimaryAttack();
 		TestEqual(TEXT("Primary attack cannot activate while dead"), TargetAttributes->GetHealth(), 100.0f);
+		TestEqual(TEXT("Dead attacker does not damage shield"), TargetAttributes->GetShield(), 50.0f);
 		AttackerASC->RemoveLooseGameplayTag(DeadStateTag);
 	}
 

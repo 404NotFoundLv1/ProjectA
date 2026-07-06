@@ -1,7 +1,7 @@
 #include "Abilities/GA_PrimaryAttack.h"
 
+#include "Abilities/PRDamageGameplayEffect.h"
 #include "Abilities/PRAbilitySystemComponent.h"
-#include "Abilities/PRPrimaryAttackDamageGameplayEffect.h"
 #include "Characters/PRCharacter.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/OverlapResult.h"
@@ -14,7 +14,8 @@ UGA_PrimaryAttack::UGA_PrimaryAttack()
 {
 	AttackRange = 240.0f;
 	AttackRadius = 110.0f;
-	DamageEffectClass = UPRPrimaryAttackDamageGameplayEffect::StaticClass();
+	DamageAmount = 10.0f;
+	DamageEffectClass = UPRDamageGameplayEffect::StaticClass();
 
 	const FGameplayTag DeadStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Dead"), false);
 	if (DeadStateTag.IsValid())
@@ -130,6 +131,14 @@ bool UGA_PrimaryAttack::ExecuteServerAttack(
 			return false;
 		}
 
+		const FGameplayTag DamageTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Data.Damage"), false);
+		if (!DamageTag.IsValid())
+		{
+			UE_LOG(LogProjectA, Warning, TEXT("Primary attack skipped for %s: Data.Damage tag is missing."), *GetNameSafe(AvatarActor));
+			return false;
+		}
+
+		DamageSpecHandle.Data->SetSetByCallerMagnitude(DamageTag, DamageAmount);
 		SourceASC->ApplyGameplayEffectSpecToTarget(*DamageSpecHandle.Data.Get(), TargetASC);
 		UE_LOG(
 			LogProjectA,
