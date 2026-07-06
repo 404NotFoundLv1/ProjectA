@@ -109,7 +109,7 @@ bool FPRGASCoreTest::RunTest(const FString& Parameters)
 	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("AttackPower"), 10.0f);
 	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("MoveSpeed"), 600.0f);
 	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("CooldownReduction"), 0.0f);
-	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("HealingPower"), 1.0f);
+	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("HealingPower"), 0.0f);
 	TestGameplayAttributeProperty(*this, AttributeSetClass, TEXT("PollutionResistance"), 0.0f);
 
 	return true;

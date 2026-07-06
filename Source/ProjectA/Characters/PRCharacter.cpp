@@ -1,6 +1,7 @@
 #include "Characters/PRCharacter.h"
 
 #include "Abilities/PRAbilitySystemComponent.h"
+#include "Abilities/PRDefaultAttributesGameplayEffect.h"
 #include "Abilities/PRAttributeSet.h"
 #include "Components/TextRenderComponent.h"
 #include "EnhancedInputComponent.h"
@@ -66,6 +67,7 @@ APRCharacter::APRCharacter()
 {
 	bReplicates = true;
 	SetReplicateMovement(true);
+	DefaultAttributesEffectClass = UPRDefaultAttributesGameplayEffect::StaticClass();
 
 	PlayerDebugLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("PlayerDebugLabel"));
 	PlayerDebugLabel->SetupAttachment(GetRootComponent());
@@ -209,6 +211,11 @@ bool APRCharacter::InitializeAbilitySystemFromPlayerState(APRPlayerState* InPlay
 	AttributeSet = NewAttributeSet;
 	AbilitySystemComponent->InitAbilityActorInfo(InPlayerState, this);
 
+	if (HasAuthority())
+	{
+		ApplyDefaultAttributes();
+	}
+
 	BindAttributeChangeDelegates();
 	bAbilitySystemInitialized = true;
 	OnAbilitySystemInitialized.Broadcast(AbilitySystemComponent);
@@ -221,6 +228,46 @@ bool APRCharacter::InitializeAbilitySystemFromPlayerState(APRPlayerState* InPlay
 		*GetNameSafe(AbilitySystemComponent->GetOwnerActor()),
 		*GetNameSafe(AbilitySystemComponent->GetAvatarActor()),
 		NetRoleToText(GetLocalRole()));
+
+	return true;
+}
+
+bool APRCharacter::ApplyDefaultAttributes()
+{
+	if (bDefaultAttributesApplied)
+	{
+		return true;
+	}
+
+	if (!HasAuthority())
+	{
+		return false;
+	}
+
+	if (!AbilitySystemComponent)
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Default attributes skipped for %s: ASC is missing."), *GetNameSafe(this));
+		return false;
+	}
+
+	if (!DefaultAttributesEffectClass)
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Default attributes skipped for %s: GE class is missing."), *GetNameSafe(this));
+		return false;
+	}
+
+	const UGameplayEffect* DefaultAttributesEffect = DefaultAttributesEffectClass->GetDefaultObject<UGameplayEffect>();
+	FGameplayEffectContextHandle EffectContext = AbilitySystemComponent->MakeEffectContext();
+	EffectContext.AddSourceObject(this);
+	AbilitySystemComponent->ApplyGameplayEffectToSelf(DefaultAttributesEffect, 1.0f, EffectContext);
+	bDefaultAttributesApplied = true;
+
+	UE_LOG(
+		LogProjectA,
+		Log,
+		TEXT("Default attributes applied for %s using %s."),
+		*GetNameSafe(this),
+		*GetNameSafe(DefaultAttributesEffect));
 
 	return true;
 }

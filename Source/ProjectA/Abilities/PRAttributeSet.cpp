@@ -13,7 +13,7 @@ UPRAttributeSet::UPRAttributeSet()
 	InitAttackPower(10.0f);
 	InitMoveSpeed(600.0f);
 	InitCooldownReduction(0.0f);
-	InitHealingPower(1.0f);
+	InitHealingPower(0.0f);
 	InitPollutionResistance(0.0f);
 }
 

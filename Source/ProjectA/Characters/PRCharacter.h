@@ -5,6 +5,7 @@
 #include "PRCharacter.generated.h"
 
 class APRPlayerState;
+class UGameplayEffect;
 class UPRAbilitySystemComponent;
 class UPRAttributeSet;
 class UTextRenderComponent;
@@ -40,6 +41,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "GAS")
 	bool IsAbilitySystemInitialized() const { return bAbilitySystemInitialized; }
 
+	UFUNCTION(BlueprintCallable, Category = "GAS")
+	bool ApplyDefaultAttributes();
+
+	UFUNCTION(BlueprintPure, Category = "GAS")
+	bool AreDefaultAttributesApplied() const { return bDefaultAttributesApplied; }
+
 	UPROPERTY(BlueprintAssignable, Category = "GAS")
 	FPRAbilitySystemInitializedSignature OnAbilitySystemInitialized;
 
@@ -63,6 +70,12 @@ protected:
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "GAS")
 	bool bAbilitySystemInitialized;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "GAS")
+	bool bDefaultAttributesApplied;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Defaults")
+	TSubclassOf<UGameplayEffect> DefaultAttributesEffectClass;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Network|Debug")
 	UTextRenderComponent* PlayerDebugLabel;
