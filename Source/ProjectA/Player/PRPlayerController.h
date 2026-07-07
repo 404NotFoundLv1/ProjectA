@@ -9,6 +9,7 @@
 class UPRGASDebugWidget;
 class UPRInventoryComponent;
 class UPRInventoryWidget;
+class UPRLootTableDataAsset;
 class UGameplayEffect;
 class APRPickupActor;
 
@@ -56,6 +57,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Drop", meta = (ClampMin = "1"))
 	void DropInventoryItem(FName ItemId, int32 Count = 1);
 
+	UFUNCTION(BlueprintCallable, Category = "Loot|Debug")
+	void SpawnTestLoot();
+
 	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
 	bool IsInventoryVisible() const;
 
@@ -85,11 +89,15 @@ public:
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Inventory|Drop")
 	void ServerDropInventoryItem(FName ItemId, int32 Count);
 
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Loot|Debug")
+	void ServerSpawnTestLoot();
+
 	UFUNCTION(BlueprintCallable, Category = "Lobby|Debug")
 	void RefreshLobbyReadyDebugDisplay();
 
 	bool TryUseInventoryItemOnServer(FName ItemId);
 	bool TryDropInventoryItemOnServer(FName ItemId, int32 Count);
+	APRPickupActor* TrySpawnTestLootOnServer(float RollOverride = -1.0f);
 
 protected:
 	virtual void BeginPlay() override;
@@ -145,6 +153,9 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory|Drop")
 	float DropHeightOffset = 20.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Loot|Debug")
+	TObjectPtr<UPRLootTableDataAsset> TestLootTable;
 
 	FTimerHandle LobbyReadyDebugTimerHandle;
 };

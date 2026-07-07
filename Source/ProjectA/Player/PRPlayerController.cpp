@@ -15,6 +15,8 @@
 #include "InputCoreTypes.h"
 #include "InputMappingContext.h"
 #include "Items/PRInventoryComponent.h"
+#include "Items/PRLootTableDataAsset.h"
+#include "Items/PRLootTableLibrary.h"
 #include "Items/PRPickupActor.h"
 #include "Player/PRPlayerState.h"
 #include "ProjectA.h"
@@ -265,6 +267,17 @@ void APRPlayerController::DropInventoryItem(const FName ItemId, const int32 Coun
 	ServerDropInventoryItem(ItemId, Count);
 }
 
+void APRPlayerController::SpawnTestLoot()
+{
+	if (HasAuthority())
+	{
+		TrySpawnTestLootOnServer();
+		return;
+	}
+
+	ServerSpawnTestLoot();
+}
+
 APRPickupActor* APRPlayerController::FindBestPickupCandidate() const
 {
 	const APawn* ControlledPawn = GetPawn();
@@ -431,6 +444,11 @@ void APRPlayerController::ServerDropInventoryItem_Implementation(const FName Ite
 	TryDropInventoryItemOnServer(ItemId, Count);
 }
 
+void APRPlayerController::ServerSpawnTestLoot_Implementation()
+{
+	TrySpawnTestLootOnServer();
+}
+
 bool APRPlayerController::TryUseInventoryItemOnServer(const FName ItemId)
 {
 	if (!HasAuthority())
@@ -543,6 +561,72 @@ bool APRPlayerController::TryDropInventoryItemOnServer(const FName ItemId, const
 		InventoryComponent->GetItemCount(ItemId));
 
 	return true;
+}
+
+APRPickupActor* APRPlayerController::TrySpawnTestLootOnServer(const float RollOverride)
+{
+	if (!HasAuthority())
+	{
+		ServerSpawnTestLoot();
+		return nullptr;
+	}
+
+	APawn* ControlledPawn = GetPawn();
+	if (!ControlledPawn)
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Test loot spawn failed for %s: pawn is missing."), *GetNameSafe(this));
+		return nullptr;
+	}
+
+	UPRLootTableDataAsset* LootTableToUse = TestLootTable;
+	if (!LootTableToUse)
+	{
+		LootTableToUse = NewObject<UPRLootTableDataAsset>(this);
+	}
+
+	if (!LootTableToUse || !LootTableToUse->IsValidLootTable())
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Test loot spawn failed for %s: loot table is invalid."), *GetNameSafe(this));
+		return nullptr;
+	}
+
+	FVector Forward = ControlledPawn->GetActorForwardVector();
+	Forward.Z = 0.0f;
+	if (!Forward.Normalize())
+	{
+		Forward = FVector::ForwardVector;
+	}
+
+	const FVector LootSpawnLocation = ControlledPawn->GetActorLocation()
+		+ Forward * FMath::Max(0.0f, DropForwardDistance)
+		+ FVector(0.0f, 0.0f, DropHeightOffset);
+
+	TSubclassOf<APRPickupActor> ResolvedPickupActorClass = PickupActorClass;
+	if (!ResolvedPickupActorClass)
+	{
+		ResolvedPickupActorClass = APRPickupActor::StaticClass();
+	}
+
+	APRPickupActor* LootPickup = UPRLootTableLibrary::SpawnLootPickupFromTable(
+		this,
+		LootTableToUse,
+		ResolvedPickupActorClass,
+		LootSpawnLocation,
+		FRotator::ZeroRotator,
+		RollOverride);
+
+	if (LootPickup)
+	{
+		UE_LOG(
+			LogProjectA,
+			Log,
+			TEXT("Test loot spawned. Controller=%s Pickup=%s ItemId=%s"),
+			*GetNameSafe(this),
+			*GetNameSafe(LootPickup),
+			*LootPickup->GetItemInstance().ItemId.ToString());
+	}
+
+	return LootPickup;
 }
 
 void APRPlayerController::RefreshLobbyReadyDebugDisplay()
