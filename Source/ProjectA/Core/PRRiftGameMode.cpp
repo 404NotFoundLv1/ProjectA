@@ -1,6 +1,9 @@
 #include "Core/PRRiftGameMode.h"
 
+#include "Core/PRSpawnManager.h"
 #include "Core/PRRiftObjectiveActor.h"
+#include "EngineUtils.h"
+#include "Engine/World.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerController.h"
@@ -65,6 +68,7 @@ bool APRRiftGameMode::StartRiftMission()
 
 	bRiftMissionStarted = true;
 	ActiveObjective = nullptr;
+	StopSpawnManagers();
 	RiftGameState->SetCurrentObjectiveState(EPRRiftObjectiveState::NotStarted);
 	RiftGameState->SetObjectiveProgress(0.0f);
 	RiftGameState->SetRiftStability(InitialRiftStability);
@@ -88,6 +92,7 @@ void APRRiftGameMode::CompleteCurrentObjective()
 
 	if (APRRiftGameState* RiftGameState = GetRiftGameState())
 	{
+		StopSpawnManagers();
 		RiftGameState->SetObjectiveProgress(1.0f);
 		RiftGameState->SetCurrentObjectiveState(EPRRiftObjectiveState::Completed);
 		OpenExtraction();
@@ -128,6 +133,7 @@ void APRRiftGameMode::HandleObjectiveActivated(APRRiftObjectiveActor* ObjectiveA
 	}
 
 	ActiveObjective = ObjectiveActor;
+	StartSpawnManagersForObjective(ObjectiveActor);
 
 	if (APRRiftGameState* RiftGameState = GetRiftGameState())
 	{
@@ -167,7 +173,53 @@ void APRRiftGameMode::HandleObjectiveCompleted(APRRiftObjectiveActor* ObjectiveA
 	}
 
 	ActiveObjective = ObjectiveActor;
+	StopSpawnManagers();
 	CompleteCurrentObjective();
+}
+
+bool APRRiftGameMode::StartSpawnManagersForObjective(APRRiftObjectiveActor* ObjectiveActor)
+{
+	if (!HasAuthority())
+	{
+		return false;
+	}
+
+	DiscoverSpawnManagers();
+	if (SpawnManagers.IsEmpty())
+	{
+		if (APRSpawnManager* FallbackSpawnManager = CreateFallbackSpawnManager(ObjectiveActor))
+		{
+			SpawnManagers.Add(FallbackSpawnManager);
+		}
+	}
+
+	bool bStartedAny = false;
+	for (const TObjectPtr<APRSpawnManager>& SpawnManager : SpawnManagers)
+	{
+		if (SpawnManager && SpawnManager->StartSpawningForObjective(ObjectiveActor))
+		{
+			bStartedAny = true;
+		}
+	}
+
+	return bStartedAny;
+}
+
+void APRRiftGameMode::StopSpawnManagers()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	DiscoverSpawnManagers();
+	for (const TObjectPtr<APRSpawnManager>& SpawnManager : SpawnManagers)
+	{
+		if (SpawnManager)
+		{
+			SpawnManager->StopSpawning();
+		}
+	}
 }
 
 APRRiftGameState* APRRiftGameMode::GetRiftGameState() const
@@ -193,4 +245,43 @@ int32 APRRiftGameMode::CountAlivePlayers() const
 	}
 
 	return AliveCount;
+}
+
+void APRRiftGameMode::DiscoverSpawnManagers()
+{
+	SpawnManagers.Reset();
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	for (TActorIterator<APRSpawnManager> SpawnManagerIt(World); SpawnManagerIt; ++SpawnManagerIt)
+	{
+		if (APRSpawnManager* SpawnManager = *SpawnManagerIt)
+		{
+			SpawnManagers.Add(SpawnManager);
+		}
+	}
+}
+
+APRSpawnManager* APRRiftGameMode::CreateFallbackSpawnManager(APRRiftObjectiveActor* ObjectiveActor)
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return nullptr;
+	}
+
+	const FVector SpawnLocation = ObjectiveActor ? ObjectiveActor->GetActorLocation() : FVector::ZeroVector;
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = this;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	return World->SpawnActor<APRSpawnManager>(
+		APRSpawnManager::StaticClass(),
+		SpawnLocation,
+		FRotator::ZeroRotator,
+		SpawnParameters);
 }

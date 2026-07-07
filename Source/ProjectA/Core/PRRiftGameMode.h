@@ -6,6 +6,7 @@
 #include "PRRiftGameMode.generated.h"
 
 class APRRiftObjectiveActor;
+class APRSpawnManager;
 
 /**
  * Server-authoritative rule set for rift missions.
@@ -44,6 +45,12 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Objective")
 	void HandleObjectiveCompleted(APRRiftObjectiveActor* ObjectiveActor);
 
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Spawning")
+	bool StartSpawnManagersForObjective(APRRiftObjectiveActor* ObjectiveActor);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Spawning")
+	void StopSpawnManagers();
+
 	UFUNCTION(BlueprintPure, Category = "Rift|Mission")
 	bool HasRiftMissionStarted() const { return bRiftMissionStarted; }
 
@@ -58,8 +65,14 @@ protected:
 	float InitialRiftStability = 100.0f;
 
 private:
+	void DiscoverSpawnManagers();
+	APRSpawnManager* CreateFallbackSpawnManager(APRRiftObjectiveActor* ObjectiveActor);
+
 	UPROPERTY(Transient)
 	TObjectPtr<APRRiftObjectiveActor> ActiveObjective;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<APRSpawnManager>> SpawnManagers;
 
 	bool bRiftMissionStarted = false;
 };
