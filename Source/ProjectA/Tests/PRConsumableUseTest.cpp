@@ -8,11 +8,13 @@
 #include "Characters/PRCharacter.h"
 #include "GameplayEffect.h"
 #include "Items/PRInventoryComponent.h"
+#include "Items/PRItemDataAsset.h"
 #include "Player/PRPlayerController.h"
 #include "Player/PRPlayerState.h"
 #include "Tests/AutomationCommon.h"
 #include "UI/PRInventoryWidget.h"
 #include "UObject/StrongObjectPtr.h"
+#include "UObject/StructOnScope.h"
 #include "UObject/UnrealType.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPRConsumableUseTest, "ProjectRift.Items.ConsumableUse", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -25,6 +27,38 @@ FPRItemInstance MakeConsumableUseTestItem(const FName ItemId, const int32 Count)
 	Item.ItemId = ItemId;
 	Item.Count = Count;
 	return Item;
+}
+
+bool SetConsumableUseTestItemDataAssets(FAutomationTestBase& Test, UPRInventoryComponent* Inventory, const TArray<UPRItemDataAsset*>& ItemDataAssets)
+{
+	UFunction* Function = Inventory ? Inventory->FindFunction(TEXT("SetItemDataAssets")) : nullptr;
+	Test.TestNotNull(TEXT("Inventory exposes SetItemDataAssets for consumable data"), Function);
+	if (!Inventory || !Function)
+	{
+		return false;
+	}
+
+	FStructOnScope Params(Function);
+	void* ParamsMemory = Params.GetStructMemory();
+
+	FArrayProperty* AssetsProperty = FindFProperty<FArrayProperty>(Function, TEXT("InItemDataAssets"));
+	FObjectProperty* InnerObjectProperty = AssetsProperty ? CastField<FObjectProperty>(AssetsProperty->Inner) : nullptr;
+	Test.TestNotNull(TEXT("SetItemDataAssets accepts consumable item data array"), AssetsProperty);
+	Test.TestNotNull(TEXT("SetItemDataAssets consumable array stores objects"), InnerObjectProperty);
+	if (!AssetsProperty || !InnerObjectProperty)
+	{
+		return false;
+	}
+
+	FScriptArrayHelper AssetsHelper(AssetsProperty, AssetsProperty->ContainerPtrToValuePtr<void>(ParamsMemory));
+	for (UPRItemDataAsset* ItemDataAsset : ItemDataAssets)
+	{
+		const int32 NewIndex = AssetsHelper.AddValue();
+		InnerObjectProperty->SetObjectPropertyValue(AssetsHelper.GetRawPtr(NewIndex), ItemDataAsset);
+	}
+
+	Inventory->ProcessEvent(Function, ParamsMemory);
+	return true;
 }
 
 struct FConsumableUseTestPlayer
@@ -141,6 +175,28 @@ bool FPRConsumableUseTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Downed character cannot use consumables"), TestPlayer.Controller->TryUseInventoryItemOnServer(TEXT("HealthInjector")));
 	TestEqual(TEXT("Downed rejected use keeps item count"), TestPlayer.Inventory->GetItemCount(TEXT("HealthInjector")), 2);
 	TestEqual(TEXT("Downed rejected use keeps Health unchanged"), TestPlayer.Attributes->GetHealth(), 20.0f);
+
+	TestTrue(TEXT("Character can respawn for data-driven consumable test"), TestPlayer.Character->RespawnFromDowned());
+	UPRItemDataAsset* CustomHealthInjectorData = NewObject<UPRItemDataAsset>(GetTransientPackage());
+	TestNotNull(TEXT("Can create custom consumable item data"), CustomHealthInjectorData);
+	if (!CustomHealthInjectorData)
+	{
+		return false;
+	}
+
+	CustomHealthInjectorData->ItemId = TEXT("CustomHealthInjector");
+	CustomHealthInjectorData->DisplayName = FText::FromString(TEXT("Custom Health Injector"));
+	CustomHealthInjectorData->ItemType = EPRItemType::Consumable;
+	CustomHealthInjectorData->MaxStackCount = 5;
+	CustomHealthInjectorData->bCanUse = true;
+	CustomHealthInjectorData->UseEffect = UPRHealthConsumableGameplayEffect::StaticClass();
+	TestTrue(TEXT("Can register data-driven consumable item data"), SetConsumableUseTestItemDataAssets(*this, TestPlayer.Inventory, { CustomHealthInjectorData }));
+
+	TestPlayer.Attributes->SetHealth(30.0f);
+	TestTrue(TEXT("Can seed custom data-driven consumable"), TestPlayer.Inventory->AddItem(MakeConsumableUseTestItem(TEXT("CustomHealthInjector"), 1)));
+	TestTrue(TEXT("Custom consumable uses its ItemData UseEffect"), TestPlayer.Controller->TryUseInventoryItemOnServer(TEXT("CustomHealthInjector")));
+	TestTrue(TEXT("Custom consumable increases Health through GameplayEffect"), TestPlayer.Attributes->GetHealth() > 30.0f);
+	TestEqual(TEXT("Custom consumable consumes one item"), TestPlayer.Inventory->GetItemCount(TEXT("CustomHealthInjector")), 0);
 
 	return true;
 }

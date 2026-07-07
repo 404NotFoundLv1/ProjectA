@@ -16,6 +16,7 @@
 #include "GameplayAbilitySpec.h"
 #include "GameplayTagsManager.h"
 #include "InputAction.h"
+#include "Player/PRPlayerController.h"
 #include "Player/PRPlayerState.h"
 #include "ProjectA.h"
 #include "TimerManager.h"
@@ -685,6 +686,11 @@ void APRCharacter::RefreshPlayerDebugLabel()
 void APRCharacter::DoInteract()
 {
 	ShowInputDebugMessage(this, TEXT("Interact"));
+
+	if (APRPlayerController* ProjectRiftController = Cast<APRPlayerController>(GetController()))
+	{
+		ProjectRiftController->TryPickup();
+	}
 }
 
 void APRCharacter::DoPrimaryAttack()
@@ -748,6 +754,11 @@ void APRCharacter::DoSkillRReleased()
 void APRCharacter::DoOpenInventory()
 {
 	ShowInputDebugMessage(this, TEXT("OpenInventory"));
+
+	if (APRPlayerController* ProjectRiftController = Cast<APRPlayerController>(GetController()))
+	{
+		ProjectRiftController->ToggleInventory();
+	}
 }
 
 bool APRCharacter::ActivateAbilityInputTag(const FGameplayTag InputTag, const TCHAR* ActionName)

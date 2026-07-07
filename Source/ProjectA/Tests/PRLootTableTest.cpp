@@ -68,6 +68,10 @@ bool FPRLootTableTest::RunTest(const FString& Parameters)
 
 	UClass* LootTableLibraryClass = UPRLootTableLibrary::StaticClass();
 	TestNotNull(TEXT("Loot table library exposes SpawnLootPickupFromTable"), LootTableLibraryClass->FindFunctionByName(TEXT("SpawnLootPickupFromTable")));
+	UFunction* SpawnLootFunction = LootTableLibraryClass->FindFunctionByName(TEXT("SpawnLootPickupFromTable"));
+	TestTrue(
+		TEXT("Loot table pickup spawning is marked BlueprintAuthorityOnly"),
+		SpawnLootFunction && SpawnLootFunction->HasAnyFunctionFlags(FUNC_BlueprintAuthorityOnly));
 
 	UClass* PlayerControllerClass = APRPlayerController::StaticClass();
 	TestNotNull(TEXT("Player controller exposes SpawnTestLoot"), PlayerControllerClass->FindFunctionByName(TEXT("SpawnTestLoot")));

@@ -2,7 +2,15 @@
 
 #include "Misc/AutomationTest.h"
 #include "Characters/PRCharacter.h"
+#include "Engine/Engine.h"
+#include "Engine/World.h"
+#include "Engine/LocalPlayer.h"
+#include "Items/PRInventoryComponent.h"
+#include "Items/PRPickupActor.h"
 #include "InputAction.h"
+#include "Player/PRPlayerController.h"
+#include "Player/PRPlayerState.h"
+#include "Tests/AutomationCommon.h"
 #include "UObject/UnrealType.h"
 
 namespace
@@ -11,6 +19,14 @@ bool HasInputActionProperty(UClass* Class, const FName PropertyName)
 {
 	const FObjectPropertyBase* Property = FindFProperty<FObjectPropertyBase>(Class, PropertyName);
 	return Property && Property->PropertyClass && Property->PropertyClass->IsChildOf(UInputAction::StaticClass());
+}
+
+FPRItemInstance MakeEnhancedInputTestItem(const FName ItemId, const int32 Count = 1)
+{
+	FPRItemInstance Item;
+	Item.ItemId = ItemId;
+	Item.Count = Count;
+	return Item;
 }
 }
 
@@ -35,6 +51,52 @@ bool FPREnhancedInputBindingsTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("DoSkillE input handler exists"), CharacterClass->FindFunctionByName(TEXT("DoSkillE")));
 	TestNotNull(TEXT("DoSkillR input handler exists"), CharacterClass->FindFunctionByName(TEXT("DoSkillR")));
 	TestNotNull(TEXT("DoOpenInventory input handler exists"), CharacterClass->FindFunctionByName(TEXT("DoOpenInventory")));
+
+	FTestWorldWrapper WorldWrapper;
+	TestTrue(TEXT("Enhanced input test world is created"), WorldWrapper.CreateTestWorld(EWorldType::Game));
+	UWorld* World = WorldWrapper.GetTestWorld();
+	if (!World)
+	{
+		return false;
+	}
+
+	TestTrue(TEXT("Enhanced input test world begins play"), WorldWrapper.BeginPlayInTestWorld());
+	if (WorldWrapper.HasFailed())
+	{
+		WorldWrapper.ForwardErrorMessages(this);
+		return false;
+	}
+
+	APRPlayerController* PlayerController = World->SpawnActor<APRPlayerController>();
+	APRPlayerState* PlayerState = World->SpawnActor<APRPlayerState>();
+	APRCharacter* Character = World->SpawnActor<APRCharacter>(FVector::ZeroVector, FRotator::ZeroRotator);
+	APRPickupActor* Pickup = World->SpawnActor<APRPickupActor>(FVector(80.0f, 0.0f, 0.0f), FRotator::ZeroRotator);
+	TestNotNull(TEXT("Can spawn input test player controller"), PlayerController);
+	TestNotNull(TEXT("Can spawn input test player state"), PlayerState);
+	TestNotNull(TEXT("Can spawn input test character"), Character);
+	TestNotNull(TEXT("Can spawn input test pickup"), Pickup);
+	if (!PlayerController || !PlayerState || !Character || !Pickup)
+	{
+		return false;
+	}
+
+	PlayerController->SetPlayerState(PlayerState);
+	PlayerController->SetPlayer(NewObject<ULocalPlayer>(GEngine));
+	PlayerController->Possess(Character);
+	Pickup->SetItemInstance(MakeEnhancedInputTestItem(TEXT("EnergyCrystal"), 1));
+
+	UPRInventoryComponent* Inventory = PlayerState->GetInventoryComponent();
+	TestNotNull(TEXT("Input test player owns inventory"), Inventory);
+	if (!Inventory)
+	{
+		return false;
+	}
+
+	Character->DoInteract();
+	TestEqual(TEXT("IA_Interact handler picks up nearby item through player controller"), Inventory->GetItemCount(TEXT("EnergyCrystal")), 1);
+
+	Character->DoOpenInventory();
+	TestTrue(TEXT("IA_OpenInventory handler toggles the player inventory UI"), PlayerController->IsInventoryVisible());
 
 	return true;
 }

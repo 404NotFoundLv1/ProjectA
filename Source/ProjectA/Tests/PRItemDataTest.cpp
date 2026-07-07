@@ -208,6 +208,14 @@ bool FPRItemDataTest::RunTest(const FString& Parameters)
 		TEXT("Material"),
 		99,
 		false);
+	TestItemDataAsset(
+		*this,
+		ItemDataClass,
+		TEXT("/Game/ProjectRift/Items/DA_CommonChip.DA_CommonChip"),
+		TEXT("CommonChip"),
+		TEXT("Material"),
+		99,
+		false);
 
 	return true;
 }

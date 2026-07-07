@@ -7,7 +7,9 @@
 
 class SScrollBox;
 class STextBlock;
+class UPRItemDataAsset;
 class UPRInventoryComponent;
+class UTexture2D;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPRInventoryItemUseRequestedSignature, FName, ItemId);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPRInventoryItemDropRequestedSignature, FName, ItemId, int32, Count);
@@ -47,6 +49,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
 	FText GetItemDisplayName(const FPRItemInstance& Item) const;
+
+	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
+	UTexture2D* GetItemIcon(const FPRItemInstance& Item) const;
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
 	FText GetItemRarityText(EPRItemRarity Rarity) const;
@@ -89,6 +94,7 @@ private:
 	FReply HandleDropSelectedClicked();
 	void RebuildItemList();
 	void RefreshSelectedItemDetails();
+	UPRItemDataAsset* FindItemData(const FPRItemInstance& Item) const;
 	FString BuildItemSummary(const FPRItemInstance& Item) const;
 	FText BuildSelectedItemDetails() const;
 

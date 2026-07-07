@@ -13,7 +13,7 @@ class PROJECTA_API UPRLootTableLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintCallable, Category = "Loot", meta = (WorldContext = "WorldContextObject"))
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Loot", meta = (WorldContext = "WorldContextObject"))
 	static APRPickupActor* SpawnLootPickupFromTable(
 		UObject* WorldContextObject,
 		const UPRLootTableDataAsset* LootTable,

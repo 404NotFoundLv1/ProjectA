@@ -27,6 +27,12 @@ APRPickupActor* UPRLootTableLibrary::SpawnLootPickupFromTable(
 		return nullptr;
 	}
 
+	if (World->GetNetMode() == NM_Client)
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Loot table spawn rejected on client world. Table=%s"), *GetNameSafe(LootTable));
+		return nullptr;
+	}
+
 	if (!PickupActorClass)
 	{
 		PickupActorClass = APRPickupActor::StaticClass();

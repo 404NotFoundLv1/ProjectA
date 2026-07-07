@@ -2,7 +2,9 @@
 
 #include "Fonts/SlateFontInfo.h"
 #include "Items/PRInventoryComponent.h"
+#include "Items/PRItemDataAsset.h"
 #include "Styling/CoreStyle.h"
+#include "Engine/Texture2D.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SScrollBox.h"
@@ -64,12 +66,26 @@ FPRItemInstance UPRInventoryWidget::GetSelectedItem() const
 
 FText UPRInventoryWidget::GetItemDisplayName(const FPRItemInstance& Item) const
 {
+	if (const UPRItemDataAsset* ItemData = FindItemData(Item))
+	{
+		if (!ItemData->DisplayName.IsEmpty())
+		{
+			return ItemData->DisplayName;
+		}
+	}
+
 	if (Item.ItemId.IsNone())
 	{
 		return FText::FromString(TEXT("Unknown Item"));
 	}
 
 	return FText::FromString(FName::NameToDisplayString(Item.ItemId.ToString(), false));
+}
+
+UTexture2D* UPRInventoryWidget::GetItemIcon(const FPRItemInstance& Item) const
+{
+	const UPRItemDataAsset* ItemData = FindItemData(Item);
+	return ItemData ? ItemData->Icon : nullptr;
 }
 
 FText UPRInventoryWidget::GetItemRarityText(const EPRItemRarity Rarity) const
@@ -116,6 +132,14 @@ FText UPRInventoryWidget::GetItemTooltipText(const FPRItemInstance& Item) const
 	Lines.Add(FString::Printf(TEXT("Count: %d"), Item.Count));
 	Lines.Add(FString::Printf(TEXT("Level: %d"), Item.Level));
 	Lines.Add(FString::Printf(TEXT("Durability: %.0f%%"), FMath::Clamp(Item.Durability, 0.0f, 1.0f) * 100.0f));
+
+	if (const UPRItemDataAsset* ItemData = FindItemData(Item))
+	{
+		if (!ItemData->Description.IsEmpty())
+		{
+			Lines.Add(ItemData->Description.ToString());
+		}
+	}
 
 	if (!Item.Affixes.IsEmpty())
 	{
@@ -339,6 +363,12 @@ void UPRInventoryWidget::RefreshSelectedItemDetails()
 	{
 		DetailTextBlock->SetText(BuildSelectedItemDetails());
 	}
+}
+
+UPRItemDataAsset* UPRInventoryWidget::FindItemData(const FPRItemInstance& Item) const
+{
+	const UPRInventoryComponent* InventoryComponent = BoundInventory.Get();
+	return InventoryComponent ? InventoryComponent->FindItemData(Item.ItemId) : nullptr;
 }
 
 FString UPRInventoryWidget::BuildItemSummary(const FPRItemInstance& Item) const

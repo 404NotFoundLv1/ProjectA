@@ -3,6 +3,8 @@
 #include "Misc/AutomationTest.h"
 
 #include "Components/ActorComponent.h"
+#include "Items/PRInventoryComponent.h"
+#include "Items/PRItemDataAsset.h"
 #include "Net/Serialization/FastArraySerializer.h"
 #include "Net/UnrealNetwork.h"
 #include "Player/PRPlayerState.h"
@@ -43,6 +45,83 @@ void SetIntProperty(UObject* Object, const TCHAR* PropertyName, const int32 Valu
 	{
 		Property->SetPropertyValue_InContainer(Object, Value);
 	}
+}
+
+FPRItemInstance MakeInventoryComponentTestItem(
+	const FName ItemId,
+	const int32 Count,
+	const int32 Level = 1,
+	const EPRItemRarity Rarity = EPRItemRarity::Common,
+	const float Durability = 1.0f,
+	const TArray<FName>& Affixes = TArray<FName>())
+{
+	FPRItemInstance Item;
+	Item.ItemId = ItemId;
+	Item.Count = Count;
+	Item.Level = Level;
+	Item.Rarity = Rarity;
+	Item.Durability = Durability;
+	Item.Affixes = Affixes;
+	return Item;
+}
+
+bool CallSetItemDataAssets(FAutomationTestBase& Test, UObject* Inventory, const TArray<UPRItemDataAsset*>& ItemDataAssets)
+{
+	UFunction* Function = Inventory ? Inventory->FindFunction(TEXT("SetItemDataAssets")) : nullptr;
+	Test.TestNotNull(TEXT("SetItemDataAssets function exists"), Function);
+	if (!Inventory || !Function)
+	{
+		return false;
+	}
+
+	FStructOnScope Params(Function);
+	void* ParamsMemory = Params.GetStructMemory();
+
+	FArrayProperty* AssetsProperty = FindFProperty<FArrayProperty>(Function, TEXT("InItemDataAssets"));
+	FObjectProperty* InnerObjectProperty = AssetsProperty ? CastField<FObjectProperty>(AssetsProperty->Inner) : nullptr;
+	Test.TestNotNull(TEXT("SetItemDataAssets accepts an item data asset array"), AssetsProperty);
+	Test.TestNotNull(TEXT("SetItemDataAssets array stores item data objects"), InnerObjectProperty);
+	if (!AssetsProperty || !InnerObjectProperty)
+	{
+		return false;
+	}
+
+	FScriptArrayHelper AssetsHelper(AssetsProperty, AssetsProperty->ContainerPtrToValuePtr<void>(ParamsMemory));
+	for (UPRItemDataAsset* ItemDataAsset : ItemDataAssets)
+	{
+		const int32 NewIndex = AssetsHelper.AddValue();
+		InnerObjectProperty->SetObjectPropertyValue(AssetsHelper.GetRawPtr(NewIndex), ItemDataAsset);
+	}
+
+	Inventory->ProcessEvent(Function, ParamsMemory);
+	return true;
+}
+
+int32 CallGetMaxStackCount(FAutomationTestBase& Test, UObject* Inventory, const FName ItemId)
+{
+	UFunction* Function = Inventory ? Inventory->FindFunction(TEXT("GetMaxStackCount")) : nullptr;
+	Test.TestNotNull(TEXT("GetMaxStackCount function exists"), Function);
+	if (!Inventory || !Function)
+	{
+		return INDEX_NONE;
+	}
+
+	FStructOnScope Params(Function);
+	void* ParamsMemory = Params.GetStructMemory();
+
+	FNameProperty* ItemIdProperty = FindFProperty<FNameProperty>(Function, TEXT("ItemId"));
+	Test.TestNotNull(TEXT("GetMaxStackCount accepts an ItemId"), ItemIdProperty);
+	if (!ItemIdProperty)
+	{
+		return INDEX_NONE;
+	}
+
+	ItemIdProperty->SetPropertyValue_InContainer(ParamsMemory, ItemId);
+	Inventory->ProcessEvent(Function, ParamsMemory);
+
+	FIntProperty* ReturnProperty = FindFProperty<FIntProperty>(Function, TEXT("ReturnValue"));
+	Test.TestNotNull(TEXT("GetMaxStackCount returns int32"), ReturnProperty);
+	return ReturnProperty ? ReturnProperty->GetPropertyValue_InContainer(ParamsMemory) : INDEX_NONE;
 }
 
 bool CallItemFunction(FAutomationTestBase& Test, UObject* Inventory, const TCHAR* FunctionName, const FName ItemId, const int32 Count)
@@ -195,6 +274,9 @@ bool FPRInventoryComponentTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("UseItem function exists"), InventoryComponentClass->FindFunctionByName(TEXT("UseItem")));
 	TestNotNull(TEXT("GetItemCount function exists"), InventoryComponentClass->FindFunctionByName(TEXT("GetItemCount")));
 	TestNotNull(TEXT("GetInventoryItems function exists for UI/debug"), InventoryComponentClass->FindFunctionByName(TEXT("GetInventoryItems")));
+	TestNotNull(TEXT("SetItemDataAssets function exists for data-driven stacking"), InventoryComponentClass->FindFunctionByName(TEXT("SetItemDataAssets")));
+	TestNotNull(TEXT("FindItemData function exists for UI and consumables"), InventoryComponentClass->FindFunctionByName(TEXT("FindItemData")));
+	TestNotNull(TEXT("GetMaxStackCount function exists for data-driven stacking"), InventoryComponentClass->FindFunctionByName(TEXT("GetMaxStackCount")));
 	TestNotNull(TEXT("Inventory exposes MaxSlots"), FindFProperty<FIntProperty>(InventoryComponentClass, TEXT("MaxSlots")));
 
 	UScriptStruct* InventoryEntryStruct = FindObject<UScriptStruct>(nullptr, TEXT("/Script/ProjectA.PRInventoryEntry"));
@@ -282,6 +364,42 @@ bool FPRInventoryComponentTest::RunTest(const FString& Parameters)
 		&& CallUseItem(*this, Inventory, TEXT("ShieldPack")));
 	TestEqual(TEXT("UseItem removes consumed item"), CallGetItemCount(*this, Inventory, TEXT("ShieldPack")), 0);
 	TestFalse(TEXT("UseItem fails when item is missing"), CallUseItem(*this, Inventory, TEXT("ShieldPack")));
+
+	UPRInventoryComponent* TypedInventory = NewObject<UPRInventoryComponent>(GetTransientPackage());
+	TestNotNull(TEXT("Can instantiate typed inventory component"), TypedInventory);
+	if (!TypedInventory)
+	{
+		return false;
+	}
+
+	SetIntProperty(TypedInventory, TEXT("MaxSlots"), 2);
+	TestTrue(
+		TEXT("Can add first affixed item instance"),
+		TypedInventory->AddItem(MakeInventoryComponentTestItem(TEXT("ModdedChip"), 1, 1, EPRItemRarity::Rare, 1.0f, { TEXT("Burning") })));
+	TestTrue(
+		TEXT("Can add same ItemId with different affix as a separate instance"),
+		TypedInventory->AddItem(MakeInventoryComponentTestItem(TEXT("ModdedChip"), 1, 1, EPRItemRarity::Rare, 1.0f, { TEXT("Freezing") })));
+	TestEqual(TEXT("Different item instance data does not collapse into one stack"), TypedInventory->GetInventoryItems().Num(), 2);
+	TestEqual(TEXT("GetItemCount sums all same-ItemId stacks"), TypedInventory->GetItemCount(TEXT("ModdedChip")), 2);
+
+	UPRItemDataAsset* HealthInjectorData = NewObject<UPRItemDataAsset>(GetTransientPackage());
+	HealthInjectorData->ItemId = TEXT("HealthInjector");
+	HealthInjectorData->MaxStackCount = 5;
+
+	UPRInventoryComponent* StackLimitInventory = NewObject<UPRInventoryComponent>(GetTransientPackage());
+	TestNotNull(TEXT("Can instantiate stack limit inventory component"), StackLimitInventory);
+	if (!StackLimitInventory)
+	{
+		return false;
+	}
+
+	SetIntProperty(StackLimitInventory, TEXT("MaxSlots"), 2);
+	TestTrue(TEXT("Can register item data assets on inventory"), CallSetItemDataAssets(*this, StackLimitInventory, { HealthInjectorData }));
+	TestEqual(TEXT("Inventory resolves data-driven max stack count"), CallGetMaxStackCount(*this, StackLimitInventory, TEXT("HealthInjector")), 5);
+	TestTrue(TEXT("Can add more than one stack worth of stackable items"), StackLimitInventory->AddItem(MakeInventoryComponentTestItem(TEXT("HealthInjector"), 7)));
+	TestEqual(TEXT("Stack-limited add keeps total count"), StackLimitInventory->GetItemCount(TEXT("HealthInjector")), 7);
+	TestEqual(TEXT("Stack-limited add splits across slots"), StackLimitInventory->GetInventoryItems().Num(), 2);
+	TestFalse(TEXT("Inventory rejects stackable add that cannot fully fit"), StackLimitInventory->CanAddItem(MakeInventoryComponentTestItem(TEXT("HealthInjector"), 4)));
 
 	return true;
 }

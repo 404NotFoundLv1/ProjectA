@@ -15,6 +15,7 @@
 #include "InputCoreTypes.h"
 #include "InputMappingContext.h"
 #include "Items/PRInventoryComponent.h"
+#include "Items/PRItemDataAsset.h"
 #include "Items/PRLootTableDataAsset.h"
 #include "Items/PRLootTableLibrary.h"
 #include "Items/PRPickupActor.h"
@@ -732,6 +733,14 @@ UPRInventoryComponent* APRPlayerController::GetLocalInventoryComponent() const
 
 TSubclassOf<UGameplayEffect> APRPlayerController::ResolveConsumableEffectClass(const FName ItemId) const
 {
+	const APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	const UPRInventoryComponent* InventoryComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetInventoryComponent() : nullptr;
+	const UPRItemDataAsset* ItemData = InventoryComponent ? InventoryComponent->FindItemData(ItemId) : nullptr;
+	if (ItemData && ItemData->bCanUse && ItemData->UseEffect)
+	{
+		return ItemData->UseEffect;
+	}
+
 	if (ItemId == HealthInjectorItemId)
 	{
 		return HealthInjectorEffectClass;
@@ -801,19 +810,20 @@ bool APRPlayerController::CanUseInventoryItemOnServer(const FName ItemId, FStrin
 		return Reject(TEXT("ability system component is missing"));
 	}
 
-	if (!ResolveConsumableEffectClass(ItemId))
+	const TSubclassOf<UGameplayEffect> ConsumableEffectClass = ResolveConsumableEffectClass(ItemId);
+	if (!ConsumableEffectClass)
 	{
 		return Reject(TEXT("item is not a supported consumable"));
 	}
 
-	if (ItemId == HealthInjectorItemId)
+	if (ItemId == HealthInjectorItemId || ConsumableEffectClass->IsChildOf(UPRHealthConsumableGameplayEffect::StaticClass()))
 	{
 		if (AttributeSet->GetHealth() >= AttributeSet->GetMaxHealth())
 		{
 			return Reject(TEXT("health is already full"));
 		}
 	}
-	else if (ItemId == ShieldPackItemId)
+	else if (ItemId == ShieldPackItemId || ConsumableEffectClass->IsChildOf(UPRShieldConsumableGameplayEffect::StaticClass()))
 	{
 		if (AttributeSet->GetShield() >= AttributeSet->GetMaxShield())
 		{

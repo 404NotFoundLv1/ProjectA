@@ -4,9 +4,11 @@
 
 #include "Blueprint/UserWidget.h"
 #include "Items/PRInventoryComponent.h"
+#include "Items/PRItemDataAsset.h"
 #include "Items/PRItemTypes.h"
 #include "Player/PRPlayerController.h"
 #include "UI/PRInventoryWidget.h"
+#include "UObject/StructOnScope.h"
 #include "UObject/UnrealType.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPRInventoryUITest, "ProjectRift.UI.Inventory", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -20,6 +22,38 @@ FPRItemInstance MakeInventoryUITestItem(const FName ItemId, const int32 Count, c
 	Item.Count = Count;
 	Item.Rarity = Rarity;
 	return Item;
+}
+
+bool SetInventoryUITestItemDataAssets(FAutomationTestBase& Test, UPRInventoryComponent* Inventory, const TArray<UPRItemDataAsset*>& ItemDataAssets)
+{
+	UFunction* Function = Inventory ? Inventory->FindFunction(TEXT("SetItemDataAssets")) : nullptr;
+	Test.TestNotNull(TEXT("Inventory exposes SetItemDataAssets for UI display data"), Function);
+	if (!Inventory || !Function)
+	{
+		return false;
+	}
+
+	FStructOnScope Params(Function);
+	void* ParamsMemory = Params.GetStructMemory();
+
+	FArrayProperty* AssetsProperty = FindFProperty<FArrayProperty>(Function, TEXT("InItemDataAssets"));
+	FObjectProperty* InnerObjectProperty = AssetsProperty ? CastField<FObjectProperty>(AssetsProperty->Inner) : nullptr;
+	Test.TestNotNull(TEXT("SetItemDataAssets accepts UI item data array"), AssetsProperty);
+	Test.TestNotNull(TEXT("SetItemDataAssets UI item data array stores objects"), InnerObjectProperty);
+	if (!AssetsProperty || !InnerObjectProperty)
+	{
+		return false;
+	}
+
+	FScriptArrayHelper AssetsHelper(AssetsProperty, AssetsProperty->ContainerPtrToValuePtr<void>(ParamsMemory));
+	for (UPRItemDataAsset* ItemDataAsset : ItemDataAssets)
+	{
+		const int32 NewIndex = AssetsHelper.AddValue();
+		InnerObjectProperty->SetObjectPropertyValue(AssetsHelper.GetRawPtr(NewIndex), ItemDataAsset);
+	}
+
+	Inventory->ProcessEvent(Function, ParamsMemory);
+	return true;
 }
 }
 
@@ -36,6 +70,7 @@ bool FPRInventoryUITest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Inventory widget exposes GetDisplayedItems"), InventoryWidgetClass->FindFunctionByName(TEXT("GetDisplayedItems")));
 	TestNotNull(TEXT("Inventory widget exposes GetBoundInventory"), InventoryWidgetClass->FindFunctionByName(TEXT("GetBoundInventory")));
 	TestNotNull(TEXT("Inventory widget exposes IsInventoryEmpty"), InventoryWidgetClass->FindFunctionByName(TEXT("IsInventoryEmpty")));
+	TestNotNull(TEXT("Inventory widget exposes GetItemIcon"), InventoryWidgetClass->FindFunctionByName(TEXT("GetItemIcon")));
 
 	UClass* PlayerControllerClass = APRPlayerController::StaticClass();
 	TestNotNull(TEXT("APRPlayerController class exists for inventory UI"), PlayerControllerClass);
@@ -83,6 +118,36 @@ bool FPRInventoryUITest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Cleared widget displays empty inventory"), Widget->IsInventoryEmpty());
 	TestTrue(TEXT("Original inventory can still change after widget unbinds"), Inventory->AddItem(MakeInventoryUITestItem(TEXT("ShieldPack"), 1)));
 	TestEqual(TEXT("Unbound widget is not updated by old inventory"), Widget->GetDisplayedItems().Num(), 0);
+
+	UPRInventoryComponent* DataInventory = NewObject<UPRInventoryComponent>(GetTransientPackage());
+	UPRInventoryWidget* DataWidget = NewObject<UPRInventoryWidget>(GetTransientPackage(), InventoryWidgetClass);
+	UPRItemDataAsset* HealthInjectorData = NewObject<UPRItemDataAsset>(GetTransientPackage());
+	TestNotNull(TEXT("Can instantiate data-driven UI inventory"), DataInventory);
+	TestNotNull(TEXT("Can instantiate data-driven UI widget"), DataWidget);
+	TestNotNull(TEXT("Can instantiate UI item data"), HealthInjectorData);
+	if (!DataInventory || !DataWidget || !HealthInjectorData)
+	{
+		return false;
+	}
+
+	HealthInjectorData->ItemId = TEXT("HealthInjector");
+	HealthInjectorData->DisplayName = FText::FromString(TEXT("Field Medic Injector"));
+	HealthInjectorData->Description = FText::FromString(TEXT("Restores health during early inventory tests."));
+	TestTrue(TEXT("Can register UI item data"), SetInventoryUITestItemDataAssets(*this, DataInventory, { HealthInjectorData }));
+	DataWidget->BindInventory(DataInventory);
+	TestTrue(TEXT("Can add data-backed UI test item"), DataInventory->AddItem(MakeInventoryUITestItem(TEXT("HealthInjector"), 1)));
+	const TArray<FPRItemInstance> DataDisplayedItems = DataWidget->GetDisplayedItems();
+	TestEqual(TEXT("Data-backed UI inventory displays one item"), DataDisplayedItems.Num(), 1);
+	if (DataDisplayedItems.Num() == 1)
+	{
+		TestEqual(
+			TEXT("Inventory UI uses item data display name instead of raw ItemId"),
+			DataWidget->GetItemDisplayName(DataDisplayedItems[0]).ToString(),
+			FString(TEXT("Field Medic Injector")));
+		TestTrue(
+			TEXT("Inventory UI tooltip includes item data description"),
+			DataWidget->GetItemTooltipText(DataDisplayedItems[0]).ToString().Contains(TEXT("Restores health")));
+	}
 
 	return true;
 }

@@ -7,6 +7,7 @@
 #include "PRInventoryComponent.generated.h"
 
 class UPRInventoryComponent;
+class UPRItemDataAsset;
 struct FPRInventoryList;
 
 USTRUCT(BlueprintType)
@@ -90,19 +91,33 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	int32 GetItemCount(FName ItemId) const;
 
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Data")
+	void SetItemDataAssets(const TArray<UPRItemDataAsset*>& InItemDataAssets);
+
+	UFUNCTION(BlueprintPure, Category = "Inventory|Data")
+	UPRItemDataAsset* FindItemData(FName ItemId) const;
+
+	UFUNCTION(BlueprintPure, Category = "Inventory|Data")
+	int32 GetMaxStackCount(FName ItemId) const;
+
 private:
 	friend struct FPRInventoryList;
 
 	int32 FindItemIndex(FName ItemId) const;
+	int32 FindStackableEntryIndex(const FPRItemInstance& Item) const;
 	void HandleInventoryListChanged();
 	void NotifyInventoryChanged();
 	void RefreshCachedItems();
+	static bool CanStackItemInstances(const FPRItemInstance& ExistingItem, const FPRItemInstance& IncomingItem);
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory", meta = (AllowPrivateAccess = "true", ClampMin = "1"))
 	int32 MaxSlots;
 
 	UPROPERTY(Replicated)
 	FPRInventoryList InventoryList;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|Data", meta = (AllowPrivateAccess = "true"))
+	TArray<TObjectPtr<UPRItemDataAsset>> ItemDataAssets;
 
 	UPROPERTY(Transient)
 	TArray<FPRItemInstance> CachedItems;
