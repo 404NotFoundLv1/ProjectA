@@ -110,6 +110,8 @@ private:
 	void DestroyGASDebugHUD();
 	void CreateInventoryUI();
 	void DestroyInventoryUI();
+	void ApplyInventoryInputMode();
+	void RestoreInventoryInputMode();
 	UPRInventoryComponent* GetLocalInventoryComponent() const;
 	TSubclassOf<UGameplayEffect> ResolveConsumableEffectClass(FName ItemId) const;
 	bool CanUseInventoryItemOnServer(FName ItemId, FString* OutFailureReason = nullptr) const;
@@ -138,6 +140,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPRInventoryWidget> InventoryWidget;
+
+	bool bInventoryInputModeActive = false;
+	bool bSavedMouseCursorVisibilityForInventory = false;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory|Use")
 	TSubclassOf<UGameplayEffect> HealthInjectorEffectClass;

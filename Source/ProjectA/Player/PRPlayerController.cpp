@@ -140,8 +140,6 @@ void APRPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APRPlayerController::SelectAssaultRoleModule);
 		InputComponent->BindKey(EKeys::P, IE_Pressed, this, &APRPlayerController::ToggleReady);
 		InputComponent->BindKey(EKeys::O, IE_Pressed, this, &APRPlayerController::StartRiftMission);
-		InputComponent->BindKey(EKeys::F, IE_Pressed, this, &APRPlayerController::TryPickup);
-		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &APRPlayerController::ToggleInventory);
 	}
 }
 
@@ -206,12 +204,19 @@ void APRPlayerController::ShowInventory()
 		return;
 	}
 
+	const bool bWasInventoryVisible = IsInventoryVisible();
 	CreateInventoryUI();
 	RefreshInventoryDisplay();
 
 	if (InventoryWidget)
 	{
+		if (!bWasInventoryVisible)
+		{
+			bSavedMouseCursorVisibilityForInventory = bShowMouseCursor;
+		}
+
 		InventoryWidget->SetVisibility(ESlateVisibility::Visible);
+		ApplyInventoryInputMode();
 	}
 }
 
@@ -221,6 +226,8 @@ void APRPlayerController::HideInventory()
 	{
 		InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
 	}
+
+	RestoreInventoryInputMode();
 }
 
 void APRPlayerController::RefreshInventoryDisplay()
@@ -707,15 +714,18 @@ void APRPlayerController::CreateInventoryUI()
 		InventoryWidget->OnDropItemRequested.AddUniqueDynamic(this, &APRPlayerController::HandleInventoryDropRequested);
 		InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
 		InventoryWidget->AddToPlayerScreen(30);
-		InventoryWidget->SetAlignmentInViewport(FVector2D::ZeroVector);
-		InventoryWidget->SetPositionInViewport(FVector2D(16.0, 256.0), false);
-		InventoryWidget->SetDesiredSizeInViewport(FVector2D(440.0, 500.0));
+		InventoryWidget->SetPositionInViewport(FVector2D::ZeroVector, false);
+		InventoryWidget->SetDesiredSizeInViewport(FVector2D(560.0, 540.0));
+		InventoryWidget->SetAnchorsInViewport(FAnchors(0.5f, 0.5f));
+		InventoryWidget->SetAlignmentInViewport(FVector2D(0.5f, 0.5f));
 		RefreshInventoryDisplay();
 	}
 }
 
 void APRPlayerController::DestroyInventoryUI()
 {
+	RestoreInventoryInputMode();
+
 	if (InventoryWidget)
 	{
 		InventoryWidget->OnUseItemRequested.RemoveDynamic(this, &APRPlayerController::HandleInventoryUseRequested);
@@ -723,6 +733,38 @@ void APRPlayerController::DestroyInventoryUI()
 		InventoryWidget->RemoveFromParent();
 		InventoryWidget = nullptr;
 	}
+}
+
+void APRPlayerController::ApplyInventoryInputMode()
+{
+	if (!IsLocalPlayerController() || !InventoryWidget)
+	{
+		return;
+	}
+
+	bShowMouseCursor = true;
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetWidgetToFocus(InventoryWidget->TakeWidget());
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
+	SetInputMode(InputMode);
+
+	bInventoryInputModeActive = true;
+}
+
+void APRPlayerController::RestoreInventoryInputMode()
+{
+	if (!IsLocalPlayerController() || !bInventoryInputModeActive)
+	{
+		return;
+	}
+
+	FInputModeGameOnly InputMode;
+	SetInputMode(InputMode);
+
+	bShowMouseCursor = bSavedMouseCursorVisibilityForInventory;
+	bInventoryInputModeActive = false;
 }
 
 UPRInventoryComponent* APRPlayerController::GetLocalInventoryComponent() const

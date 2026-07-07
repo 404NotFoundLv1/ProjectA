@@ -3,10 +3,14 @@
 #include "Misc/AutomationTest.h"
 
 #include "Blueprint/UserWidget.h"
+#include "Engine/Engine.h"
+#include "Engine/LocalPlayer.h"
+#include "Engine/World.h"
 #include "Items/PRInventoryComponent.h"
 #include "Items/PRItemDataAsset.h"
 #include "Items/PRItemTypes.h"
 #include "Player/PRPlayerController.h"
+#include "Tests/AutomationCommon.h"
 #include "UI/PRInventoryWidget.h"
 #include "UObject/StructOnScope.h"
 #include "UObject/UnrealType.h"
@@ -80,6 +84,51 @@ bool FPRInventoryUITest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Player controller exposes RefreshInventoryDisplay"), PlayerControllerClass->FindFunctionByName(TEXT("RefreshInventoryDisplay")));
 	TestNotNull(TEXT("Player controller exposes IsInventoryVisible"), PlayerControllerClass->FindFunctionByName(TEXT("IsInventoryVisible")));
 	TestNotNull(TEXT("Player controller has configurable InventoryWidgetClass"), FindFProperty<FClassProperty>(PlayerControllerClass, TEXT("InventoryWidgetClass")));
+
+	FTestWorldWrapper WorldWrapper;
+	TestTrue(TEXT("Inventory UI test world is created"), WorldWrapper.CreateTestWorld(EWorldType::Game));
+	UWorld* World = WorldWrapper.GetTestWorld();
+	if (!World)
+	{
+		return false;
+	}
+
+	TestTrue(TEXT("Inventory UI test world begins play"), WorldWrapper.BeginPlayInTestWorld());
+	if (WorldWrapper.HasFailed())
+	{
+		WorldWrapper.ForwardErrorMessages(this);
+		return false;
+	}
+
+	APRPlayerController* PlayerController = World->SpawnActor<APRPlayerController>();
+	TestNotNull(TEXT("Can spawn inventory UI player controller"), PlayerController);
+	if (!PlayerController)
+	{
+		return false;
+	}
+
+	PlayerController->SetPlayer(NewObject<ULocalPlayer>(GEngine));
+	PlayerController->bShowMouseCursor = false;
+	PlayerController->ShowInventory();
+	TestTrue(TEXT("Showing inventory makes the inventory visible"), PlayerController->IsInventoryVisible());
+	TestTrue(TEXT("Showing inventory displays the mouse cursor for item selection"), PlayerController->bShowMouseCursor);
+
+	UPRInventoryWidget* RuntimeInventoryWidget = PlayerController->GetInventoryWidget();
+	TestNotNull(TEXT("Showing inventory creates a runtime inventory widget"), RuntimeInventoryWidget);
+	if (RuntimeInventoryWidget)
+	{
+		const FVector2D Alignment = RuntimeInventoryWidget->GetAlignmentInViewport();
+		const FAnchors Anchors = RuntimeInventoryWidget->GetAnchorsInViewport();
+		TestTrue(TEXT("Inventory widget is horizontally centered"), FMath::IsNearlyEqual(Alignment.X, 0.5f));
+		TestTrue(TEXT("Inventory widget is vertically centered"), FMath::IsNearlyEqual(Alignment.Y, 0.5f));
+		TestTrue(TEXT("Inventory widget anchor min X is centered"), FMath::IsNearlyEqual(Anchors.Minimum.X, 0.5f));
+		TestTrue(TEXT("Inventory widget anchor min Y is centered"), FMath::IsNearlyEqual(Anchors.Minimum.Y, 0.5f));
+		TestTrue(TEXT("Inventory widget anchor max X is centered"), FMath::IsNearlyEqual(Anchors.Maximum.X, 0.5f));
+		TestTrue(TEXT("Inventory widget anchor max Y is centered"), FMath::IsNearlyEqual(Anchors.Maximum.Y, 0.5f));
+	}
+
+	PlayerController->HideInventory();
+	TestFalse(TEXT("Hiding inventory restores the mouse cursor visibility"), PlayerController->bShowMouseCursor);
 
 	UPRInventoryComponent* Inventory = NewObject<UPRInventoryComponent>(GetTransientPackage());
 	UPRInventoryWidget* Widget = NewObject<UPRInventoryWidget>(GetTransientPackage(), InventoryWidgetClass);

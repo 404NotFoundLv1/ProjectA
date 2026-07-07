@@ -2,12 +2,14 @@
 
 #include "Misc/AutomationTest.h"
 #include "Characters/PRCharacter.h"
+#include "Components/InputComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Engine/LocalPlayer.h"
 #include "Items/PRInventoryComponent.h"
 #include "Items/PRPickupActor.h"
 #include "InputAction.h"
+#include "InputCoreTypes.h"
 #include "Player/PRPlayerController.h"
 #include "Player/PRPlayerState.h"
 #include "Tests/AutomationCommon.h"
@@ -19,6 +21,24 @@ bool HasInputActionProperty(UClass* Class, const FName PropertyName)
 {
 	const FObjectPropertyBase* Property = FindFProperty<FObjectPropertyBase>(Class, PropertyName);
 	return Property && Property->PropertyClass && Property->PropertyClass->IsChildOf(UInputAction::StaticClass());
+}
+
+bool HasLegacyPressedKeyBinding(const UInputComponent* InputComponent, const FKey Key)
+{
+	if (!InputComponent)
+	{
+		return false;
+	}
+
+	for (const FInputKeyBinding& KeyBinding : InputComponent->KeyBindings)
+	{
+		if (KeyBinding.Chord.Key == Key && KeyBinding.KeyEvent == IE_Pressed)
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 FPRItemInstance MakeEnhancedInputTestItem(const FName ItemId, const int32 Count = 1)
@@ -82,6 +102,11 @@ bool FPREnhancedInputBindingsTest::RunTest(const FString& Parameters)
 
 	PlayerController->SetPlayerState(PlayerState);
 	PlayerController->SetPlayer(NewObject<ULocalPlayer>(GEngine));
+	PlayerController->InitInputSystem();
+	TestNotNull(TEXT("Player controller input component is initialized"), PlayerController->InputComponent.Get());
+	TestFalse(TEXT("Tab is handled only by IA_OpenInventory, not a legacy PlayerController key binding"), HasLegacyPressedKeyBinding(PlayerController->InputComponent, EKeys::Tab));
+	TestFalse(TEXT("F is handled only by IA_Interact, not a legacy PlayerController key binding"), HasLegacyPressedKeyBinding(PlayerController->InputComponent, EKeys::F));
+
 	PlayerController->Possess(Character);
 	Pickup->SetItemInstance(MakeEnhancedInputTestItem(TEXT("EnergyCrystal"), 1));
 
