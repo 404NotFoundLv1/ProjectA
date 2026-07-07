@@ -3,10 +3,57 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Items/PRItemTypes.h"
+#include "Net/Serialization/FastArraySerializer.h"
 #include "PRInventoryComponent.generated.h"
 
+class UPRInventoryComponent;
+struct FPRInventoryList;
+
+USTRUCT(BlueprintType)
+struct PROJECTA_API FPRInventoryEntry : public FFastArraySerializerItem
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
+	FPRItemInstance Item;
+};
+
+USTRUCT()
+struct PROJECTA_API FPRInventoryList : public FFastArraySerializer
+{
+	GENERATED_BODY()
+
+public:
+	bool NetDeltaSerialize(FNetDeltaSerializeInfo& DeltaParms)
+	{
+		return FFastArraySerializer::FastArrayDeltaSerialize<FPRInventoryEntry, FPRInventoryList>(Entries, DeltaParms, *this);
+	}
+
+	void PostReplicatedReceive(const FFastArraySerializer::FPostReplicatedReceiveParameters& Parameters);
+
+	void SetOwnerComponent(UPRInventoryComponent* InOwnerComponent);
+	int32 FindEntryIndex(FName ItemId) const;
+
+	UPROPERTY()
+	TArray<FPRInventoryEntry> Entries;
+
+private:
+	UPRInventoryComponent* OwnerComponent = nullptr;
+};
+
+template<>
+struct TStructOpsTypeTraits<FPRInventoryList> : public TStructOpsTypeTraitsBase2<FPRInventoryList>
+{
+	enum
+	{
+		WithNetDeltaSerializer = true,
+	};
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPRInventoryChangedDelegate);
+
 /**
- * Server-owned player inventory. Replication is added in a later inventory milestone.
+ * Server-owned player inventory replicated to the owning client with FastArray.
  */
 UCLASS(BlueprintType, ClassGroup = (ProjectRift), meta = (BlueprintSpawnableComponent))
 class PROJECTA_API UPRInventoryComponent : public UActorComponent
@@ -15,6 +62,13 @@ class PROJECTA_API UPRInventoryComponent : public UActorComponent
 
 public:
 	UPRInventoryComponent();
+
+	virtual void PostInitProperties() override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual ELifetimeCondition GetReplicationCondition() const override { return COND_OwnerOnly; }
+
+	UPROPERTY(BlueprintAssignable, Category = "Inventory")
+	FPRInventoryChangedDelegate OnInventoryChanged;
 
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	bool CanAddItem(const FPRItemInstance& Item) const;
@@ -28,21 +82,28 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Inventory")
 	bool UseItem(FName ItemId);
 
-	const TArray<FPRItemInstance>& GetItems() const { return Items; }
+	const TArray<FPRItemInstance>& GetItems() const { return CachedItems; }
 
 	UFUNCTION(BlueprintPure, Category = "Inventory")
-	TArray<FPRItemInstance> GetInventoryItems() const { return Items; }
+	TArray<FPRItemInstance> GetInventoryItems() const { return CachedItems; }
 
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	int32 GetItemCount(FName ItemId) const;
 
 private:
+	friend struct FPRInventoryList;
+
 	int32 FindItemIndex(FName ItemId) const;
+	void HandleInventoryListChanged();
 	void NotifyInventoryChanged();
+	void RefreshCachedItems();
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory", meta = (AllowPrivateAccess = "true", ClampMin = "1"))
 	int32 MaxSlots;
 
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Inventory", meta = (AllowPrivateAccess = "true"))
-	TArray<FPRItemInstance> Items;
+	UPROPERTY(Replicated)
+	FPRInventoryList InventoryList;
+
+	UPROPERTY(Transient)
+	TArray<FPRItemInstance> CachedItems;
 };

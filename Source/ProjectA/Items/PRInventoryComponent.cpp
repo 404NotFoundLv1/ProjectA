@@ -1,12 +1,52 @@
 #include "Items/PRInventoryComponent.h"
 
 #include "GameFramework/Actor.h"
+#include "Net/UnrealNetwork.h"
 #include "ProjectA.h"
+
+void FPRInventoryList::PostReplicatedReceive(const FFastArraySerializer::FPostReplicatedReceiveParameters& Parameters)
+{
+	if (OwnerComponent)
+	{
+		OwnerComponent->HandleInventoryListChanged();
+	}
+}
+
+void FPRInventoryList::SetOwnerComponent(UPRInventoryComponent* InOwnerComponent)
+{
+	OwnerComponent = InOwnerComponent;
+}
+
+int32 FPRInventoryList::FindEntryIndex(const FName ItemId) const
+{
+	return Entries.IndexOfByPredicate(
+		[ItemId](const FPRInventoryEntry& Entry)
+		{
+			return Entry.Item.ItemId == ItemId;
+		});
+}
 
 UPRInventoryComponent::UPRInventoryComponent()
 	: MaxSlots(20)
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
+	InventoryList.SetOwnerComponent(this);
+}
+
+void UPRInventoryComponent::PostInitProperties()
+{
+	Super::PostInitProperties();
+
+	InventoryList.SetOwnerComponent(this);
+	RefreshCachedItems();
+}
+
+void UPRInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(UPRInventoryComponent, InventoryList);
 }
 
 bool UPRInventoryComponent::CanAddItem(const FPRItemInstance& Item) const
@@ -16,7 +56,7 @@ bool UPRInventoryComponent::CanAddItem(const FPRItemInstance& Item) const
 		return false;
 	}
 
-	return FindItemIndex(Item.ItemId) != INDEX_NONE || Items.Num() < MaxSlots;
+	return FindItemIndex(Item.ItemId) != INDEX_NONE || InventoryList.Entries.Num() < MaxSlots;
 }
 
 bool UPRInventoryComponent::AddItem(const FPRItemInstance& Item)
@@ -30,7 +70,7 @@ bool UPRInventoryComponent::AddItem(const FPRItemInstance& Item)
 			*GetNameSafe(GetOwner()),
 			*Item.ItemId.ToString(),
 			Item.Count,
-			Items.Num(),
+			InventoryList.Entries.Num(),
 			MaxSlots);
 		return false;
 	}
@@ -38,11 +78,15 @@ bool UPRInventoryComponent::AddItem(const FPRItemInstance& Item)
 	const int32 ExistingIndex = FindItemIndex(Item.ItemId);
 	if (ExistingIndex != INDEX_NONE)
 	{
-		Items[ExistingIndex].Count += Item.Count;
+		FPRInventoryEntry& ExistingEntry = InventoryList.Entries[ExistingIndex];
+		ExistingEntry.Item.Count += Item.Count;
+		InventoryList.MarkItemDirty(ExistingEntry);
 	}
 	else
 	{
-		Items.Add(Item);
+		FPRInventoryEntry& NewEntry = InventoryList.Entries.AddDefaulted_GetRef();
+		NewEntry.Item = Item;
+		InventoryList.MarkItemDirty(NewEntry);
 	}
 
 	NotifyInventoryChanged();
@@ -55,7 +99,7 @@ bool UPRInventoryComponent::AddItem(const FPRItemInstance& Item)
 		*Item.ItemId.ToString(),
 		Item.Count,
 		GetItemCount(Item.ItemId),
-		Items.Num(),
+		InventoryList.Entries.Num(),
 		MaxSlots);
 
 	return true;
@@ -69,7 +113,7 @@ bool UPRInventoryComponent::RemoveItem(const FName ItemId, const int32 Count)
 	}
 
 	const int32 ExistingIndex = FindItemIndex(ItemId);
-	if (ExistingIndex == INDEX_NONE || Items[ExistingIndex].Count < Count)
+	if (ExistingIndex == INDEX_NONE || InventoryList.Entries[ExistingIndex].Item.Count < Count)
 	{
 		UE_LOG(
 			LogProjectA,
@@ -78,14 +122,20 @@ bool UPRInventoryComponent::RemoveItem(const FName ItemId, const int32 Count)
 			*GetNameSafe(GetOwner()),
 			*ItemId.ToString(),
 			Count,
-			ExistingIndex == INDEX_NONE ? 0 : Items[ExistingIndex].Count);
+			ExistingIndex == INDEX_NONE ? 0 : InventoryList.Entries[ExistingIndex].Item.Count);
 		return false;
 	}
 
-	Items[ExistingIndex].Count -= Count;
-	if (Items[ExistingIndex].Count <= 0)
+	FPRInventoryEntry& ExistingEntry = InventoryList.Entries[ExistingIndex];
+	ExistingEntry.Item.Count -= Count;
+	if (ExistingEntry.Item.Count <= 0)
 	{
-		Items.RemoveAt(ExistingIndex);
+		InventoryList.Entries.RemoveAt(ExistingIndex);
+		InventoryList.MarkArrayDirty();
+	}
+	else
+	{
+		InventoryList.MarkItemDirty(ExistingEntry);
 	}
 
 	NotifyInventoryChanged();
@@ -98,7 +148,7 @@ bool UPRInventoryComponent::RemoveItem(const FName ItemId, const int32 Count)
 		*ItemId.ToString(),
 		Count,
 		GetItemCount(ItemId),
-		Items.Num(),
+		InventoryList.Entries.Num(),
 		MaxSlots);
 
 	return true;
@@ -124,22 +174,35 @@ bool UPRInventoryComponent::UseItem(const FName ItemId)
 int32 UPRInventoryComponent::GetItemCount(const FName ItemId) const
 {
 	const int32 ExistingIndex = FindItemIndex(ItemId);
-	return ExistingIndex == INDEX_NONE ? 0 : Items[ExistingIndex].Count;
+	return ExistingIndex == INDEX_NONE ? 0 : InventoryList.Entries[ExistingIndex].Item.Count;
 }
 
 int32 UPRInventoryComponent::FindItemIndex(const FName ItemId) const
 {
-	return Items.IndexOfByPredicate(
-		[ItemId](const FPRItemInstance& Item)
-		{
-			return Item.ItemId == ItemId;
-		});
+	return InventoryList.FindEntryIndex(ItemId);
+}
+
+void UPRInventoryComponent::HandleInventoryListChanged()
+{
+	RefreshCachedItems();
+	OnInventoryChanged.Broadcast();
 }
 
 void UPRInventoryComponent::NotifyInventoryChanged()
 {
+	HandleInventoryListChanged();
+
 	if (AActor* Owner = GetOwner())
 	{
 		Owner->ForceNetUpdate();
+	}
+}
+
+void UPRInventoryComponent::RefreshCachedItems()
+{
+	CachedItems.Reset(InventoryList.Entries.Num());
+	for (const FPRInventoryEntry& Entry : InventoryList.Entries)
+	{
+		CachedItems.Add(Entry.Item);
 	}
 }

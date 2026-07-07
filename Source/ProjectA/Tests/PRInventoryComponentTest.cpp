@@ -3,6 +3,8 @@
 #include "Misc/AutomationTest.h"
 
 #include "Components/ActorComponent.h"
+#include "Net/Serialization/FastArraySerializer.h"
+#include "Net/UnrealNetwork.h"
 #include "Player/PRPlayerState.h"
 #include "UObject/StructOnScope.h"
 #include "UObject/UnrealType.h"
@@ -168,6 +170,7 @@ int32 CallGetItemCount(FAutomationTestBase& Test, UObject* Inventory, const FNam
 	Test.TestNotNull(TEXT("GetItemCount returns int32"), ReturnProperty);
 	return ReturnProperty ? ReturnProperty->GetPropertyValue_InContainer(ParamsMemory) : INDEX_NONE;
 }
+
 }
 
 bool FPRInventoryComponentTest::RunTest(const FString& Parameters)
@@ -193,7 +196,50 @@ bool FPRInventoryComponentTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("GetItemCount function exists"), InventoryComponentClass->FindFunctionByName(TEXT("GetItemCount")));
 	TestNotNull(TEXT("GetInventoryItems function exists for UI/debug"), InventoryComponentClass->FindFunctionByName(TEXT("GetInventoryItems")));
 	TestNotNull(TEXT("Inventory exposes MaxSlots"), FindFProperty<FIntProperty>(InventoryComponentClass, TEXT("MaxSlots")));
-	TestNotNull(TEXT("Inventory stores item entries"), FindFProperty<FArrayProperty>(InventoryComponentClass, TEXT("Items")));
+
+	UScriptStruct* InventoryEntryStruct = FindObject<UScriptStruct>(nullptr, TEXT("/Script/ProjectA.PRInventoryEntry"));
+	UScriptStruct* InventoryListStruct = FindObject<UScriptStruct>(nullptr, TEXT("/Script/ProjectA.PRInventoryList"));
+	TestNotNull(TEXT("FPRInventoryEntry struct exists"), InventoryEntryStruct);
+	TestNotNull(TEXT("FPRInventoryList struct exists"), InventoryListStruct);
+	TestTrue(
+		TEXT("FPRInventoryEntry derives from FFastArraySerializerItem"),
+		InventoryEntryStruct && InventoryEntryStruct->IsChildOf(FFastArraySerializerItem::StaticStruct()));
+	TestTrue(
+		TEXT("FPRInventoryList derives from FFastArraySerializer"),
+		InventoryListStruct && InventoryListStruct->IsChildOf(FFastArraySerializer::StaticStruct()));
+
+	FStructProperty* EntryItemProperty = InventoryEntryStruct ? FindFProperty<FStructProperty>(InventoryEntryStruct, TEXT("Item")) : nullptr;
+	TestNotNull(TEXT("FPRInventoryEntry stores an FPRItemInstance Item"), EntryItemProperty);
+	TestTrue(
+		TEXT("FPRInventoryEntry Item property uses FPRItemInstance"),
+		EntryItemProperty && EntryItemProperty->Struct == ItemInstanceStruct);
+
+	FArrayProperty* EntriesProperty = InventoryListStruct ? FindFProperty<FArrayProperty>(InventoryListStruct, TEXT("Entries")) : nullptr;
+	TestNotNull(TEXT("FPRInventoryList stores replicated Entries"), EntriesProperty);
+	FStructProperty* EntriesInnerProperty = EntriesProperty ? CastField<FStructProperty>(EntriesProperty->Inner) : nullptr;
+	TestTrue(
+		TEXT("FPRInventoryList Entries contain FPRInventoryEntry"),
+		EntriesInnerProperty && EntriesInnerProperty->Struct == InventoryEntryStruct);
+
+	FStructProperty* InventoryListProperty = FindFProperty<FStructProperty>(InventoryComponentClass, TEXT("InventoryList"));
+	TestNotNull(TEXT("Inventory component stores FPRInventoryList"), InventoryListProperty);
+	TestTrue(
+		TEXT("InventoryList property uses FPRInventoryList"),
+		InventoryListProperty && InventoryListProperty->Struct == InventoryListStruct);
+	TestTrue(
+		TEXT("InventoryList is marked replicated"),
+		InventoryListProperty && InventoryListProperty->HasAnyPropertyFlags(CPF_Net));
+	TestNull(TEXT("Inventory no longer exposes a replicated raw Items array"), FindFProperty<FArrayProperty>(InventoryComponentClass, TEXT("Items")));
+	TestNotNull(TEXT("Inventory exposes OnInventoryChanged for UI refresh"), FindFProperty<FMulticastDelegateProperty>(InventoryComponentClass, TEXT("OnInventoryChanged")));
+
+	UActorComponent* InventoryComponentCDO = Cast<UActorComponent>(InventoryComponentClass->GetDefaultObject());
+	TestTrue(
+		TEXT("Inventory component replicates by default"),
+		InventoryComponentCDO && InventoryComponentCDO->GetIsReplicated());
+	TestEqual(
+		TEXT("Inventory component replicates only to owning client"),
+		InventoryComponentCDO ? InventoryComponentCDO->GetReplicationCondition() : COND_Never,
+		COND_OwnerOnly);
 
 	APRPlayerState* PlayerState = NewObject<APRPlayerState>();
 	UObject* PlayerInventory = FindObject<UObject>(PlayerState, TEXT("InventoryComponent"));
