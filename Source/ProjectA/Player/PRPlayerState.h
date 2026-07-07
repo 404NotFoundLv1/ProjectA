@@ -8,6 +8,7 @@
 class UPRAbilitySystemComponent;
 class UPRAttributeSet;
 class UAbilitySystemComponent;
+class UPRInventoryComponent;
 
 /**
  * Player-owned replicated data that should survive pawn replacement.
@@ -29,6 +30,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "GAS")
 	UPRAttributeSet* GetAttributeSet() const { return AttributeSet.Get(); }
+
+	UFUNCTION(BlueprintPure, Category = "Inventory")
+	UPRInventoryComponent* GetInventoryComponent() const { return InventoryComponent.Get(); }
 
 	UFUNCTION(BlueprintPure, Category = "Lobby")
 	bool IsReady() const { return bIsReady; }
@@ -60,6 +64,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPRAttributeSet> AttributeSet;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPRInventoryComponent> InventoryComponent;
 
 	UPROPERTY(ReplicatedUsing = OnRep_IsReady, VisibleInstanceOnly, BlueprintReadOnly, Category = "Lobby", meta = (AllowPrivateAccess = "true"))
 	bool bIsReady;

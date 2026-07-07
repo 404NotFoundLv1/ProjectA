@@ -2,6 +2,7 @@
 
 #include "Abilities/PRAbilitySystemComponent.h"
 #include "Abilities/PRAttributeSet.h"
+#include "Items/PRInventoryComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "ProjectA.h"
 
@@ -14,6 +15,7 @@ APRPlayerState::APRPlayerState()
 
 	AbilitySystemComponent = CreateDefaultSubobject<UPRAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
 	AttributeSet = CreateDefaultSubobject<UPRAttributeSet>(TEXT("AttributeSet"));
+	InventoryComponent = CreateDefaultSubobject<UPRInventoryComponent>(TEXT("InventoryComponent"));
 }
 
 void APRPlayerState::BeginPlay()

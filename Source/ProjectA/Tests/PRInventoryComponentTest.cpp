@@ -1,0 +1,243 @@
+#if WITH_DEV_AUTOMATION_TESTS
+
+#include "Misc/AutomationTest.h"
+
+#include "Components/ActorComponent.h"
+#include "Player/PRPlayerState.h"
+#include "UObject/StructOnScope.h"
+#include "UObject/UnrealType.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPRInventoryComponentTest, "ProjectRift.Items.InventoryComponent", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+namespace
+{
+UScriptStruct* GetItemInstanceStruct()
+{
+	return FindObject<UScriptStruct>(nullptr, TEXT("/Script/ProjectA.PRItemInstance"));
+}
+
+void SetItemInstance(void* ItemMemory, const FName ItemId, const int32 Count)
+{
+	UScriptStruct* ItemInstanceStruct = GetItemInstanceStruct();
+	if (!ItemMemory || !ItemInstanceStruct)
+	{
+		return;
+	}
+
+	if (FNameProperty* ItemIdProperty = FindFProperty<FNameProperty>(ItemInstanceStruct, TEXT("ItemId")))
+	{
+		ItemIdProperty->SetPropertyValue_InContainer(ItemMemory, ItemId);
+	}
+
+	if (FIntProperty* CountProperty = FindFProperty<FIntProperty>(ItemInstanceStruct, TEXT("Count")))
+	{
+		CountProperty->SetPropertyValue_InContainer(ItemMemory, Count);
+	}
+}
+
+void SetIntProperty(UObject* Object, const TCHAR* PropertyName, const int32 Value)
+{
+	if (FIntProperty* Property = Object ? FindFProperty<FIntProperty>(Object->GetClass(), PropertyName) : nullptr)
+	{
+		Property->SetPropertyValue_InContainer(Object, Value);
+	}
+}
+
+bool CallItemFunction(FAutomationTestBase& Test, UObject* Inventory, const TCHAR* FunctionName, const FName ItemId, const int32 Count)
+{
+	UFunction* Function = Inventory ? Inventory->FindFunction(FName(FunctionName)) : nullptr;
+	Test.TestNotNull(FString::Printf(TEXT("%s function exists"), FunctionName), Function);
+	if (!Inventory || !Function)
+	{
+		return false;
+	}
+
+	FStructOnScope Params(Function);
+	void* ParamsMemory = Params.GetStructMemory();
+
+	FStructProperty* ItemProperty = FindFProperty<FStructProperty>(Function, TEXT("Item"));
+	Test.TestNotNull(FString::Printf(TEXT("%s accepts FPRItemInstance Item"), FunctionName), ItemProperty);
+	if (!ItemProperty)
+	{
+		return false;
+	}
+
+	void* ItemMemory = ItemProperty->ContainerPtrToValuePtr<void>(ParamsMemory);
+	SetItemInstance(ItemMemory, ItemId, Count);
+
+	Inventory->ProcessEvent(Function, ParamsMemory);
+
+	FBoolProperty* ReturnProperty = FindFProperty<FBoolProperty>(Function, TEXT("ReturnValue"));
+	Test.TestNotNull(FString::Printf(TEXT("%s returns bool"), FunctionName), ReturnProperty);
+	return ReturnProperty && ReturnProperty->GetPropertyValue_InContainer(ParamsMemory);
+}
+
+bool CallNamedCountFunction(FAutomationTestBase& Test, UObject* Inventory, const TCHAR* FunctionName, const FName ItemId, const int32 Count)
+{
+	UFunction* Function = Inventory ? Inventory->FindFunction(FName(FunctionName)) : nullptr;
+	Test.TestNotNull(FString::Printf(TEXT("%s function exists"), FunctionName), Function);
+	if (!Inventory || !Function)
+	{
+		return false;
+	}
+
+	FStructOnScope Params(Function);
+	void* ParamsMemory = Params.GetStructMemory();
+
+	if (FNameProperty* ItemIdProperty = FindFProperty<FNameProperty>(Function, TEXT("ItemId")))
+	{
+		ItemIdProperty->SetPropertyValue_InContainer(ParamsMemory, ItemId);
+	}
+	else
+	{
+		Test.AddError(FString::Printf(TEXT("%s is missing ItemId parameter"), FunctionName));
+		return false;
+	}
+
+	if (FIntProperty* CountProperty = FindFProperty<FIntProperty>(Function, TEXT("Count")))
+	{
+		CountProperty->SetPropertyValue_InContainer(ParamsMemory, Count);
+	}
+	else
+	{
+		Test.AddError(FString::Printf(TEXT("%s is missing Count parameter"), FunctionName));
+		return false;
+	}
+
+	Inventory->ProcessEvent(Function, ParamsMemory);
+
+	FBoolProperty* ReturnProperty = FindFProperty<FBoolProperty>(Function, TEXT("ReturnValue"));
+	Test.TestNotNull(FString::Printf(TEXT("%s returns bool"), FunctionName), ReturnProperty);
+	return ReturnProperty && ReturnProperty->GetPropertyValue_InContainer(ParamsMemory);
+}
+
+bool CallUseItem(FAutomationTestBase& Test, UObject* Inventory, const FName ItemId)
+{
+	UFunction* Function = Inventory ? Inventory->FindFunction(TEXT("UseItem")) : nullptr;
+	Test.TestNotNull(TEXT("UseItem function exists"), Function);
+	if (!Inventory || !Function)
+	{
+		return false;
+	}
+
+	FStructOnScope Params(Function);
+	void* ParamsMemory = Params.GetStructMemory();
+
+	if (FNameProperty* ItemIdProperty = FindFProperty<FNameProperty>(Function, TEXT("ItemId")))
+	{
+		ItemIdProperty->SetPropertyValue_InContainer(ParamsMemory, ItemId);
+	}
+	else
+	{
+		Test.AddError(TEXT("UseItem is missing ItemId parameter"));
+		return false;
+	}
+
+	Inventory->ProcessEvent(Function, ParamsMemory);
+
+	FBoolProperty* ReturnProperty = FindFProperty<FBoolProperty>(Function, TEXT("ReturnValue"));
+	Test.TestNotNull(TEXT("UseItem returns bool"), ReturnProperty);
+	return ReturnProperty && ReturnProperty->GetPropertyValue_InContainer(ParamsMemory);
+}
+
+int32 CallGetItemCount(FAutomationTestBase& Test, UObject* Inventory, const FName ItemId)
+{
+	UFunction* Function = Inventory ? Inventory->FindFunction(TEXT("GetItemCount")) : nullptr;
+	Test.TestNotNull(TEXT("GetItemCount function exists"), Function);
+	if (!Inventory || !Function)
+	{
+		return INDEX_NONE;
+	}
+
+	FStructOnScope Params(Function);
+	void* ParamsMemory = Params.GetStructMemory();
+
+	if (FNameProperty* ItemIdProperty = FindFProperty<FNameProperty>(Function, TEXT("ItemId")))
+	{
+		ItemIdProperty->SetPropertyValue_InContainer(ParamsMemory, ItemId);
+	}
+	else
+	{
+		Test.AddError(TEXT("GetItemCount is missing ItemId parameter"));
+		return INDEX_NONE;
+	}
+
+	Inventory->ProcessEvent(Function, ParamsMemory);
+
+	FIntProperty* ReturnProperty = FindFProperty<FIntProperty>(Function, TEXT("ReturnValue"));
+	Test.TestNotNull(TEXT("GetItemCount returns int32"), ReturnProperty);
+	return ReturnProperty ? ReturnProperty->GetPropertyValue_InContainer(ParamsMemory) : INDEX_NONE;
+}
+}
+
+bool FPRInventoryComponentTest::RunTest(const FString& Parameters)
+{
+	UClass* InventoryComponentClass = FindObject<UClass>(nullptr, TEXT("/Script/ProjectA.PRInventoryComponent"));
+	TestNotNull(TEXT("UPRInventoryComponent class exists"), InventoryComponentClass);
+	TestTrue(
+		TEXT("UPRInventoryComponent derives from UActorComponent"),
+		InventoryComponentClass && InventoryComponentClass->IsChildOf(UActorComponent::StaticClass()));
+
+	UScriptStruct* ItemInstanceStruct = GetItemInstanceStruct();
+	TestNotNull(TEXT("FPRItemInstance struct is available to inventory"), ItemInstanceStruct);
+
+	if (!InventoryComponentClass || !ItemInstanceStruct)
+	{
+		return false;
+	}
+
+	TestNotNull(TEXT("CanAddItem function exists"), InventoryComponentClass->FindFunctionByName(TEXT("CanAddItem")));
+	TestNotNull(TEXT("AddItem function exists"), InventoryComponentClass->FindFunctionByName(TEXT("AddItem")));
+	TestNotNull(TEXT("RemoveItem function exists"), InventoryComponentClass->FindFunctionByName(TEXT("RemoveItem")));
+	TestNotNull(TEXT("UseItem function exists"), InventoryComponentClass->FindFunctionByName(TEXT("UseItem")));
+	TestNotNull(TEXT("GetItemCount function exists"), InventoryComponentClass->FindFunctionByName(TEXT("GetItemCount")));
+	TestNotNull(TEXT("GetInventoryItems function exists for UI/debug"), InventoryComponentClass->FindFunctionByName(TEXT("GetInventoryItems")));
+	TestNotNull(TEXT("Inventory exposes MaxSlots"), FindFProperty<FIntProperty>(InventoryComponentClass, TEXT("MaxSlots")));
+	TestNotNull(TEXT("Inventory stores item entries"), FindFProperty<FArrayProperty>(InventoryComponentClass, TEXT("Items")));
+
+	APRPlayerState* PlayerState = NewObject<APRPlayerState>();
+	UObject* PlayerInventory = FindObject<UObject>(PlayerState, TEXT("InventoryComponent"));
+	TestNotNull(TEXT("APRPlayerState owns InventoryComponent subobject"), PlayerInventory);
+	TestTrue(
+		TEXT("APRPlayerState InventoryComponent uses ProjectRift inventory class"),
+		PlayerInventory && PlayerInventory->IsA(InventoryComponentClass));
+	TestNotNull(
+		TEXT("APRPlayerState exposes Blueprint inventory getter"),
+		APRPlayerState::StaticClass()->FindFunctionByName(TEXT("GetInventoryComponent")));
+
+	UObject* Inventory = NewObject<UObject>(GetTransientPackage(), InventoryComponentClass);
+	TestNotNull(TEXT("Can instantiate UPRInventoryComponent"), Inventory);
+	if (!Inventory)
+	{
+		return false;
+	}
+
+	SetIntProperty(Inventory, TEXT("MaxSlots"), 1);
+
+	TestTrue(TEXT("Can add valid item to empty inventory"), CallItemFunction(*this, Inventory, TEXT("CanAddItem"), TEXT("HealthInjector"), 2));
+	TestTrue(TEXT("AddItem accepts valid item"), CallItemFunction(*this, Inventory, TEXT("AddItem"), TEXT("HealthInjector"), 2));
+	TestEqual(TEXT("AddItem stores item count"), CallGetItemCount(*this, Inventory, TEXT("HealthInjector")), 2);
+
+	TestTrue(TEXT("AddItem stacks matching ItemId"), CallItemFunction(*this, Inventory, TEXT("AddItem"), TEXT("HealthInjector"), 3));
+	TestEqual(TEXT("Stacked item count is accumulated"), CallGetItemCount(*this, Inventory, TEXT("HealthInjector")), 5);
+
+	TestFalse(TEXT("Inventory rejects new stack when full"), CallItemFunction(*this, Inventory, TEXT("CanAddItem"), TEXT("ShieldPack"), 1));
+	TestFalse(TEXT("AddItem fails for new stack when full"), CallItemFunction(*this, Inventory, TEXT("AddItem"), TEXT("ShieldPack"), 1));
+	TestEqual(TEXT("Rejected item was not added"), CallGetItemCount(*this, Inventory, TEXT("ShieldPack")), 0);
+
+	TestTrue(TEXT("RemoveItem removes partial count"), CallNamedCountFunction(*this, Inventory, TEXT("RemoveItem"), TEXT("HealthInjector"), 2));
+	TestEqual(TEXT("Partial remove decreases count"), CallGetItemCount(*this, Inventory, TEXT("HealthInjector")), 3);
+	TestFalse(TEXT("RemoveItem rejects more than available count"), CallNamedCountFunction(*this, Inventory, TEXT("RemoveItem"), TEXT("HealthInjector"), 4));
+	TestEqual(TEXT("Failed remove does not change count"), CallGetItemCount(*this, Inventory, TEXT("HealthInjector")), 3);
+	TestTrue(TEXT("RemoveItem removes final stack"), CallNamedCountFunction(*this, Inventory, TEXT("RemoveItem"), TEXT("HealthInjector"), 3));
+	TestEqual(TEXT("Final remove deletes stack"), CallGetItemCount(*this, Inventory, TEXT("HealthInjector")), 0);
+
+	TestTrue(TEXT("UseItem consumes one item"), CallItemFunction(*this, Inventory, TEXT("AddItem"), TEXT("ShieldPack"), 1)
+		&& CallUseItem(*this, Inventory, TEXT("ShieldPack")));
+	TestEqual(TEXT("UseItem removes consumed item"), CallGetItemCount(*this, Inventory, TEXT("ShieldPack")), 0);
+	TestFalse(TEXT("UseItem fails when item is missing"), CallUseItem(*this, Inventory, TEXT("ShieldPack")));
+
+	return true;
+}
+
+#endif
