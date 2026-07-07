@@ -14,6 +14,7 @@ public class ProjectA : ModuleRules
 			"Engine",
 			"InputCore",
 			"EnhancedInput",
+			"EngineSettings",
 			"AIModule",
 			"StateTreeModule",
 			"GameplayStateTreeModule",
