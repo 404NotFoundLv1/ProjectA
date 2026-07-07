@@ -4,8 +4,10 @@
 
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/WidgetComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/DefaultPawn.h"
 #include "Items/PRPickupActor.h"
 #include "Tests/AutomationCommon.h"
 #include "UObject/UnrealType.h"
@@ -40,6 +42,7 @@ bool FPRPickupActorTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("SetItemInstance function exists"), PickupActorClass->FindFunctionByName(TEXT("SetItemInstance")));
 	TestNotNull(TEXT("CanBePickedUp function exists"), PickupActorClass->FindFunctionByName(TEXT("CanBePickedUp")));
 	TestNotNull(TEXT("SetPickedUp function exists"), PickupActorClass->FindFunctionByName(TEXT("SetPickedUp")));
+	TestNotNull(TEXT("GetInteractionPromptText function exists"), PickupActorClass->FindFunctionByName(TEXT("GetInteractionPromptText")));
 
 	FStructProperty* ItemInstanceProperty = FindFProperty<FStructProperty>(PickupActorClass, TEXT("ItemInstance"));
 	TestNotNull(TEXT("Pickup actor owns ItemInstance"), ItemInstanceProperty);
@@ -62,8 +65,10 @@ bool FPRPickupActorTest::RunTest(const FString& Parameters)
 
 	UStaticMeshComponent* Mesh = PickupDefaults ? FindObject<UStaticMeshComponent>(PickupDefaults, TEXT("Mesh")) : nullptr;
 	USphereComponent* InteractionSphere = PickupDefaults ? FindObject<USphereComponent>(PickupDefaults, TEXT("InteractionSphere")) : nullptr;
+	UWidgetComponent* InteractionPromptWidget = PickupDefaults ? FindObject<UWidgetComponent>(PickupDefaults, TEXT("InteractionPromptWidget")) : nullptr;
 	TestNotNull(TEXT("Pickup actor owns Mesh component"), Mesh);
 	TestNotNull(TEXT("Pickup actor owns InteractionSphere component"), InteractionSphere);
+	TestNotNull(TEXT("Pickup actor owns a screen-space interaction prompt widget"), InteractionPromptWidget);
 	TestTrue(TEXT("Pickup mesh has a visible default mesh"), Mesh && Mesh->GetStaticMesh() != nullptr);
 	TestTrue(TEXT("Interaction sphere has usable radius"), InteractionSphere && InteractionSphere->GetUnscaledSphereRadius() >= 100.0f);
 	TestTrue(TEXT("Interaction sphere is query only"), InteractionSphere && InteractionSphere->GetCollisionEnabled() == ECollisionEnabled::QueryOnly);
@@ -71,6 +76,17 @@ bool FPRPickupActorTest::RunTest(const FString& Parameters)
 		TEXT("Interaction sphere overlaps pawns"),
 		InteractionSphere ? InteractionSphere->GetCollisionResponseToChannel(ECC_Pawn) : ECR_Ignore,
 		ECR_Overlap);
+	TestTrue(TEXT("Pickup prompt widget is hidden until a pawn is nearby"), InteractionPromptWidget && InteractionPromptWidget->bHiddenInGame);
+	TestEqual(
+		TEXT("Pickup prompt uses screen-space widget rendering for localized text"),
+		InteractionPromptWidget ? InteractionPromptWidget->GetWidgetSpace() : EWidgetSpace::World,
+		EWidgetSpace::Screen);
+	TestTrue(
+		TEXT("Pickup prompt widget has a native widget class"),
+		InteractionPromptWidget && InteractionPromptWidget->GetWidgetClass() != nullptr);
+	TestTrue(
+		TEXT("Pickup prompt is lifted clear of the pickup mesh"),
+		InteractionPromptWidget && InteractionPromptWidget->GetRelativeLocation().Z >= 220.0f);
 
 	FTestWorldWrapper WorldWrapper;
 	TestTrue(TEXT("Test world is created"), WorldWrapper.CreateTestWorld(EWorldType::Game));
@@ -96,6 +112,22 @@ bool FPRPickupActorTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Pickup stores assigned item id"), Pickup->GetItemInstance().ItemId, FName(TEXT("EnergyCrystal")));
 	TestEqual(TEXT("Pickup stores assigned item count"), Pickup->GetItemInstance().Count, 3);
 	TestTrue(TEXT("Pickup with valid item is pickable"), Pickup->CanBePickedUp());
+
+	UWidgetComponent* RuntimeInteractionPromptWidget = FindObject<UWidgetComponent>(Pickup, TEXT("InteractionPromptWidget"));
+	ADefaultPawn* NearbyPawn = World->SpawnActor<ADefaultPawn>(FVector(80.0f, 0.0f, 0.0f), FRotator::ZeroRotator);
+	TestNotNull(TEXT("Can spawn nearby pawn for pickup prompt"), NearbyPawn);
+	if (RuntimeInteractionPromptWidget)
+	{
+		RuntimeInteractionPromptWidget->SetHiddenInGame(true);
+		RuntimeInteractionPromptWidget->SetVisibility(false, true);
+	}
+	Pickup->Tick(0.0f);
+	TestFalse(
+		TEXT("Pickup prompt widget becomes visible when a pawn is already nearby"),
+		RuntimeInteractionPromptWidget ? RuntimeInteractionPromptWidget->bHiddenInGame : true);
+	TestTrue(
+		TEXT("Pickup prompt widget component becomes visible when a pawn is already nearby"),
+		RuntimeInteractionPromptWidget && RuntimeInteractionPromptWidget->IsVisible());
 
 	Pickup->SetPickedUp(true);
 	TestTrue(TEXT("Pickup stores picked-up state"), Pickup->IsPickedUp());

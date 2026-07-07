@@ -15,6 +15,7 @@ void APRRiftGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(APRRiftGameState, bExtractionAvailable);
 	DOREPLIFETIME(APRRiftGameState, AlivePlayerCount);
 	DOREPLIFETIME(APRRiftGameState, MissionTime);
+	DOREPLIFETIME(APRRiftGameState, ObjectiveProgress);
 }
 
 void APRRiftGameState::SetCurrentObjectiveState(const EPRRiftObjectiveState InCurrentObjectiveState)
@@ -42,6 +43,11 @@ void APRRiftGameState::SetMissionTime(const float InMissionTime)
 	MissionTime = FMath::Max(0.0f, InMissionTime);
 }
 
+void APRRiftGameState::SetObjectiveProgress(const float InObjectiveProgress)
+{
+	ObjectiveProgress = FMath::Clamp(InObjectiveProgress, 0.0f, 1.0f);
+}
+
 void APRRiftGameState::OnRep_CurrentObjectiveState()
 {
 }
@@ -59,5 +65,9 @@ void APRRiftGameState::OnRep_AlivePlayerCount()
 }
 
 void APRRiftGameState::OnRep_MissionTime()
+{
+}
+
+void APRRiftGameState::OnRep_ObjectiveProgress()
 {
 }

@@ -6,6 +6,7 @@
 #include "Abilities/PRShieldConsumableGameplayEffect.h"
 #include "Characters/PRCharacter.h"
 #include "Core/PRShipLobbyGameMode.h"
+#include "Core/PRRiftObjectiveActor.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -30,6 +31,26 @@ namespace
 const FName AssaultRoleModuleName(TEXT("Ability.Role.Assault"));
 const FName HealthInjectorItemId(TEXT("HealthInjector"));
 const FName ShieldPackItemId(TEXT("ShieldPack"));
+
+int32 GetLobbyReadyDebugMessageKey(const AController* Controller)
+{
+	return Controller && Controller->IsLocalController() ? 16016 : 16017;
+}
+
+bool IsShipLobbyDebugWorld(const UWorld* World)
+{
+	if (!World)
+	{
+		return false;
+	}
+
+	if (const AGameModeBase* AuthGameMode = World->GetAuthGameMode())
+	{
+		return AuthGameMode->IsA<APRShipLobbyGameMode>();
+	}
+
+	return World->GetMapName().Contains(TEXT("L_ShipLobby"));
+}
 
 bool FindInventoryItemById(const UPRInventoryComponent* InventoryComponent, const FName ItemId, FPRItemInstance& OutItem)
 {
@@ -179,10 +200,23 @@ void APRPlayerController::TryPickup()
 	if (!PickupCandidate)
 	{
 		UE_LOG(LogProjectA, Verbose, TEXT("TryPickup found no nearby pickup for %s."), *GetNameSafe(this));
+		TryActivateRiftObjective();
 		return;
 	}
 
 	ServerTryPickup(PickupCandidate);
+}
+
+void APRPlayerController::TryActivateRiftObjective()
+{
+	APRRiftObjectiveActor* ObjectiveCandidate = FindBestRiftObjectiveCandidate();
+	if (!ObjectiveCandidate)
+	{
+		UE_LOG(LogProjectA, Verbose, TEXT("TryActivateRiftObjective found no nearby objective for %s."), *GetNameSafe(this));
+		return;
+	}
+
+	ServerTryActivateRiftObjective(ObjectiveCandidate);
 }
 
 void APRPlayerController::ToggleInventory()
@@ -331,6 +365,51 @@ APRPickupActor* APRPlayerController::FindBestPickupCandidate() const
 	return BestPickup;
 }
 
+APRRiftObjectiveActor* APRPlayerController::FindBestRiftObjectiveCandidate() const
+{
+	const APawn* ControlledPawn = GetPawn();
+	UWorld* World = GetWorld();
+	if (!ControlledPawn || !World || ObjectiveInteractionRadius <= 0.0f)
+	{
+		return nullptr;
+	}
+
+	FCollisionObjectQueryParams ObjectQueryParams;
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(PRRiftObjectiveInteraction), false, ControlledPawn);
+	QueryParams.AddIgnoredActor(ControlledPawn);
+
+	TArray<FOverlapResult> Overlaps;
+	World->OverlapMultiByObjectType(
+		Overlaps,
+		ControlledPawn->GetActorLocation(),
+		FQuat::Identity,
+		ObjectQueryParams,
+		FCollisionShape::MakeSphere(ObjectiveInteractionRadius),
+		QueryParams);
+
+	APRRiftObjectiveActor* BestObjective = nullptr;
+	float BestDistanceSquared = TNumericLimits<float>::Max();
+	for (const FOverlapResult& Overlap : Overlaps)
+	{
+		APRRiftObjectiveActor* ObjectiveActor = Cast<APRRiftObjectiveActor>(Overlap.GetActor());
+		if (!ObjectiveActor || !ObjectiveActor->CanActivateObjective(const_cast<APRPlayerController*>(this)))
+		{
+			continue;
+		}
+
+		const float DistanceSquared = FVector::DistSquared(ControlledPawn->GetActorLocation(), ObjectiveActor->GetActorLocation());
+		if (DistanceSquared < BestDistanceSquared)
+		{
+			BestDistanceSquared = DistanceSquared;
+			BestObjective = ObjectiveActor;
+		}
+	}
+
+	return BestObjective;
+}
+
 bool APRPlayerController::TryPickupOnServer(APRPickupActor* PickupActor)
 {
 	if (!HasAuthority())
@@ -388,6 +467,38 @@ bool APRPlayerController::TryPickupOnServer(APRPickupActor* PickupActor)
 	return true;
 }
 
+bool APRPlayerController::TryActivateRiftObjectiveOnServer(APRRiftObjectiveActor* ObjectiveActor)
+{
+	if (!HasAuthority())
+	{
+		ServerTryActivateRiftObjective(ObjectiveActor);
+		return false;
+	}
+
+	FString FailureReason;
+	if (!CanServerActivateRiftObjective(ObjectiveActor, &FailureReason))
+	{
+		UE_LOG(
+			LogProjectA,
+			Log,
+			TEXT("Rift objective activation rejected. Controller=%s Objective=%s Reason=%s"),
+			*GetNameSafe(this),
+			*GetNameSafe(ObjectiveActor),
+			*FailureReason);
+		return false;
+	}
+
+	const bool bActivated = ObjectiveActor->ActivateObjective(this);
+	UE_LOG(
+		LogProjectA,
+		Log,
+		TEXT("Rift objective activation %s. Controller=%s Objective=%s"),
+		bActivated ? TEXT("succeeded") : TEXT("failed"),
+		*GetNameSafe(this),
+		*GetNameSafe(ObjectiveActor));
+	return bActivated;
+}
+
 void APRPlayerController::ServerSetReady_Implementation(const bool bReady)
 {
 	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
@@ -440,6 +551,11 @@ void APRPlayerController::ServerStartRiftMission_Implementation()
 void APRPlayerController::ServerTryPickup_Implementation(APRPickupActor* PickupActor)
 {
 	TryPickupOnServer(PickupActor);
+}
+
+void APRPlayerController::ServerTryActivateRiftObjective_Implementation(APRRiftObjectiveActor* ObjectiveActor)
+{
+	TryActivateRiftObjectiveOnServer(ObjectiveActor);
 }
 
 void APRPlayerController::ServerUseInventoryItem_Implementation(const FName ItemId)
@@ -645,6 +761,13 @@ void APRPlayerController::RefreshLobbyReadyDebugDisplay()
 	}
 
 	const UWorld* World = GetWorld();
+	const int32 MessageKey = GetLobbyReadyDebugMessageKey(this);
+	if (!IsShipLobbyDebugWorld(World))
+	{
+		GEngine->RemoveOnScreenDebugMessage(MessageKey);
+		return;
+	}
+
 	const AGameStateBase* GameState = World ? World->GetGameState() : nullptr;
 	if (!GameState)
 	{
@@ -659,7 +782,6 @@ void APRPlayerController::RefreshLobbyReadyDebugDisplay()
 		ReadyList += LINE_TERMINATOR;
 	}
 
-	const int32 MessageKey = IsLocalController() ? 16016 : 16017;
 	GEngine->AddOnScreenDebugMessage(MessageKey, 1.1f, FColor::Green, ReadyList);
 }
 
@@ -1067,6 +1189,62 @@ bool APRPlayerController::CanServerPickup(APRPickupActor* PickupActor, FString* 
 	if (!InventoryComponent->CanAddItem(PickedItem))
 	{
 		return Reject(TEXT("inventory cannot accept item"));
+	}
+
+	if (OutFailureReason)
+	{
+		OutFailureReason->Reset();
+	}
+
+	return true;
+}
+
+bool APRPlayerController::CanServerActivateRiftObjective(APRRiftObjectiveActor* ObjectiveActor, FString* OutFailureReason) const
+{
+	auto Reject = [OutFailureReason](const TCHAR* Reason)
+	{
+		if (OutFailureReason)
+		{
+			*OutFailureReason = Reason;
+		}
+		return false;
+	};
+
+	if (!HasAuthority())
+	{
+		return Reject(TEXT("controller is not authoritative"));
+	}
+
+	if (!ObjectiveActor)
+	{
+		return Reject(TEXT("objective is null"));
+	}
+
+	if (ObjectiveActor->IsActorBeingDestroyed())
+	{
+		return Reject(TEXT("objective is being destroyed"));
+	}
+
+	if (ObjectiveActor->GetWorld() != GetWorld())
+	{
+		return Reject(TEXT("objective belongs to a different world"));
+	}
+
+	if (!ObjectiveActor->CanActivateObjective(const_cast<APRPlayerController*>(this)))
+	{
+		return Reject(TEXT("objective is not available"));
+	}
+
+	const APawn* ControlledPawn = GetPawn();
+	if (!ControlledPawn)
+	{
+		return Reject(TEXT("controller has no pawn"));
+	}
+
+	const float MaxDistance = FMath::Max(ObjectiveInteractionRadius, ObjectiveActor->GetInteractionRadius());
+	if (FVector::DistSquared(ControlledPawn->GetActorLocation(), ObjectiveActor->GetActorLocation()) > FMath::Square(MaxDistance))
+	{
+		return Reject(TEXT("objective is out of range"));
 	}
 
 	if (OutFailureReason)

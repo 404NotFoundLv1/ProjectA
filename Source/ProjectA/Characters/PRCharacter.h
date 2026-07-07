@@ -146,6 +146,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Network|Debug")
 	UTextRenderComponent* PlayerDebugLabel;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Network|Debug")
+	bool bShowPlayerDebugLabel;
+
 	FDelegateHandle HealthChangedDelegateHandle;
 	FDelegateHandle ShieldChangedDelegateHandle;
 	FDelegateHandle EnergyChangedDelegateHandle;

@@ -7,6 +7,9 @@
 
 class USphereComponent;
 class UStaticMeshComponent;
+class UWidgetComponent;
+class UPrimitiveComponent;
+class APawn;
 
 /**
  * Replicated world item actor used as the visual/interactable pickup target.
@@ -19,6 +22,7 @@ class PROJECTA_API APRPickupActor : public AActor
 public:
 	APRPickupActor();
 
+	virtual void Tick(float DeltaSeconds) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UFUNCTION(BlueprintPure, Category = "Pickup")
@@ -33,11 +37,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Pickup")
 	bool IsPickedUp() const { return bIsPickedUp; }
 
+	UFUNCTION(BlueprintPure, Category = "Pickup")
+	FText GetInteractionPromptText() const;
+
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Pickup")
 	void SetPickedUp(bool bNewPickedUp);
 
 	UStaticMeshComponent* GetMeshComponent() const { return Mesh; }
 	USphereComponent* GetInteractionSphere() const { return InteractionSphere; }
+	UWidgetComponent* GetInteractionPromptWidget() const { return InteractionPromptWidget; }
 
 private:
 	UFUNCTION()
@@ -46,13 +54,36 @@ private:
 	UFUNCTION()
 	void OnRep_IsPickedUp();
 
+	UFUNCTION()
+	void HandleInteractionSphereBeginOverlap(
+		UPrimitiveComponent* OverlappedComponent,
+		AActor* OtherActor,
+		UPrimitiveComponent* OtherComp,
+		int32 OtherBodyIndex,
+		bool bFromSweep,
+		const FHitResult& SweepResult);
+
+	UFUNCTION()
+	void HandleInteractionSphereEndOverlap(
+		UPrimitiveComponent* OverlappedComponent,
+		AActor* OtherActor,
+		UPrimitiveComponent* OtherComp,
+		int32 OtherBodyIndex);
+
 	void RefreshPickupVisualState();
+	void SetInteractionPromptVisible(bool bVisible);
+	void RefreshInteractionPromptWidget();
+	void UpdateInteractionPromptVisibility();
+	APawn* FindNearbyPromptPawn() const;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Pickup", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> Mesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Pickup", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USphereComponent> InteractionSphere;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Pickup", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UWidgetComponent> InteractionPromptWidget;
 
 	UPROPERTY(ReplicatedUsing = OnRep_ItemInstance, EditAnywhere, BlueprintReadOnly, Category = "Pickup", meta = (AllowPrivateAccess = "true"))
 	FPRItemInstance ItemInstance;

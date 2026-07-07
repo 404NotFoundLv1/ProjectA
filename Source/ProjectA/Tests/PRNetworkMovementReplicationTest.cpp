@@ -15,6 +15,7 @@ bool FPRNetworkMovementReplicationTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("ProjectRift character movement replication is enabled on the actor"), CharacterDefaults->IsReplicatingMovement());
 	TestNotNull(TEXT("ProjectRift character keeps the engine CharacterMovement component"), CharacterDefaults->GetCharacterMovement());
 	TestNotNull(TEXT("ProjectRift character exposes a multiplayer debug label"), CharacterDefaults->GetPlayerDebugLabel());
+	TestFalse(TEXT("Multiplayer debug label is hidden by default"), CharacterDefaults->GetPlayerDebugLabel() && CharacterDefaults->GetPlayerDebugLabel()->IsVisible());
 
 	return true;
 }

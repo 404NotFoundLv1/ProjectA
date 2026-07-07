@@ -5,6 +5,8 @@
 #include "Core/PRRiftGameState.h"
 #include "PRRiftGameMode.generated.h"
 
+class APRRiftObjectiveActor;
+
 /**
  * Server-authoritative rule set for rift missions.
  */
@@ -33,6 +35,15 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Mission")
 	void UpdateAlivePlayerCount();
 
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Objective")
+	void HandleObjectiveActivated(APRRiftObjectiveActor* ObjectiveActor);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Objective")
+	void HandleObjectiveProgressChanged(APRRiftObjectiveActor* ObjectiveActor, float ObjectiveProgress);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Objective")
+	void HandleObjectiveCompleted(APRRiftObjectiveActor* ObjectiveActor);
+
 	UFUNCTION(BlueprintPure, Category = "Rift|Mission")
 	bool HasRiftMissionStarted() const { return bRiftMissionStarted; }
 
@@ -47,5 +58,8 @@ protected:
 	float InitialRiftStability = 100.0f;
 
 private:
+	UPROPERTY(Transient)
+	TObjectPtr<APRRiftObjectiveActor> ActiveObjective;
+
 	bool bRiftMissionStarted = false;
 };

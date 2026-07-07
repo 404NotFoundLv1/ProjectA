@@ -41,6 +41,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Rift|State")
 	float GetMissionTime() const { return MissionTime; }
 
+	UFUNCTION(BlueprintPure, Category = "Rift|State")
+	float GetObjectiveProgress() const { return ObjectiveProgress; }
+
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|State")
 	void SetCurrentObjectiveState(EPRRiftObjectiveState InCurrentObjectiveState);
 
@@ -55,6 +58,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|State")
 	void SetMissionTime(float InMissionTime);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|State")
+	void SetObjectiveProgress(float InObjectiveProgress);
 
 protected:
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentObjectiveState, BlueprintReadOnly, Category = "Rift|State")
@@ -72,6 +78,9 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_MissionTime, BlueprintReadOnly, Category = "Rift|State")
 	float MissionTime = 0.0f;
 
+	UPROPERTY(ReplicatedUsing = OnRep_ObjectiveProgress, BlueprintReadOnly, Category = "Rift|State")
+	float ObjectiveProgress = 0.0f;
+
 	UFUNCTION()
 	void OnRep_CurrentObjectiveState();
 
@@ -86,4 +95,7 @@ protected:
 
 	UFUNCTION()
 	void OnRep_MissionTime();
+
+	UFUNCTION()
+	void OnRep_ObjectiveProgress();
 };

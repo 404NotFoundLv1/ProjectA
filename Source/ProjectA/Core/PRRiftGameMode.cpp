@@ -1,5 +1,6 @@
 #include "Core/PRRiftGameMode.h"
 
+#include "Core/PRRiftObjectiveActor.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerController.h"
@@ -63,7 +64,9 @@ bool APRRiftGameMode::StartRiftMission()
 	}
 
 	bRiftMissionStarted = true;
-	RiftGameState->SetCurrentObjectiveState(EPRRiftObjectiveState::Active);
+	ActiveObjective = nullptr;
+	RiftGameState->SetCurrentObjectiveState(EPRRiftObjectiveState::NotStarted);
+	RiftGameState->SetObjectiveProgress(0.0f);
 	RiftGameState->SetRiftStability(InitialRiftStability);
 	RiftGameState->SetExtractionAvailable(false);
 	RiftGameState->SetMissionTime(0.0f);
@@ -85,6 +88,7 @@ void APRRiftGameMode::CompleteCurrentObjective()
 
 	if (APRRiftGameState* RiftGameState = GetRiftGameState())
 	{
+		RiftGameState->SetObjectiveProgress(1.0f);
 		RiftGameState->SetCurrentObjectiveState(EPRRiftObjectiveState::Completed);
 		OpenExtraction();
 	}
@@ -114,6 +118,56 @@ void APRRiftGameMode::UpdateAlivePlayerCount()
 	{
 		RiftGameState->SetAlivePlayerCount(CountAlivePlayers());
 	}
+}
+
+void APRRiftGameMode::HandleObjectiveActivated(APRRiftObjectiveActor* ObjectiveActor)
+{
+	if (!HasAuthority() || !ObjectiveActor)
+	{
+		return;
+	}
+
+	ActiveObjective = ObjectiveActor;
+
+	if (APRRiftGameState* RiftGameState = GetRiftGameState())
+	{
+		RiftGameState->SetCurrentObjectiveState(EPRRiftObjectiveState::Active);
+		RiftGameState->SetObjectiveProgress(ObjectiveActor->GetObjectiveProgress());
+	}
+}
+
+void APRRiftGameMode::HandleObjectiveProgressChanged(APRRiftObjectiveActor* ObjectiveActor, const float ObjectiveProgress)
+{
+	if (!HasAuthority() || !ObjectiveActor)
+	{
+		return;
+	}
+
+	if (ActiveObjective && ActiveObjective != ObjectiveActor)
+	{
+		return;
+	}
+
+	if (APRRiftGameState* RiftGameState = GetRiftGameState())
+	{
+		RiftGameState->SetObjectiveProgress(ObjectiveProgress);
+	}
+}
+
+void APRRiftGameMode::HandleObjectiveCompleted(APRRiftObjectiveActor* ObjectiveActor)
+{
+	if (!HasAuthority() || !ObjectiveActor)
+	{
+		return;
+	}
+
+	if (ActiveObjective && ActiveObjective != ObjectiveActor)
+	{
+		return;
+	}
+
+	ActiveObjective = ObjectiveActor;
+	CompleteCurrentObjective();
 }
 
 APRRiftGameState* APRRiftGameMode::GetRiftGameState() const

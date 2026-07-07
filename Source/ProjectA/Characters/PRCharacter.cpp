@@ -83,6 +83,7 @@ APRCharacter::APRCharacter()
 	AssaultBlastAbilityClass = UGA_AssaultBlast::StaticClass();
 	AssaultShieldAbilityClass = UGA_AssaultShield::StaticClass();
 	AutoRespawnDelay = 5.0f;
+	bShowPlayerDebugLabel = false;
 
 	PlayerDebugLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("PlayerDebugLabel"));
 	PlayerDebugLabel->SetupAttachment(GetRootComponent());
@@ -92,6 +93,8 @@ APRCharacter::APRCharacter()
 	PlayerDebugLabel->SetTextRenderColor(FColor::White);
 	PlayerDebugLabel->SetWorldSize(24.0f);
 	PlayerDebugLabel->SetText(FText::FromString(TEXT("Player")));
+	PlayerDebugLabel->SetHiddenInGame(true);
+	PlayerDebugLabel->SetVisibility(false);
 
 	static ConstructorHelpers::FObjectFinder<UInputAction> JumpActionAsset(TEXT("/Game/ProjectRift/Input/Actions/IA_Jump.IA_Jump"));
 	if (JumpActionAsset.Succeeded())
@@ -666,6 +669,13 @@ void APRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 void APRCharacter::RefreshPlayerDebugLabel()
 {
 	if (!PlayerDebugLabel)
+	{
+		return;
+	}
+
+	PlayerDebugLabel->SetHiddenInGame(!bShowPlayerDebugLabel);
+	PlayerDebugLabel->SetVisibility(bShowPlayerDebugLabel);
+	if (!bShowPlayerDebugLabel)
 	{
 		return;
 	}

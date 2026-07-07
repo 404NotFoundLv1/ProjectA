@@ -12,6 +12,7 @@ class UPRInventoryWidget;
 class UPRLootTableDataAsset;
 class UGameplayEffect;
 class APRPickupActor;
+class APRRiftObjectiveActor;
 
 /**
  * Player-owned input and UI entry point for ProjectRift.
@@ -38,6 +39,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Pickup")
 	void TryPickup();
+
+	UFUNCTION(BlueprintCallable, Category = "Rift|Objective")
+	void TryActivateRiftObjective();
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	void ToggleInventory();
@@ -69,7 +73,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Pickup")
 	APRPickupActor* FindBestPickupCandidate() const;
 
+	UFUNCTION(BlueprintCallable, Category = "Rift|Objective")
+	APRRiftObjectiveActor* FindBestRiftObjectiveCandidate() const;
+
 	bool TryPickupOnServer(APRPickupActor* PickupActor);
+	bool TryActivateRiftObjectiveOnServer(APRRiftObjectiveActor* ObjectiveActor);
 
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Lobby")
 	void ServerSetReady(bool bReady);
@@ -82,6 +90,9 @@ public:
 
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Pickup")
 	void ServerTryPickup(APRPickupActor* PickupActor);
+
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Rift|Objective")
+	void ServerTryActivateRiftObjective(APRRiftObjectiveActor* ObjectiveActor);
 
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Inventory|Use")
 	void ServerUseInventoryItem(FName ItemId);
@@ -125,9 +136,13 @@ private:
 	void HandleInventoryDropRequested(FName ItemId, int32 Count);
 
 	bool CanServerPickup(APRPickupActor* PickupActor, FString* OutFailureReason = nullptr) const;
+	bool CanServerActivateRiftObjective(APRRiftObjectiveActor* ObjectiveActor, FString* OutFailureReason = nullptr) const;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Pickup", meta = (ClampMin = "0.0"))
 	float PickupInteractionRadius = 250.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Rift|Objective", meta = (ClampMin = "0.0"))
+	float ObjectiveInteractionRadius = 250.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Debug")
 	TSubclassOf<UPRGASDebugWidget> GASDebugWidgetClass;
