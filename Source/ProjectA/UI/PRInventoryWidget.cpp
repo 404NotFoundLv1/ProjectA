@@ -132,6 +132,25 @@ FText UPRInventoryWidget::GetItemTooltipText(const FPRItemInstance& Item) const
 	return FText::FromString(FString::Join(Lines, LINE_TERMINATOR));
 }
 
+void UPRInventoryWidget::RequestUseSelectedItem()
+{
+	if (HasSelectedItem())
+	{
+		OnUseItemRequested.Broadcast(DisplayedItems[SelectedItemIndex].ItemId);
+	}
+}
+
+void UPRInventoryWidget::RequestUseDisplayedItem(const int32 ItemIndex)
+{
+	if (DisplayedItems.IsValidIndex(ItemIndex))
+	{
+		SelectedItemIndex = ItemIndex;
+		OnUseItemRequested.Broadcast(DisplayedItems[ItemIndex].ItemId);
+		RebuildItemList();
+		RefreshSelectedItemDetails();
+	}
+}
+
 TSharedRef<SWidget> UPRInventoryWidget::RebuildWidget()
 {
 	TSharedRef<SWidget> Widget = SNew(SBorder)
@@ -166,6 +185,20 @@ TSharedRef<SWidget> UPRInventoryWidget::RebuildWidget()
 					.ColorAndOpacity(FSlateColor(FLinearColor(0.88f, 0.9f, 0.86f, 1.0f)))
 					.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 12))
 					.Text(FText::FromString(TEXT("Select an item.")))
+				]
+			]
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.0f, 8.0f, 0.0f, 0.0f)
+			[
+				SNew(SButton)
+				.OnClicked(FOnClicked::CreateUObject(this, &UPRInventoryWidget::HandleUseSelectedClicked))
+				[
+					SNew(STextBlock)
+					.Justification(ETextJustify::Center)
+					.ColorAndOpacity(FSlateColor(FLinearColor(0.95f, 0.96f, 0.92f, 1.0f)))
+					.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 13))
+					.Text(FText::FromString(TEXT("Use Selected")))
 				]
 			]
 		];
@@ -203,6 +236,12 @@ void UPRInventoryWidget::HandleInventoryChanged()
 FReply UPRInventoryWidget::HandleItemClicked(const int32 ItemIndex)
 {
 	SelectDisplayedItem(ItemIndex);
+	return FReply::Handled();
+}
+
+FReply UPRInventoryWidget::HandleUseSelectedClicked()
+{
+	RequestUseSelectedItem();
 	return FReply::Handled();
 }
 

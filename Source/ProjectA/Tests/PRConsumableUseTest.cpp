@@ -1,0 +1,148 @@
+#if WITH_DEV_AUTOMATION_TESTS
+
+#include "Misc/AutomationTest.h"
+
+#include "Abilities/PRAttributeSet.h"
+#include "Abilities/PRHealthConsumableGameplayEffect.h"
+#include "Abilities/PRShieldConsumableGameplayEffect.h"
+#include "Characters/PRCharacter.h"
+#include "GameplayEffect.h"
+#include "Items/PRInventoryComponent.h"
+#include "Player/PRPlayerController.h"
+#include "Player/PRPlayerState.h"
+#include "Tests/AutomationCommon.h"
+#include "UI/PRInventoryWidget.h"
+#include "UObject/StrongObjectPtr.h"
+#include "UObject/UnrealType.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPRConsumableUseTest, "ProjectRift.Items.ConsumableUse", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+namespace
+{
+FPRItemInstance MakeConsumableUseTestItem(const FName ItemId, const int32 Count)
+{
+	FPRItemInstance Item;
+	Item.ItemId = ItemId;
+	Item.Count = Count;
+	return Item;
+}
+
+struct FConsumableUseTestPlayer
+{
+	TObjectPtr<APRPlayerController> Controller;
+	TObjectPtr<APRPlayerState> PlayerState;
+	TObjectPtr<APRCharacter> Character;
+	TObjectPtr<UPRInventoryComponent> Inventory;
+	TObjectPtr<UPRAttributeSet> Attributes;
+};
+
+FConsumableUseTestPlayer SpawnConsumableUseTestPlayer(FAutomationTestBase& Test, UWorld* World)
+{
+	FConsumableUseTestPlayer Result;
+	if (!World)
+	{
+		return Result;
+	}
+
+	Result.Controller = World->SpawnActor<APRPlayerController>();
+	Result.PlayerState = World->SpawnActor<APRPlayerState>();
+	Result.Character = World->SpawnActor<APRCharacter>(FVector::ZeroVector, FRotator::ZeroRotator);
+
+	Test.TestNotNull(TEXT("Consumable test controller spawned"), Result.Controller.Get());
+	Test.TestNotNull(TEXT("Consumable test player state spawned"), Result.PlayerState.Get());
+	Test.TestNotNull(TEXT("Consumable test character spawned"), Result.Character.Get());
+
+	if (!Result.Controller || !Result.PlayerState || !Result.Character)
+	{
+		return Result;
+	}
+
+	Result.Controller->SetPlayerState(Result.PlayerState);
+	Result.Controller->Possess(Result.Character);
+
+	Result.Inventory = Result.PlayerState->GetInventoryComponent();
+	Result.Attributes = Result.PlayerState->GetAttributeSet();
+	Test.TestNotNull(TEXT("Consumable test inventory exists"), Result.Inventory.Get());
+	Test.TestNotNull(TEXT("Consumable test attributes exist"), Result.Attributes.Get());
+	Test.TestTrue(TEXT("Consumable test character initializes ASC"), Result.Character->IsAbilitySystemInitialized());
+
+	return Result;
+}
+}
+
+bool FPRConsumableUseTest::RunTest(const FString& Parameters)
+{
+	TestTrue(
+		TEXT("Health consumable GE derives from UGameplayEffect"),
+		UPRHealthConsumableGameplayEffect::StaticClass()->IsChildOf(UGameplayEffect::StaticClass()));
+	TestTrue(
+		TEXT("Shield consumable GE derives from UGameplayEffect"),
+		UPRShieldConsumableGameplayEffect::StaticClass()->IsChildOf(UGameplayEffect::StaticClass()));
+
+	UClass* PlayerControllerClass = APRPlayerController::StaticClass();
+	TestNotNull(TEXT("Player controller exposes UseInventoryItem"), PlayerControllerClass->FindFunctionByName(TEXT("UseInventoryItem")));
+	TestNotNull(TEXT("Player controller exposes ServerUseInventoryItem"), PlayerControllerClass->FindFunctionByName(TEXT("ServerUseInventoryItem")));
+	UFunction* ServerUseFunction = PlayerControllerClass->FindFunctionByName(TEXT("ServerUseInventoryItem"));
+	TestTrue(TEXT("ServerUseInventoryItem is a server RPC"), ServerUseFunction && ServerUseFunction->HasAnyFunctionFlags(FUNC_NetServer));
+
+	UClass* InventoryWidgetClass = UPRInventoryWidget::StaticClass();
+	TestNotNull(TEXT("Inventory widget exposes RequestUseSelectedItem"), InventoryWidgetClass->FindFunctionByName(TEXT("RequestUseSelectedItem")));
+	TestNotNull(TEXT("Inventory widget exposes RequestUseDisplayedItem"), InventoryWidgetClass->FindFunctionByName(TEXT("RequestUseDisplayedItem")));
+	TestNotNull(TEXT("Inventory widget exposes OnUseItemRequested delegate"), FindFProperty<FMulticastDelegateProperty>(InventoryWidgetClass, TEXT("OnUseItemRequested")));
+
+	FTestWorldWrapper WorldWrapper;
+	TestTrue(TEXT("Test world is created"), WorldWrapper.CreateTestWorld(EWorldType::Game));
+	UWorld* World = WorldWrapper.GetTestWorld();
+	if (!World)
+	{
+		return false;
+	}
+
+	TestTrue(TEXT("Test world begins play"), WorldWrapper.BeginPlayInTestWorld());
+	if (WorldWrapper.HasFailed())
+	{
+		WorldWrapper.ForwardErrorMessages(this);
+		return false;
+	}
+
+	FConsumableUseTestPlayer TestPlayer = SpawnConsumableUseTestPlayer(*this, World);
+	if (!TestPlayer.Controller || !TestPlayer.Inventory || !TestPlayer.Attributes || !TestPlayer.Character)
+	{
+		return false;
+	}
+
+	TestPlayer.Attributes->SetHealth(40.0f);
+	TestTrue(TEXT("Can seed HealthInjector stack"), TestPlayer.Inventory->AddItem(MakeConsumableUseTestItem(TEXT("HealthInjector"), 2)));
+	TestTrue(TEXT("HealthInjector can be used on the server"), TestPlayer.Controller->TryUseInventoryItemOnServer(TEXT("HealthInjector")));
+	TestTrue(TEXT("HealthInjector increases Health"), TestPlayer.Attributes->GetHealth() > 40.0f);
+	TestTrue(TEXT("HealthInjector clamps Health to MaxHealth"), TestPlayer.Attributes->GetHealth() <= TestPlayer.Attributes->GetMaxHealth());
+	TestEqual(TEXT("HealthInjector consumes one item"), TestPlayer.Inventory->GetItemCount(TEXT("HealthInjector")), 1);
+
+	const float FullHealth = TestPlayer.Attributes->GetMaxHealth();
+	TestPlayer.Attributes->SetHealth(FullHealth);
+	TestFalse(TEXT("HealthInjector cannot be wasted at full Health"), TestPlayer.Controller->TryUseInventoryItemOnServer(TEXT("HealthInjector")));
+	TestEqual(TEXT("Rejected full Health use keeps item count"), TestPlayer.Inventory->GetItemCount(TEXT("HealthInjector")), 1);
+	TestEqual(TEXT("Rejected full Health use keeps Health unchanged"), TestPlayer.Attributes->GetHealth(), FullHealth);
+
+	TestPlayer.Attributes->SetShield(10.0f);
+	TestTrue(TEXT("Can seed ShieldPack"), TestPlayer.Inventory->AddItem(MakeConsumableUseTestItem(TEXT("ShieldPack"), 1)));
+	TestTrue(TEXT("ShieldPack can be used on the server"), TestPlayer.Controller->TryUseInventoryItemOnServer(TEXT("ShieldPack")));
+	TestTrue(TEXT("ShieldPack increases Shield"), TestPlayer.Attributes->GetShield() > 10.0f);
+	TestTrue(TEXT("ShieldPack clamps Shield to MaxShield"), TestPlayer.Attributes->GetShield() <= TestPlayer.Attributes->GetMaxShield());
+	TestEqual(TEXT("ShieldPack consumes one item"), TestPlayer.Inventory->GetItemCount(TEXT("ShieldPack")), 0);
+
+	const float HealthBeforeMissingItem = TestPlayer.Attributes->GetHealth();
+	TestFalse(TEXT("Missing consumable cannot be used"), TestPlayer.Controller->TryUseInventoryItemOnServer(TEXT("ShieldPack")));
+	TestEqual(TEXT("Missing consumable does not change Health"), TestPlayer.Attributes->GetHealth(), HealthBeforeMissingItem);
+
+	TestTrue(TEXT("Can seed downed-state HealthInjector"), TestPlayer.Inventory->AddItem(MakeConsumableUseTestItem(TEXT("HealthInjector"), 1)));
+	TestPlayer.Attributes->SetHealth(20.0f);
+	TestTrue(TEXT("Character can enter downed state for consumable test"), TestPlayer.Character->EnterDownedState());
+	TestFalse(TEXT("Downed character cannot use consumables"), TestPlayer.Controller->TryUseInventoryItemOnServer(TEXT("HealthInjector")));
+	TestEqual(TEXT("Downed rejected use keeps item count"), TestPlayer.Inventory->GetItemCount(TEXT("HealthInjector")), 2);
+	TestEqual(TEXT("Downed rejected use keeps Health unchanged"), TestPlayer.Attributes->GetHealth(), 20.0f);
+
+	return true;
+}
+
+#endif

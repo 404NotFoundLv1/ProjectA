@@ -9,6 +9,8 @@ class SScrollBox;
 class STextBlock;
 class UPRInventoryComponent;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPRInventoryItemUseRequestedSignature, FName, ItemId);
+
 /**
  * Lightweight runtime inventory panel backed by the replicated owner inventory.
  */
@@ -54,6 +56,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
 	FText GetItemTooltipText(const FPRItemInstance& Item) const;
 
+	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
+	void RequestUseSelectedItem();
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
+	void RequestUseDisplayedItem(int32 ItemIndex);
+
+	UPROPERTY(BlueprintAssignable, Category = "Inventory|UI")
+	FPRInventoryItemUseRequestedSignature OnUseItemRequested;
+
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual void ReleaseSlateResources(bool bReleaseChildren) override;
@@ -64,6 +75,7 @@ private:
 	void HandleInventoryChanged();
 
 	FReply HandleItemClicked(int32 ItemIndex);
+	FReply HandleUseSelectedClicked();
 	void RebuildItemList();
 	void RefreshSelectedItemDetails();
 	FString BuildItemSummary(const FPRItemInstance& Item) const;

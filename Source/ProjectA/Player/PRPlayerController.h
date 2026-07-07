@@ -8,6 +8,7 @@
 class UPRGASDebugWidget;
 class UPRInventoryComponent;
 class UPRInventoryWidget;
+class UGameplayEffect;
 class APRPickupActor;
 
 /**
@@ -48,6 +49,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	void RefreshInventoryDisplay();
 
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Use")
+	void UseInventoryItem(FName ItemId);
+
 	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
 	bool IsInventoryVisible() const;
 
@@ -71,8 +75,13 @@ public:
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Pickup")
 	void ServerTryPickup(APRPickupActor* PickupActor);
 
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Inventory|Use")
+	void ServerUseInventoryItem(FName ItemId);
+
 	UFUNCTION(BlueprintCallable, Category = "Lobby|Debug")
 	void RefreshLobbyReadyDebugDisplay();
+
+	bool TryUseInventoryItemOnServer(FName ItemId);
 
 protected:
 	virtual void BeginPlay() override;
@@ -86,6 +95,12 @@ private:
 	void CreateInventoryUI();
 	void DestroyInventoryUI();
 	UPRInventoryComponent* GetLocalInventoryComponent() const;
+	TSubclassOf<UGameplayEffect> ResolveConsumableEffectClass(FName ItemId) const;
+	bool CanUseInventoryItemOnServer(FName ItemId, FString* OutFailureReason = nullptr) const;
+
+	UFUNCTION()
+	void HandleInventoryUseRequested(FName ItemId);
+
 	bool CanServerPickup(APRPickupActor* PickupActor, FString* OutFailureReason = nullptr) const;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Pickup", meta = (ClampMin = "0.0"))
@@ -102,6 +117,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPRInventoryWidget> InventoryWidget;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Inventory|Use")
+	TSubclassOf<UGameplayEffect> HealthInjectorEffectClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Inventory|Use")
+	TSubclassOf<UGameplayEffect> ShieldPackEffectClass;
 
 	FTimerHandle LobbyReadyDebugTimerHandle;
 };

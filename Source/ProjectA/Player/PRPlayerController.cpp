@@ -1,5 +1,10 @@
 #include "Player/PRPlayerController.h"
 
+#include "Abilities/PRAbilitySystemComponent.h"
+#include "Abilities/PRAttributeSet.h"
+#include "Abilities/PRHealthConsumableGameplayEffect.h"
+#include "Abilities/PRShieldConsumableGameplayEffect.h"
+#include "Characters/PRCharacter.h"
 #include "Core/PRShipLobbyGameMode.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/Engine.h"
@@ -20,6 +25,8 @@
 namespace
 {
 const FName AssaultRoleModuleName(TEXT("Ability.Role.Assault"));
+const FName HealthInjectorItemId(TEXT("HealthInjector"));
+const FName ShieldPackItemId(TEXT("ShieldPack"));
 
 FString GetLobbyReadyLine(const APlayerState* PlayerState)
 {
@@ -69,6 +76,8 @@ APRPlayerController::APRPlayerController()
 	}
 
 	InventoryWidgetClass = UPRInventoryWidget::StaticClass();
+	HealthInjectorEffectClass = UPRHealthConsumableGameplayEffect::StaticClass();
+	ShieldPackEffectClass = UPRShieldConsumableGameplayEffect::StaticClass();
 }
 
 void APRPlayerController::BeginPlay()
@@ -212,6 +221,17 @@ void APRPlayerController::RefreshInventoryDisplay()
 bool APRPlayerController::IsInventoryVisible() const
 {
 	return InventoryWidget && InventoryWidget->GetVisibility() == ESlateVisibility::Visible;
+}
+
+void APRPlayerController::UseInventoryItem(const FName ItemId)
+{
+	if (HasAuthority())
+	{
+		TryUseInventoryItemOnServer(ItemId);
+		return;
+	}
+
+	ServerUseInventoryItem(ItemId);
 }
 
 APRPickupActor* APRPlayerController::FindBestPickupCandidate() const
@@ -370,6 +390,66 @@ void APRPlayerController::ServerTryPickup_Implementation(APRPickupActor* PickupA
 	TryPickupOnServer(PickupActor);
 }
 
+void APRPlayerController::ServerUseInventoryItem_Implementation(const FName ItemId)
+{
+	TryUseInventoryItemOnServer(ItemId);
+}
+
+bool APRPlayerController::TryUseInventoryItemOnServer(const FName ItemId)
+{
+	if (!HasAuthority())
+	{
+		ServerUseInventoryItem(ItemId);
+		return false;
+	}
+
+	FString FailureReason;
+	if (!CanUseInventoryItemOnServer(ItemId, &FailureReason))
+	{
+		UE_LOG(
+			LogProjectA,
+			Log,
+			TEXT("Inventory item use rejected. Controller=%s ItemId=%s Reason=%s"),
+			*GetNameSafe(this),
+			*ItemId.ToString(),
+			*FailureReason);
+		return false;
+	}
+
+	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	UPRAbilitySystemComponent* AbilitySystemComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetProjectRiftAbilitySystemComponent() : nullptr;
+	UPRInventoryComponent* InventoryComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetInventoryComponent() : nullptr;
+	const TSubclassOf<UGameplayEffect> ConsumableEffectClass = ResolveConsumableEffectClass(ItemId);
+	if (!AbilitySystemComponent || !InventoryComponent || !ConsumableEffectClass)
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Inventory item use failed after validation for %s."), *ItemId.ToString());
+		return false;
+	}
+
+	const UGameplayEffect* ConsumableEffect = ConsumableEffectClass->GetDefaultObject<UGameplayEffect>();
+	FGameplayEffectContextHandle EffectContext = AbilitySystemComponent->MakeEffectContext();
+	EffectContext.AddSourceObject(this);
+	AbilitySystemComponent->ApplyGameplayEffectToSelf(ConsumableEffect, 1.0f, EffectContext);
+
+	const bool bConsumed = InventoryComponent->UseItem(ItemId);
+	if (!bConsumed)
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Inventory item effect applied but item removal failed. ItemId=%s"), *ItemId.ToString());
+		return false;
+	}
+
+	UE_LOG(
+		LogProjectA,
+		Log,
+		TEXT("Inventory item used. Controller=%s ItemId=%s Remaining=%d Effect=%s"),
+		*GetNameSafe(this),
+		*ItemId.ToString(),
+		InventoryComponent->GetItemCount(ItemId),
+		*GetNameSafe(ConsumableEffect));
+
+	return true;
+}
+
 void APRPlayerController::RefreshLobbyReadyDebugDisplay()
 {
 	if (!IsLocalPlayerController() || !GEngine)
@@ -443,6 +523,7 @@ void APRPlayerController::CreateInventoryUI()
 	InventoryWidget = CreateWidget<UPRInventoryWidget>(this, InventoryWidgetClass);
 	if (InventoryWidget)
 	{
+		InventoryWidget->OnUseItemRequested.AddUniqueDynamic(this, &APRPlayerController::HandleInventoryUseRequested);
 		InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
 		InventoryWidget->AddToPlayerScreen(30);
 		InventoryWidget->SetAlignmentInViewport(FVector2D::ZeroVector);
@@ -456,6 +537,7 @@ void APRPlayerController::DestroyInventoryUI()
 {
 	if (InventoryWidget)
 	{
+		InventoryWidget->OnUseItemRequested.RemoveDynamic(this, &APRPlayerController::HandleInventoryUseRequested);
 		InventoryWidget->RemoveFromParent();
 		InventoryWidget = nullptr;
 	}
@@ -465,6 +547,110 @@ UPRInventoryComponent* APRPlayerController::GetLocalInventoryComponent() const
 {
 	const APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
 	return ProjectRiftPlayerState ? ProjectRiftPlayerState->GetInventoryComponent() : nullptr;
+}
+
+TSubclassOf<UGameplayEffect> APRPlayerController::ResolveConsumableEffectClass(const FName ItemId) const
+{
+	if (ItemId == HealthInjectorItemId)
+	{
+		return HealthInjectorEffectClass;
+	}
+
+	if (ItemId == ShieldPackItemId)
+	{
+		return ShieldPackEffectClass;
+	}
+
+	return nullptr;
+}
+
+bool APRPlayerController::CanUseInventoryItemOnServer(const FName ItemId, FString* OutFailureReason) const
+{
+	auto Reject = [OutFailureReason](const TCHAR* Reason)
+	{
+		if (OutFailureReason)
+		{
+			*OutFailureReason = Reason;
+		}
+		return false;
+	};
+
+	if (!HasAuthority())
+	{
+		return Reject(TEXT("controller is not authoritative"));
+	}
+
+	if (ItemId.IsNone())
+	{
+		return Reject(TEXT("item id is empty"));
+	}
+
+	APRCharacter* ProjectRiftCharacter = Cast<APRCharacter>(GetPawn());
+	if (!ProjectRiftCharacter)
+	{
+		return Reject(TEXT("controlled ProjectRift character is missing"));
+	}
+
+	if (!ProjectRiftCharacter->IsAlive())
+	{
+		return Reject(TEXT("character is not alive"));
+	}
+
+	const APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	const UPRInventoryComponent* InventoryComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetInventoryComponent() : nullptr;
+	const UPRAttributeSet* AttributeSet = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetAttributeSet() : nullptr;
+	const UPRAbilitySystemComponent* AbilitySystemComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetProjectRiftAbilitySystemComponent() : nullptr;
+	if (!InventoryComponent)
+	{
+		return Reject(TEXT("inventory is missing"));
+	}
+
+	if (InventoryComponent->GetItemCount(ItemId) <= 0)
+	{
+		return Reject(TEXT("item is not in inventory"));
+	}
+
+	if (!AttributeSet)
+	{
+		return Reject(TEXT("attribute set is missing"));
+	}
+
+	if (!AbilitySystemComponent)
+	{
+		return Reject(TEXT("ability system component is missing"));
+	}
+
+	if (!ResolveConsumableEffectClass(ItemId))
+	{
+		return Reject(TEXT("item is not a supported consumable"));
+	}
+
+	if (ItemId == HealthInjectorItemId)
+	{
+		if (AttributeSet->GetHealth() >= AttributeSet->GetMaxHealth())
+		{
+			return Reject(TEXT("health is already full"));
+		}
+	}
+	else if (ItemId == ShieldPackItemId)
+	{
+		if (AttributeSet->GetShield() >= AttributeSet->GetMaxShield())
+		{
+			return Reject(TEXT("shield is already full"));
+		}
+	}
+
+	if (OutFailureReason)
+	{
+		OutFailureReason->Reset();
+	}
+
+	return true;
+}
+
+void APRPlayerController::HandleInventoryUseRequested(const FName ItemId)
+{
+	UseInventoryItem(ItemId);
 }
 
 bool APRPlayerController::CanServerPickup(APRPickupActor* PickupActor, FString* OutFailureReason) const
