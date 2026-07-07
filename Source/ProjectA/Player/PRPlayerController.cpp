@@ -14,6 +14,7 @@
 #include "Player/PRPlayerState.h"
 #include "ProjectA.h"
 #include "UI/PRGASDebugWidget.h"
+#include "UI/PRInventoryWidget.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -66,6 +67,8 @@ APRPlayerController::APRPlayerController()
 	{
 		GASDebugWidgetClass = GASDebugWidgetAsset.Class;
 	}
+
+	InventoryWidgetClass = UPRInventoryWidget::StaticClass();
 }
 
 void APRPlayerController::BeginPlay()
@@ -83,11 +86,13 @@ void APRPlayerController::BeginPlay()
 			0.25f);
 
 		CreateGASDebugHUD();
+		CreateInventoryUI();
 	}
 }
 
 void APRPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	DestroyInventoryUI();
 	DestroyGASDebugHUD();
 	GetWorldTimerManager().ClearTimer(LobbyReadyDebugTimerHandle);
 
@@ -104,7 +109,15 @@ void APRPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::P, IE_Pressed, this, &APRPlayerController::ToggleReady);
 		InputComponent->BindKey(EKeys::O, IE_Pressed, this, &APRPlayerController::StartRiftMission);
 		InputComponent->BindKey(EKeys::F, IE_Pressed, this, &APRPlayerController::TryPickup);
+		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &APRPlayerController::ToggleInventory);
 	}
+}
+
+void APRPlayerController::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+
+	RefreshInventoryDisplay();
 }
 
 void APRPlayerController::SelectAssaultRoleModule()
@@ -140,6 +153,65 @@ void APRPlayerController::TryPickup()
 	}
 
 	ServerTryPickup(PickupCandidate);
+}
+
+void APRPlayerController::ToggleInventory()
+{
+	if (IsInventoryVisible())
+	{
+		HideInventory();
+	}
+	else
+	{
+		ShowInventory();
+	}
+}
+
+void APRPlayerController::ShowInventory()
+{
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
+
+	CreateInventoryUI();
+	RefreshInventoryDisplay();
+
+	if (InventoryWidget)
+	{
+		InventoryWidget->SetVisibility(ESlateVisibility::Visible);
+	}
+}
+
+void APRPlayerController::HideInventory()
+{
+	if (InventoryWidget)
+	{
+		InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+
+void APRPlayerController::RefreshInventoryDisplay()
+{
+	if (!IsLocalPlayerController() || !InventoryWidget)
+	{
+		return;
+	}
+
+	UPRInventoryComponent* InventoryComponent = GetLocalInventoryComponent();
+	if (InventoryWidget->GetBoundInventory() != InventoryComponent)
+	{
+		InventoryWidget->BindInventory(InventoryComponent);
+	}
+	else
+	{
+		InventoryWidget->RefreshInventory();
+	}
+}
+
+bool APRPlayerController::IsInventoryVisible() const
+{
+	return InventoryWidget && InventoryWidget->GetVisibility() == ESlateVisibility::Visible;
 }
 
 APRPickupActor* APRPlayerController::FindBestPickupCandidate() const
@@ -354,6 +426,45 @@ void APRPlayerController::DestroyGASDebugHUD()
 		GASDebugWidget->RemoveFromParent();
 		GASDebugWidget = nullptr;
 	}
+}
+
+void APRPlayerController::CreateInventoryUI()
+{
+	if (!IsLocalPlayerController() || InventoryWidget)
+	{
+		return;
+	}
+
+	if (!InventoryWidgetClass)
+	{
+		InventoryWidgetClass = UPRInventoryWidget::StaticClass();
+	}
+
+	InventoryWidget = CreateWidget<UPRInventoryWidget>(this, InventoryWidgetClass);
+	if (InventoryWidget)
+	{
+		InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
+		InventoryWidget->AddToPlayerScreen(30);
+		InventoryWidget->SetAlignmentInViewport(FVector2D::ZeroVector);
+		InventoryWidget->SetPositionInViewport(FVector2D(16.0, 256.0), false);
+		InventoryWidget->SetDesiredSizeInViewport(FVector2D(440.0, 500.0));
+		RefreshInventoryDisplay();
+	}
+}
+
+void APRPlayerController::DestroyInventoryUI()
+{
+	if (InventoryWidget)
+	{
+		InventoryWidget->RemoveFromParent();
+		InventoryWidget = nullptr;
+	}
+}
+
+UPRInventoryComponent* APRPlayerController::GetLocalInventoryComponent() const
+{
+	const APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	return ProjectRiftPlayerState ? ProjectRiftPlayerState->GetInventoryComponent() : nullptr;
 }
 
 bool APRPlayerController::CanServerPickup(APRPickupActor* PickupActor, FString* OutFailureReason) const

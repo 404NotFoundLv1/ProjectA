@@ -6,6 +6,8 @@
 #include "PRPlayerController.generated.h"
 
 class UPRGASDebugWidget;
+class UPRInventoryComponent;
+class UPRInventoryWidget;
 class APRPickupActor;
 
 /**
@@ -34,6 +36,24 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Pickup")
 	void TryPickup();
 
+	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
+	void ToggleInventory();
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
+	void ShowInventory();
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
+	void HideInventory();
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
+	void RefreshInventoryDisplay();
+
+	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
+	bool IsInventoryVisible() const;
+
+	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
+	UPRInventoryWidget* GetInventoryWidget() const { return InventoryWidget.Get(); }
+
 	UFUNCTION(BlueprintCallable, Category = "Pickup")
 	APRPickupActor* FindBestPickupCandidate() const;
 
@@ -58,10 +78,14 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void SetupInputComponent() override;
+	virtual void OnRep_PlayerState() override;
 
 private:
 	void CreateGASDebugHUD();
 	void DestroyGASDebugHUD();
+	void CreateInventoryUI();
+	void DestroyInventoryUI();
+	UPRInventoryComponent* GetLocalInventoryComponent() const;
 	bool CanServerPickup(APRPickupActor* PickupActor, FString* OutFailureReason = nullptr) const;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Pickup", meta = (ClampMin = "0.0"))
@@ -72,6 +96,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPRGASDebugWidget> GASDebugWidget;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Inventory|UI")
+	TSubclassOf<UPRInventoryWidget> InventoryWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPRInventoryWidget> InventoryWidget;
 
 	FTimerHandle LobbyReadyDebugTimerHandle;
 };
