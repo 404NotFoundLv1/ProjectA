@@ -14,7 +14,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPRPickupActorTest, "ProjectRift.Items.PickupAc
 
 namespace
 {
-UScriptStruct* GetItemInstanceStruct()
+UScriptStruct* GetPickupActorItemInstanceStruct()
 {
 	return FindObject<UScriptStruct>(nullptr, TEXT("/Script/ProjectA.PRItemInstance"));
 }
@@ -28,7 +28,7 @@ bool FPRPickupActorTest::RunTest(const FString& Parameters)
 		TEXT("APRPickupActor derives from AActor"),
 		PickupActorClass && PickupActorClass->IsChildOf(AActor::StaticClass()));
 
-	UScriptStruct* ItemInstanceStruct = GetItemInstanceStruct();
+	UScriptStruct* ItemInstanceStruct = GetPickupActorItemInstanceStruct();
 	TestNotNull(TEXT("FPRItemInstance struct is available to pickup actor"), ItemInstanceStruct);
 
 	if (!PickupActorClass || !ItemInstanceStruct)

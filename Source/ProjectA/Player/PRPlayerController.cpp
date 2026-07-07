@@ -1,12 +1,16 @@
 #include "Player/PRPlayerController.h"
 
 #include "Core/PRShipLobbyGameMode.h"
+#include "Engine/OverlapResult.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "GameFramework/GameStateBase.h"
+#include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerState.h"
 #include "InputCoreTypes.h"
 #include "InputMappingContext.h"
+#include "Items/PRInventoryComponent.h"
+#include "Items/PRPickupActor.h"
 #include "Player/PRPlayerState.h"
 #include "ProjectA.h"
 #include "UI/PRGASDebugWidget.h"
@@ -99,6 +103,7 @@ void APRPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APRPlayerController::SelectAssaultRoleModule);
 		InputComponent->BindKey(EKeys::P, IE_Pressed, this, &APRPlayerController::ToggleReady);
 		InputComponent->BindKey(EKeys::O, IE_Pressed, this, &APRPlayerController::StartRiftMission);
+		InputComponent->BindKey(EKeys::F, IE_Pressed, this, &APRPlayerController::TryPickup);
 	}
 }
 
@@ -123,6 +128,120 @@ void APRPlayerController::ToggleReady()
 void APRPlayerController::StartRiftMission()
 {
 	ServerStartRiftMission();
+}
+
+void APRPlayerController::TryPickup()
+{
+	APRPickupActor* PickupCandidate = FindBestPickupCandidate();
+	if (!PickupCandidate)
+	{
+		UE_LOG(LogProjectA, Verbose, TEXT("TryPickup found no nearby pickup for %s."), *GetNameSafe(this));
+		return;
+	}
+
+	ServerTryPickup(PickupCandidate);
+}
+
+APRPickupActor* APRPlayerController::FindBestPickupCandidate() const
+{
+	const APawn* ControlledPawn = GetPawn();
+	UWorld* World = GetWorld();
+	if (!ControlledPawn || !World || PickupInteractionRadius <= 0.0f)
+	{
+		return nullptr;
+	}
+
+	FCollisionObjectQueryParams ObjectQueryParams;
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(PRPickupInteraction), false, ControlledPawn);
+	QueryParams.AddIgnoredActor(ControlledPawn);
+
+	TArray<FOverlapResult> Overlaps;
+	World->OverlapMultiByObjectType(
+		Overlaps,
+		ControlledPawn->GetActorLocation(),
+		FQuat::Identity,
+		ObjectQueryParams,
+		FCollisionShape::MakeSphere(PickupInteractionRadius),
+		QueryParams);
+
+	APRPickupActor* BestPickup = nullptr;
+	float BestDistanceSquared = TNumericLimits<float>::Max();
+	for (const FOverlapResult& Overlap : Overlaps)
+	{
+		APRPickupActor* PickupActor = Cast<APRPickupActor>(Overlap.GetActor());
+		if (!PickupActor || !PickupActor->CanBePickedUp())
+		{
+			continue;
+		}
+
+		const float DistanceSquared = FVector::DistSquared(ControlledPawn->GetActorLocation(), PickupActor->GetActorLocation());
+		if (DistanceSquared < BestDistanceSquared)
+		{
+			BestDistanceSquared = DistanceSquared;
+			BestPickup = PickupActor;
+		}
+	}
+
+	return BestPickup;
+}
+
+bool APRPlayerController::TryPickupOnServer(APRPickupActor* PickupActor)
+{
+	if (!HasAuthority())
+	{
+		ServerTryPickup(PickupActor);
+		return false;
+	}
+
+	FString FailureReason;
+	if (!CanServerPickup(PickupActor, &FailureReason))
+	{
+		UE_LOG(
+			LogProjectA,
+			Log,
+			TEXT("Server pickup rejected. Controller=%s Pickup=%s Reason=%s"),
+			*GetNameSafe(this),
+			*GetNameSafe(PickupActor),
+			*FailureReason);
+		return false;
+	}
+
+	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	UPRInventoryComponent* InventoryComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetInventoryComponent() : nullptr;
+	if (!InventoryComponent)
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Server pickup failed because inventory disappeared for %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	const FPRItemInstance PickedItem = PickupActor->GetItemInstance();
+	if (!InventoryComponent->AddItem(PickedItem))
+	{
+		UE_LOG(
+			LogProjectA,
+			Log,
+			TEXT("Server pickup rejected during inventory add. Controller=%s Pickup=%s ItemId=%s"),
+			*GetNameSafe(this),
+			*GetNameSafe(PickupActor),
+			*PickedItem.ItemId.ToString());
+		return false;
+	}
+
+	PickupActor->SetPickedUp(true);
+	PickupActor->Destroy();
+
+	UE_LOG(
+		LogProjectA,
+		Log,
+		TEXT("Server pickup succeeded. Controller=%s Pickup=%s ItemId=%s Count=%d"),
+		*GetNameSafe(this),
+		*GetNameSafe(PickupActor),
+		*PickedItem.ItemId.ToString(),
+		PickedItem.Count);
+
+	return true;
 }
 
 void APRPlayerController::ServerSetReady_Implementation(const bool bReady)
@@ -172,6 +291,11 @@ void APRPlayerController::ServerStartRiftMission_Implementation()
 	}
 
 	LobbyGameMode->StartRiftMission(this);
+}
+
+void APRPlayerController::ServerTryPickup_Implementation(APRPickupActor* PickupActor)
+{
+	TryPickupOnServer(PickupActor);
 }
 
 void APRPlayerController::RefreshLobbyReadyDebugDisplay()
@@ -230,4 +354,78 @@ void APRPlayerController::DestroyGASDebugHUD()
 		GASDebugWidget->RemoveFromParent();
 		GASDebugWidget = nullptr;
 	}
+}
+
+bool APRPlayerController::CanServerPickup(APRPickupActor* PickupActor, FString* OutFailureReason) const
+{
+	auto Reject = [OutFailureReason](const TCHAR* Reason)
+	{
+		if (OutFailureReason)
+		{
+			*OutFailureReason = Reason;
+		}
+		return false;
+	};
+
+	if (!HasAuthority())
+	{
+		return Reject(TEXT("controller is not authoritative"));
+	}
+
+	if (!PickupActor)
+	{
+		return Reject(TEXT("pickup is null"));
+	}
+
+	if (PickupActor->IsActorBeingDestroyed())
+	{
+		return Reject(TEXT("pickup is already being destroyed"));
+	}
+
+	if (PickupActor->GetWorld() != GetWorld())
+	{
+		return Reject(TEXT("pickup belongs to a different world"));
+	}
+
+	if (!PickupActor->CanBePickedUp())
+	{
+		return Reject(TEXT("pickup is not available"));
+	}
+
+	const FPRItemInstance PickedItem = PickupActor->GetItemInstance();
+	if (!PickedItem.IsValid())
+	{
+		return Reject(TEXT("pickup item is invalid"));
+	}
+
+	const APawn* ControlledPawn = GetPawn();
+	if (!ControlledPawn)
+	{
+		return Reject(TEXT("controller has no pawn"));
+	}
+
+	const float MaxDistance = FMath::Max(0.0f, PickupInteractionRadius);
+	if (FVector::DistSquared(ControlledPawn->GetActorLocation(), PickupActor->GetActorLocation()) > FMath::Square(MaxDistance))
+	{
+		return Reject(TEXT("pickup is out of range"));
+	}
+
+	const APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	const UPRInventoryComponent* InventoryComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetInventoryComponent() : nullptr;
+	if (!InventoryComponent)
+	{
+		return Reject(TEXT("inventory is missing"));
+	}
+
+	if (!InventoryComponent->CanAddItem(PickedItem))
+	{
+		return Reject(TEXT("inventory cannot accept item"));
+	}
+
+	if (OutFailureReason)
+	{
+		OutFailureReason->Reset();
+	}
+
+	return true;
 }

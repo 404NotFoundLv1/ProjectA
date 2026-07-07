@@ -6,6 +6,7 @@
 #include "PRPlayerController.generated.h"
 
 class UPRGASDebugWidget;
+class APRPickupActor;
 
 /**
  * Player-owned input and UI entry point for ProjectRift.
@@ -30,6 +31,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Lobby|Travel")
 	void StartRiftMission();
 
+	UFUNCTION(BlueprintCallable, Category = "Pickup")
+	void TryPickup();
+
+	UFUNCTION(BlueprintCallable, Category = "Pickup")
+	APRPickupActor* FindBestPickupCandidate() const;
+
+	bool TryPickupOnServer(APRPickupActor* PickupActor);
+
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Lobby")
 	void ServerSetReady(bool bReady);
 
@@ -38,6 +47,9 @@ public:
 
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Lobby|Travel")
 	void ServerStartRiftMission();
+
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Pickup")
+	void ServerTryPickup(APRPickupActor* PickupActor);
 
 	UFUNCTION(BlueprintCallable, Category = "Lobby|Debug")
 	void RefreshLobbyReadyDebugDisplay();
@@ -50,6 +62,10 @@ protected:
 private:
 	void CreateGASDebugHUD();
 	void DestroyGASDebugHUD();
+	bool CanServerPickup(APRPickupActor* PickupActor, FString* OutFailureReason = nullptr) const;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Pickup", meta = (ClampMin = "0.0"))
+	float PickupInteractionRadius = 250.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Debug")
 	TSubclassOf<UPRGASDebugWidget> GASDebugWidgetClass;
