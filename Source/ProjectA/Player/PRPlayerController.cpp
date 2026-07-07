@@ -28,6 +28,25 @@ const FName AssaultRoleModuleName(TEXT("Ability.Role.Assault"));
 const FName HealthInjectorItemId(TEXT("HealthInjector"));
 const FName ShieldPackItemId(TEXT("ShieldPack"));
 
+bool FindInventoryItemById(const UPRInventoryComponent* InventoryComponent, const FName ItemId, FPRItemInstance& OutItem)
+{
+	if (!InventoryComponent || ItemId.IsNone())
+	{
+		return false;
+	}
+
+	for (const FPRItemInstance& Item : InventoryComponent->GetItems())
+	{
+		if (Item.ItemId == ItemId)
+		{
+			OutItem = Item;
+			return true;
+		}
+	}
+
+	return false;
+}
+
 FString GetLobbyReadyLine(const APlayerState* PlayerState)
 {
 	const APRPlayerState* ProjectRiftPlayerState = Cast<APRPlayerState>(PlayerState);
@@ -78,6 +97,7 @@ APRPlayerController::APRPlayerController()
 	InventoryWidgetClass = UPRInventoryWidget::StaticClass();
 	HealthInjectorEffectClass = UPRHealthConsumableGameplayEffect::StaticClass();
 	ShieldPackEffectClass = UPRShieldConsumableGameplayEffect::StaticClass();
+	PickupActorClass = APRPickupActor::StaticClass();
 }
 
 void APRPlayerController::BeginPlay()
@@ -232,6 +252,17 @@ void APRPlayerController::UseInventoryItem(const FName ItemId)
 	}
 
 	ServerUseInventoryItem(ItemId);
+}
+
+void APRPlayerController::DropInventoryItem(const FName ItemId, const int32 Count)
+{
+	if (HasAuthority())
+	{
+		TryDropInventoryItemOnServer(ItemId, Count);
+		return;
+	}
+
+	ServerDropInventoryItem(ItemId, Count);
 }
 
 APRPickupActor* APRPlayerController::FindBestPickupCandidate() const
@@ -395,6 +426,11 @@ void APRPlayerController::ServerUseInventoryItem_Implementation(const FName Item
 	TryUseInventoryItemOnServer(ItemId);
 }
 
+void APRPlayerController::ServerDropInventoryItem_Implementation(const FName ItemId, const int32 Count)
+{
+	TryDropInventoryItemOnServer(ItemId, Count);
+}
+
 bool APRPlayerController::TryUseInventoryItemOnServer(const FName ItemId)
 {
 	if (!HasAuthority())
@@ -446,6 +482,65 @@ bool APRPlayerController::TryUseInventoryItemOnServer(const FName ItemId)
 		*ItemId.ToString(),
 		InventoryComponent->GetItemCount(ItemId),
 		*GetNameSafe(ConsumableEffect));
+
+	return true;
+}
+
+bool APRPlayerController::TryDropInventoryItemOnServer(const FName ItemId, const int32 Count)
+{
+	if (!HasAuthority())
+	{
+		ServerDropInventoryItem(ItemId, Count);
+		return false;
+	}
+
+	FString FailureReason;
+	if (!CanDropInventoryItemOnServer(ItemId, Count, &FailureReason))
+	{
+		UE_LOG(
+			LogProjectA,
+			Log,
+			TEXT("Inventory drop rejected. Controller=%s ItemId=%s Count=%d Reason=%s"),
+			*GetNameSafe(this),
+			*ItemId.ToString(),
+			Count,
+			*FailureReason);
+		return false;
+	}
+
+	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	UPRInventoryComponent* InventoryComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetInventoryComponent() : nullptr;
+	FPRItemInstance DroppedItem;
+	if (!InventoryComponent || !FindInventoryItemById(InventoryComponent, ItemId, DroppedItem))
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Inventory drop failed after validation for %s."), *ItemId.ToString());
+		return false;
+	}
+
+	DroppedItem.Count = Count;
+	if (!InventoryComponent->RemoveItem(ItemId, Count))
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Inventory drop failed during item removal. ItemId=%s Count=%d"), *ItemId.ToString(), Count);
+		return false;
+	}
+
+	APRPickupActor* DroppedPickup = SpawnDroppedPickupOnServer(DroppedItem);
+	if (!DroppedPickup)
+	{
+		InventoryComponent->AddItem(DroppedItem);
+		UE_LOG(LogProjectA, Warning, TEXT("Inventory drop failed during pickup spawn; item restored. ItemId=%s Count=%d"), *ItemId.ToString(), Count);
+		return false;
+	}
+
+	UE_LOG(
+		LogProjectA,
+		Log,
+		TEXT("Inventory item dropped. Controller=%s Pickup=%s ItemId=%s Count=%d Remaining=%d"),
+		*GetNameSafe(this),
+		*GetNameSafe(DroppedPickup),
+		*ItemId.ToString(),
+		Count,
+		InventoryComponent->GetItemCount(ItemId));
 
 	return true;
 }
@@ -524,6 +619,7 @@ void APRPlayerController::CreateInventoryUI()
 	if (InventoryWidget)
 	{
 		InventoryWidget->OnUseItemRequested.AddUniqueDynamic(this, &APRPlayerController::HandleInventoryUseRequested);
+		InventoryWidget->OnDropItemRequested.AddUniqueDynamic(this, &APRPlayerController::HandleInventoryDropRequested);
 		InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
 		InventoryWidget->AddToPlayerScreen(30);
 		InventoryWidget->SetAlignmentInViewport(FVector2D::ZeroVector);
@@ -538,6 +634,7 @@ void APRPlayerController::DestroyInventoryUI()
 	if (InventoryWidget)
 	{
 		InventoryWidget->OnUseItemRequested.RemoveDynamic(this, &APRPlayerController::HandleInventoryUseRequested);
+		InventoryWidget->OnDropItemRequested.RemoveDynamic(this, &APRPlayerController::HandleInventoryDropRequested);
 		InventoryWidget->RemoveFromParent();
 		InventoryWidget = nullptr;
 	}
@@ -648,9 +745,126 @@ bool APRPlayerController::CanUseInventoryItemOnServer(const FName ItemId, FStrin
 	return true;
 }
 
+bool APRPlayerController::CanDropInventoryItemOnServer(const FName ItemId, const int32 Count, FString* OutFailureReason) const
+{
+	auto Reject = [OutFailureReason](const TCHAR* Reason)
+	{
+		if (OutFailureReason)
+		{
+			*OutFailureReason = Reason;
+		}
+		return false;
+	};
+
+	if (!HasAuthority())
+	{
+		return Reject(TEXT("controller is not authoritative"));
+	}
+
+	if (ItemId.IsNone())
+	{
+		return Reject(TEXT("item id is empty"));
+	}
+
+	if (Count <= 0)
+	{
+		return Reject(TEXT("drop count must be positive"));
+	}
+
+	if (!GetWorld())
+	{
+		return Reject(TEXT("world is missing"));
+	}
+
+	if (!GetPawn())
+	{
+		return Reject(TEXT("controller has no pawn"));
+	}
+
+	if (!PickupActorClass)
+	{
+		return Reject(TEXT("pickup actor class is missing"));
+	}
+
+	const APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	const UPRInventoryComponent* InventoryComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetInventoryComponent() : nullptr;
+	if (!InventoryComponent)
+	{
+		return Reject(TEXT("inventory is missing"));
+	}
+
+	const int32 AvailableCount = InventoryComponent->GetItemCount(ItemId);
+	if (AvailableCount <= 0)
+	{
+		return Reject(TEXT("item is not in inventory"));
+	}
+
+	if (AvailableCount < Count)
+	{
+		return Reject(TEXT("drop count exceeds inventory count"));
+	}
+
+	FPRItemInstance ExistingItem;
+	if (!FindInventoryItemById(InventoryComponent, ItemId, ExistingItem) || !ExistingItem.IsValid())
+	{
+		return Reject(TEXT("inventory item is invalid"));
+	}
+
+	if (OutFailureReason)
+	{
+		OutFailureReason->Reset();
+	}
+
+	return true;
+}
+
+APRPickupActor* APRPlayerController::SpawnDroppedPickupOnServer(const FPRItemInstance& DroppedItem) const
+{
+	if (!HasAuthority() || !DroppedItem.IsValid())
+	{
+		return nullptr;
+	}
+
+	UWorld* World = GetWorld();
+	APawn* ControlledPawn = GetPawn();
+	if (!World || !ControlledPawn || !PickupActorClass)
+	{
+		return nullptr;
+	}
+
+	FVector Forward = ControlledPawn->GetActorForwardVector();
+	Forward.Z = 0.0f;
+	if (!Forward.Normalize())
+	{
+		Forward = FVector::ForwardVector;
+	}
+
+	const FVector DropLocation = ControlledPawn->GetActorLocation()
+		+ Forward * FMath::Max(0.0f, DropForwardDistance)
+		+ FVector(0.0f, 0.0f, DropHeightOffset);
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = const_cast<APRPlayerController*>(this);
+	SpawnParameters.Instigator = ControlledPawn;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
+	APRPickupActor* DroppedPickup = World->SpawnActor<APRPickupActor>(PickupActorClass, DropLocation, FRotator::ZeroRotator, SpawnParameters);
+	if (DroppedPickup)
+	{
+		DroppedPickup->SetItemInstance(DroppedItem);
+	}
+
+	return DroppedPickup;
+}
+
 void APRPlayerController::HandleInventoryUseRequested(const FName ItemId)
 {
 	UseInventoryItem(ItemId);
+}
+
+void APRPlayerController::HandleInventoryDropRequested(const FName ItemId, const int32 Count)
+{
+	DropInventoryItem(ItemId, Count);
 }
 
 bool APRPlayerController::CanServerPickup(APRPickupActor* PickupActor, FString* OutFailureReason) const

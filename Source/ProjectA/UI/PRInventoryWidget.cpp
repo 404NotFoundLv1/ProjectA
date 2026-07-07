@@ -151,6 +151,25 @@ void UPRInventoryWidget::RequestUseDisplayedItem(const int32 ItemIndex)
 	}
 }
 
+void UPRInventoryWidget::RequestDropSelectedItem(const int32 Count)
+{
+	if (HasSelectedItem() && Count > 0)
+	{
+		OnDropItemRequested.Broadcast(DisplayedItems[SelectedItemIndex].ItemId, Count);
+	}
+}
+
+void UPRInventoryWidget::RequestDropDisplayedItem(const int32 ItemIndex, const int32 Count)
+{
+	if (DisplayedItems.IsValidIndex(ItemIndex) && Count > 0)
+	{
+		SelectedItemIndex = ItemIndex;
+		OnDropItemRequested.Broadcast(DisplayedItems[ItemIndex].ItemId, Count);
+		RebuildItemList();
+		RefreshSelectedItemDetails();
+	}
+}
+
 TSharedRef<SWidget> UPRInventoryWidget::RebuildWidget()
 {
 	TSharedRef<SWidget> Widget = SNew(SBorder)
@@ -191,14 +210,34 @@ TSharedRef<SWidget> UPRInventoryWidget::RebuildWidget()
 			.AutoHeight()
 			.Padding(0.0f, 8.0f, 0.0f, 0.0f)
 			[
-				SNew(SButton)
-				.OnClicked(FOnClicked::CreateUObject(this, &UPRInventoryWidget::HandleUseSelectedClicked))
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				.FillWidth(1.0f)
+				.Padding(0.0f, 0.0f, 5.0f, 0.0f)
 				[
-					SNew(STextBlock)
-					.Justification(ETextJustify::Center)
-					.ColorAndOpacity(FSlateColor(FLinearColor(0.95f, 0.96f, 0.92f, 1.0f)))
-					.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 13))
-					.Text(FText::FromString(TEXT("Use Selected")))
+					SNew(SButton)
+					.OnClicked(FOnClicked::CreateUObject(this, &UPRInventoryWidget::HandleUseSelectedClicked))
+					[
+						SNew(STextBlock)
+						.Justification(ETextJustify::Center)
+						.ColorAndOpacity(FSlateColor(FLinearColor(0.95f, 0.96f, 0.92f, 1.0f)))
+						.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 13))
+						.Text(FText::FromString(TEXT("Use Selected")))
+					]
+				]
+				+ SHorizontalBox::Slot()
+				.FillWidth(1.0f)
+				.Padding(5.0f, 0.0f, 0.0f, 0.0f)
+				[
+					SNew(SButton)
+					.OnClicked(FOnClicked::CreateUObject(this, &UPRInventoryWidget::HandleDropSelectedClicked))
+					[
+						SNew(STextBlock)
+						.Justification(ETextJustify::Center)
+						.ColorAndOpacity(FSlateColor(FLinearColor(0.95f, 0.96f, 0.92f, 1.0f)))
+						.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 13))
+						.Text(FText::FromString(TEXT("Drop One")))
+					]
 				]
 			]
 		];
@@ -242,6 +281,12 @@ FReply UPRInventoryWidget::HandleItemClicked(const int32 ItemIndex)
 FReply UPRInventoryWidget::HandleUseSelectedClicked()
 {
 	RequestUseSelectedItem();
+	return FReply::Handled();
+}
+
+FReply UPRInventoryWidget::HandleDropSelectedClicked()
+{
+	RequestDropSelectedItem(1);
 	return FReply::Handled();
 }
 

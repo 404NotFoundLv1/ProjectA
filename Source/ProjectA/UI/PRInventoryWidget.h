@@ -10,6 +10,7 @@ class STextBlock;
 class UPRInventoryComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPRInventoryItemUseRequestedSignature, FName, ItemId);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPRInventoryItemDropRequestedSignature, FName, ItemId, int32, Count);
 
 /**
  * Lightweight runtime inventory panel backed by the replicated owner inventory.
@@ -62,8 +63,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	void RequestUseDisplayedItem(int32 ItemIndex);
 
+	UFUNCTION(BlueprintCallable, Category = "Inventory|UI", meta = (ClampMin = "1"))
+	void RequestDropSelectedItem(int32 Count = 1);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|UI", meta = (ClampMin = "1"))
+	void RequestDropDisplayedItem(int32 ItemIndex, int32 Count = 1);
+
 	UPROPERTY(BlueprintAssignable, Category = "Inventory|UI")
 	FPRInventoryItemUseRequestedSignature OnUseItemRequested;
+
+	UPROPERTY(BlueprintAssignable, Category = "Inventory|UI")
+	FPRInventoryItemDropRequestedSignature OnDropItemRequested;
 
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
@@ -76,6 +86,7 @@ private:
 
 	FReply HandleItemClicked(int32 ItemIndex);
 	FReply HandleUseSelectedClicked();
+	FReply HandleDropSelectedClicked();
 	void RebuildItemList();
 	void RefreshSelectedItemDetails();
 	FString BuildItemSummary(const FPRItemInstance& Item) const;

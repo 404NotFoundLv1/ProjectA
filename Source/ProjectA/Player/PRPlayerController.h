@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Items/PRItemTypes.h"
 #include "ProjectAPlayerController.h"
 #include "TimerManager.h"
 #include "PRPlayerController.generated.h"
@@ -52,6 +53,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Use")
 	void UseInventoryItem(FName ItemId);
 
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Drop", meta = (ClampMin = "1"))
+	void DropInventoryItem(FName ItemId, int32 Count = 1);
+
 	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
 	bool IsInventoryVisible() const;
 
@@ -78,10 +82,14 @@ public:
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Inventory|Use")
 	void ServerUseInventoryItem(FName ItemId);
 
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Inventory|Drop")
+	void ServerDropInventoryItem(FName ItemId, int32 Count);
+
 	UFUNCTION(BlueprintCallable, Category = "Lobby|Debug")
 	void RefreshLobbyReadyDebugDisplay();
 
 	bool TryUseInventoryItemOnServer(FName ItemId);
+	bool TryDropInventoryItemOnServer(FName ItemId, int32 Count);
 
 protected:
 	virtual void BeginPlay() override;
@@ -97,9 +105,14 @@ private:
 	UPRInventoryComponent* GetLocalInventoryComponent() const;
 	TSubclassOf<UGameplayEffect> ResolveConsumableEffectClass(FName ItemId) const;
 	bool CanUseInventoryItemOnServer(FName ItemId, FString* OutFailureReason = nullptr) const;
+	bool CanDropInventoryItemOnServer(FName ItemId, int32 Count, FString* OutFailureReason = nullptr) const;
+	APRPickupActor* SpawnDroppedPickupOnServer(const FPRItemInstance& DroppedItem) const;
 
 	UFUNCTION()
 	void HandleInventoryUseRequested(FName ItemId);
+
+	UFUNCTION()
+	void HandleInventoryDropRequested(FName ItemId, int32 Count);
 
 	bool CanServerPickup(APRPickupActor* PickupActor, FString* OutFailureReason = nullptr) const;
 
@@ -123,6 +136,15 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory|Use")
 	TSubclassOf<UGameplayEffect> ShieldPackEffectClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Inventory|Drop")
+	TSubclassOf<APRPickupActor> PickupActorClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Inventory|Drop", meta = (ClampMin = "0.0"))
+	float DropForwardDistance = 160.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Inventory|Drop")
+	float DropHeightOffset = 20.0f;
 
 	FTimerHandle LobbyReadyDebugTimerHandle;
 };
