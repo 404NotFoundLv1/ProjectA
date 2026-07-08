@@ -13,6 +13,8 @@ void APRRiftGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(APRRiftGameState, CurrentObjectiveState);
 	DOREPLIFETIME(APRRiftGameState, RiftStability);
 	DOREPLIFETIME(APRRiftGameState, bExtractionAvailable);
+	DOREPLIFETIME(APRRiftGameState, ExtractedPlayerCount);
+	DOREPLIFETIME(APRRiftGameState, bExtractionComplete);
 	DOREPLIFETIME(APRRiftGameState, AlivePlayerCount);
 	DOREPLIFETIME(APRRiftGameState, MissionTime);
 	DOREPLIFETIME(APRRiftGameState, ObjectiveProgress);
@@ -31,6 +33,16 @@ void APRRiftGameState::SetRiftStability(const float InRiftStability)
 void APRRiftGameState::SetExtractionAvailable(const bool bInExtractionAvailable)
 {
 	bExtractionAvailable = bInExtractionAvailable;
+}
+
+void APRRiftGameState::SetExtractedPlayerCount(const int32 InExtractedPlayerCount)
+{
+	ExtractedPlayerCount = FMath::Max(0, InExtractedPlayerCount);
+}
+
+void APRRiftGameState::SetExtractionComplete(const bool bInExtractionComplete)
+{
+	bExtractionComplete = bInExtractionComplete;
 }
 
 void APRRiftGameState::SetAlivePlayerCount(const int32 InAlivePlayerCount)
@@ -57,6 +69,14 @@ void APRRiftGameState::OnRep_RiftStability()
 }
 
 void APRRiftGameState::OnRep_ExtractionAvailable()
+{
+}
+
+void APRRiftGameState::OnRep_ExtractedPlayerCount()
+{
+}
+
+void APRRiftGameState::OnRep_ExtractionComplete()
 {
 }
 

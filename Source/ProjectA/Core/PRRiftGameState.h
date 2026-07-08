@@ -36,6 +36,12 @@ public:
 	bool IsExtractionAvailable() const { return bExtractionAvailable; }
 
 	UFUNCTION(BlueprintPure, Category = "Rift|State")
+	int32 GetExtractedPlayerCount() const { return ExtractedPlayerCount; }
+
+	UFUNCTION(BlueprintPure, Category = "Rift|State")
+	bool IsExtractionComplete() const { return bExtractionComplete; }
+
+	UFUNCTION(BlueprintPure, Category = "Rift|State")
 	int32 GetAlivePlayerCount() const { return AlivePlayerCount; }
 
 	UFUNCTION(BlueprintPure, Category = "Rift|State")
@@ -52,6 +58,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|State")
 	void SetExtractionAvailable(bool bInExtractionAvailable);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|State")
+	void SetExtractedPlayerCount(int32 InExtractedPlayerCount);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|State")
+	void SetExtractionComplete(bool bInExtractionComplete);
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|State")
 	void SetAlivePlayerCount(int32 InAlivePlayerCount);
@@ -72,6 +84,12 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_ExtractionAvailable, BlueprintReadOnly, Category = "Rift|State")
 	bool bExtractionAvailable = false;
 
+	UPROPERTY(ReplicatedUsing = OnRep_ExtractedPlayerCount, BlueprintReadOnly, Category = "Rift|State")
+	int32 ExtractedPlayerCount = 0;
+
+	UPROPERTY(ReplicatedUsing = OnRep_ExtractionComplete, BlueprintReadOnly, Category = "Rift|State")
+	bool bExtractionComplete = false;
+
 	UPROPERTY(ReplicatedUsing = OnRep_AlivePlayerCount, BlueprintReadOnly, Category = "Rift|State")
 	int32 AlivePlayerCount = 0;
 
@@ -89,6 +107,12 @@ protected:
 
 	UFUNCTION()
 	void OnRep_ExtractionAvailable();
+
+	UFUNCTION()
+	void OnRep_ExtractedPlayerCount();
+
+	UFUNCTION()
+	void OnRep_ExtractionComplete();
 
 	UFUNCTION()
 	void OnRep_AlivePlayerCount();

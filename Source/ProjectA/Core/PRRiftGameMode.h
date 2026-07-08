@@ -3,10 +3,12 @@
 #include "CoreMinimal.h"
 #include "Core/PRGameModeBase.h"
 #include "Core/PRRiftGameState.h"
+#include "UObject/ObjectKey.h"
 #include "PRRiftGameMode.generated.h"
 
 class APRRiftObjectiveActor;
 class APRSpawnManager;
+class APlayerState;
 
 /**
  * Server-authoritative rule set for rift missions.
@@ -32,6 +34,33 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Mission")
 	void OpenExtraction();
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Mission")
+	bool RegisterPlayerExtracted(AController* ExtractingController);
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Mission")
+	bool IsPlayerExtracted(AController* Controller) const;
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Mission")
+	void ResetExtractionState();
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Mission")
+	void CheckExtractionCompletion();
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Extraction")
+	FString GetReturnToLobbyMapPath() const { return ReturnToLobbyMapPath; }
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Extraction")
+	FString BuildReturnToLobbyTravelURL() const;
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Extraction")
+	bool IsReturnToLobbyTravelPending() const { return bReturnToLobbyTravelPending; }
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Extraction")
+	void SetReturnToLobbyServerTravelEnabled(bool bEnabled);
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Mission")
+	int32 GetExtractedPlayerCount() const { return ExtractedPlayerStates.Num(); }
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Mission")
 	void UpdateAlivePlayerCount();
@@ -64,9 +93,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Mission", meta = (ClampMin = "0.0", ClampMax = "100.0"))
 	float InitialRiftStability = 100.0f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Extraction")
+	FString ReturnToLobbyMapPath = TEXT("/Game/ProjectRift/Maps/L_ShipLobby");
+
 private:
 	void DiscoverSpawnManagers();
 	APRSpawnManager* CreateFallbackSpawnManager(APRRiftObjectiveActor* ObjectiveActor);
+	APlayerState* ResolveExtractionPlayerState(AController* Controller) const;
+	void RequestReturnToLobbyTravel();
 
 	UPROPERTY(Transient)
 	TObjectPtr<APRRiftObjectiveActor> ActiveObjective;
@@ -75,4 +109,7 @@ private:
 	TArray<TObjectPtr<APRSpawnManager>> SpawnManagers;
 
 	bool bRiftMissionStarted = false;
+	bool bReturnToLobbyTravelPending = false;
+	bool bReturnToLobbyServerTravelEnabled = true;
+	TSet<TObjectKey<APlayerState>> ExtractedPlayerStates;
 };
