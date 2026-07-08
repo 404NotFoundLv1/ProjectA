@@ -24,6 +24,7 @@
 #include "ProjectA.h"
 #include "UI/PRGASDebugWidget.h"
 #include "UI/PRInventoryWidget.h"
+#include "UI/PRRiftSettlementWidget.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -119,6 +120,7 @@ APRPlayerController::APRPlayerController()
 	}
 
 	InventoryWidgetClass = UPRInventoryWidget::StaticClass();
+	RiftSettlementWidgetClass = UPRRiftSettlementWidget::StaticClass();
 	HealthInjectorEffectClass = UPRHealthConsumableGameplayEffect::StaticClass();
 	ShieldPackEffectClass = UPRShieldConsumableGameplayEffect::StaticClass();
 	PickupActorClass = APRPickupActor::StaticClass();
@@ -140,11 +142,13 @@ void APRPlayerController::BeginPlay()
 
 		CreateGASDebugHUD();
 		CreateInventoryUI();
+		CreateRiftSettlementUI();
 	}
 }
 
 void APRPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	DestroyRiftSettlementUI();
 	DestroyInventoryUI();
 	DestroyGASDebugHUD();
 	GetWorldTimerManager().ClearTimer(LobbyReadyDebugTimerHandle);
@@ -854,6 +858,39 @@ void APRPlayerController::DestroyInventoryUI()
 		InventoryWidget->OnDropItemRequested.RemoveDynamic(this, &APRPlayerController::HandleInventoryDropRequested);
 		InventoryWidget->RemoveFromParent();
 		InventoryWidget = nullptr;
+	}
+}
+
+void APRPlayerController::CreateRiftSettlementUI()
+{
+	if (!IsLocalPlayerController() || RiftSettlementWidget)
+	{
+		return;
+	}
+
+	if (!RiftSettlementWidgetClass)
+	{
+		RiftSettlementWidgetClass = UPRRiftSettlementWidget::StaticClass();
+	}
+
+	RiftSettlementWidget = CreateWidget<UPRRiftSettlementWidget>(this, RiftSettlementWidgetClass);
+	if (RiftSettlementWidget)
+	{
+		RiftSettlementWidget->SetVisibility(ESlateVisibility::Collapsed);
+		RiftSettlementWidget->AddToPlayerScreen(45);
+		RiftSettlementWidget->SetPositionInViewport(FVector2D::ZeroVector, false);
+		RiftSettlementWidget->SetDesiredSizeInViewport(FVector2D(640.0, 420.0));
+		RiftSettlementWidget->SetAnchorsInViewport(FAnchors(0.5f, 0.5f));
+		RiftSettlementWidget->SetAlignmentInViewport(FVector2D(0.5f, 0.5f));
+	}
+}
+
+void APRPlayerController::DestroyRiftSettlementUI()
+{
+	if (RiftSettlementWidget)
+	{
+		RiftSettlementWidget->RemoveFromParent();
+		RiftSettlementWidget = nullptr;
 	}
 }
 

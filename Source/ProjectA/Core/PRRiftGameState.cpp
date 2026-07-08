@@ -18,6 +18,8 @@ void APRRiftGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(APRRiftGameState, AlivePlayerCount);
 	DOREPLIFETIME(APRRiftGameState, MissionTime);
 	DOREPLIFETIME(APRRiftGameState, ObjectiveProgress);
+	DOREPLIFETIME(APRRiftGameState, SettlementData);
+	DOREPLIFETIME(APRRiftGameState, bSettlementReady);
 }
 
 void APRRiftGameState::SetCurrentObjectiveState(const EPRRiftObjectiveState InCurrentObjectiveState)
@@ -60,6 +62,29 @@ void APRRiftGameState::SetObjectiveProgress(const float InObjectiveProgress)
 	ObjectiveProgress = FMath::Clamp(InObjectiveProgress, 0.0f, 1.0f);
 }
 
+void APRRiftGameState::SetSettlementData(const FPRRiftSettlementData& InSettlementData)
+{
+	SettlementData = InSettlementData;
+	SettlementData.MissionTime = FMath::Max(0.0f, SettlementData.MissionTime);
+	SettlementData.RiftStability = FMath::Clamp(SettlementData.RiftStability, 0.0f, 100.0f);
+	SettlementData.ObjectiveProgress = FMath::Clamp(SettlementData.ObjectiveProgress, 0.0f, 1.0f);
+	SettlementData.AlivePlayerCount = FMath::Max(0, SettlementData.AlivePlayerCount);
+	SettlementData.ExtractedPlayerCount = FMath::Max(0, SettlementData.ExtractedPlayerCount);
+	SettlementData.ExtractedItemCount = FMath::Max(0, SettlementData.ExtractedItemCount);
+	SettlementData.ExtractedUniqueItemTypes = FMath::Max(0, SettlementData.ExtractedUniqueItemTypes);
+}
+
+void APRRiftGameState::SetSettlementReady(const bool bInSettlementReady)
+{
+	bSettlementReady = bInSettlementReady;
+}
+
+void APRRiftGameState::ResetSettlementData()
+{
+	SettlementData = FPRRiftSettlementData();
+	bSettlementReady = false;
+}
+
 void APRRiftGameState::OnRep_CurrentObjectiveState()
 {
 }
@@ -89,5 +114,13 @@ void APRRiftGameState::OnRep_MissionTime()
 }
 
 void APRRiftGameState::OnRep_ObjectiveProgress()
+{
+}
+
+void APRRiftGameState::OnRep_SettlementData()
+{
+}
+
+void APRRiftGameState::OnRep_SettlementReady()
 {
 }

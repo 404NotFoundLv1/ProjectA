@@ -56,6 +56,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Rift|Extraction")
 	bool IsReturnToLobbyTravelPending() const { return bReturnToLobbyTravelPending; }
 
+	UFUNCTION(BlueprintPure, Category = "Rift|Extraction")
+	float GetReturnToLobbyDelayAfterSettlement() const { return ReturnToLobbyDelayAfterSettlement; }
+
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Extraction")
 	void SetReturnToLobbyServerTravelEnabled(bool bEnabled);
 
@@ -83,6 +86,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Rift|Mission")
 	bool HasRiftMissionStarted() const { return bRiftMissionStarted; }
 
+	UFUNCTION(BlueprintPure, Category = "Rift|Settlement")
+	FPRRiftSettlementData GenerateSettlementData(EPRRiftMissionResult Result) const;
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Settlement")
+	void FinalizeRiftSettlement(EPRRiftMissionResult Result);
+
 protected:
 	UFUNCTION(BlueprintPure, Category = "Rift|Mission")
 	APRRiftGameState* GetRiftGameState() const;
@@ -96,11 +105,16 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Extraction")
 	FString ReturnToLobbyMapPath = TEXT("/Game/ProjectRift/Maps/L_ShipLobby");
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Extraction", meta = (ClampMin = "0.0"))
+	float ReturnToLobbyDelayAfterSettlement = 4.0f;
+
 private:
 	void DiscoverSpawnManagers();
 	APRSpawnManager* CreateFallbackSpawnManager(APRRiftObjectiveActor* ObjectiveActor);
 	APlayerState* ResolveExtractionPlayerState(AController* Controller) const;
+	void CountExtractedInventoryItems(int32& OutItemCount, int32& OutUniqueItemTypes) const;
 	void RequestReturnToLobbyTravel();
+	void PerformReturnToLobbyTravel();
 
 	UPROPERTY(Transient)
 	TObjectPtr<APRRiftObjectiveActor> ActiveObjective;
@@ -112,4 +126,5 @@ private:
 	bool bReturnToLobbyTravelPending = false;
 	bool bReturnToLobbyServerTravelEnabled = true;
 	TSet<TObjectKey<APlayerState>> ExtractedPlayerStates;
+	FTimerHandle ReturnToLobbyTravelTimerHandle;
 };

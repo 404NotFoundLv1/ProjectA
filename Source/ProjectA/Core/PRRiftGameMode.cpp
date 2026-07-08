@@ -8,6 +8,9 @@
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
+#include "Items/PRInventoryComponent.h"
+#include "Items/PRItemTypes.h"
+#include "Player/PRPlayerState.h"
 #include "ProjectA.h"
 
 APRRiftGameMode::APRRiftGameMode()
@@ -164,9 +167,11 @@ void APRRiftGameMode::ResetExtractionState()
 	{
 		RiftGameState->SetExtractedPlayerCount(0);
 		RiftGameState->SetExtractionComplete(false);
+		RiftGameState->ResetSettlementData();
 	}
 
 	bReturnToLobbyTravelPending = false;
+	GetWorldTimerManager().ClearTimer(ReturnToLobbyTravelTimerHandle);
 }
 
 void APRRiftGameMode::CheckExtractionCompletion()
@@ -213,6 +218,48 @@ void APRRiftGameMode::SetReturnToLobbyServerTravelEnabled(const bool bEnabled)
 	}
 
 	bReturnToLobbyServerTravelEnabled = bEnabled;
+}
+
+FPRRiftSettlementData APRRiftGameMode::GenerateSettlementData(const EPRRiftMissionResult Result) const
+{
+	FPRRiftSettlementData Settlement;
+	Settlement.Result = Result;
+
+	if (const APRRiftGameState* RiftGameState = GetRiftGameState())
+	{
+		Settlement.MissionTime = RiftGameState->GetMissionTime();
+		Settlement.RiftStability = RiftGameState->GetRiftStability();
+		Settlement.ObjectiveProgress = RiftGameState->GetObjectiveProgress();
+		Settlement.AlivePlayerCount = RiftGameState->GetAlivePlayerCount();
+		Settlement.ExtractedPlayerCount = RiftGameState->GetExtractedPlayerCount();
+	}
+
+	CountExtractedInventoryItems(Settlement.ExtractedItemCount, Settlement.ExtractedUniqueItemTypes);
+
+	return Settlement;
+}
+
+void APRRiftGameMode::FinalizeRiftSettlement(const EPRRiftMissionResult Result)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (APRRiftGameState* RiftGameState = GetRiftGameState())
+	{
+		RiftGameState->SetSettlementData(GenerateSettlementData(Result));
+		RiftGameState->SetSettlementReady(true);
+
+		const FPRRiftSettlementData Settlement = RiftGameState->GetSettlementData();
+		UE_LOG(LogProjectA, Log, TEXT("Rift settlement finalized. Result=%d Time=%.1f Extracted=%d/%d Items=%d Types=%d"),
+			static_cast<int32>(Settlement.Result),
+			Settlement.MissionTime,
+			Settlement.ExtractedPlayerCount,
+			Settlement.AlivePlayerCount,
+			Settlement.ExtractedItemCount,
+			Settlement.ExtractedUniqueItemTypes);
+	}
 }
 
 void APRRiftGameMode::UpdateAlivePlayerCount()
@@ -395,12 +442,55 @@ APlayerState* APRRiftGameMode::ResolveExtractionPlayerState(AController* Control
 	return Controller ? Controller->GetPlayerState<APlayerState>() : nullptr;
 }
 
+void APRRiftGameMode::CountExtractedInventoryItems(int32& OutItemCount, int32& OutUniqueItemTypes) const
+{
+	OutItemCount = 0;
+	OutUniqueItemTypes = 0;
+
+	const AGameStateBase* CurrentGameState = GameState;
+	if (!CurrentGameState)
+	{
+		return;
+	}
+
+	TSet<FName> UniqueItemIds;
+	for (const TObjectPtr<APlayerState>& PlayerState : CurrentGameState->PlayerArray)
+	{
+		if (!PlayerState || !ExtractedPlayerStates.Contains(TObjectKey<APlayerState>(PlayerState.Get())))
+		{
+			continue;
+		}
+
+		const APRPlayerState* ProjectRiftPlayerState = Cast<APRPlayerState>(PlayerState.Get());
+		const UPRInventoryComponent* InventoryComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetInventoryComponent() : nullptr;
+		if (!InventoryComponent)
+		{
+			continue;
+		}
+
+		for (const FPRItemInstance& Item : InventoryComponent->GetItems())
+		{
+			if (!Item.IsValid())
+			{
+				continue;
+			}
+
+			OutItemCount += Item.Count;
+			UniqueItemIds.Add(Item.ItemId);
+		}
+	}
+
+	OutUniqueItemTypes = UniqueItemIds.Num();
+}
+
 void APRRiftGameMode::RequestReturnToLobbyTravel()
 {
 	if (!HasAuthority() || bReturnToLobbyTravelPending)
 	{
 		return;
 	}
+
+	FinalizeRiftSettlement(EPRRiftMissionResult::Success);
 
 	const FString TravelURL = BuildReturnToLobbyTravelURL();
 	if (TravelURL.IsEmpty())
@@ -425,7 +515,45 @@ void APRRiftGameMode::RequestReturnToLobbyTravel()
 		return;
 	}
 
-	UE_LOG(LogProjectA, Log, TEXT("Rift extraction completed. Returning to lobby via ServerTravel: %s"), *TravelURL);
+	if (ReturnToLobbyDelayAfterSettlement > 0.0f)
+	{
+		UE_LOG(LogProjectA, Log, TEXT("Rift extraction completed. Showing settlement for %.1f seconds before return travel: %s"),
+			ReturnToLobbyDelayAfterSettlement,
+			*TravelURL);
+		World->GetTimerManager().SetTimer(
+			ReturnToLobbyTravelTimerHandle,
+			this,
+			&APRRiftGameMode::PerformReturnToLobbyTravel,
+			ReturnToLobbyDelayAfterSettlement,
+			false);
+		return;
+	}
+
+	PerformReturnToLobbyTravel();
+}
+
+void APRRiftGameMode::PerformReturnToLobbyTravel()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	const FString TravelURL = BuildReturnToLobbyTravelURL();
+	if (TravelURL.IsEmpty())
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Rift return travel skipped because lobby map path is empty."));
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Rift return travel skipped because world is missing: %s"), *TravelURL);
+		return;
+	}
+
+	UE_LOG(LogProjectA, Log, TEXT("Rift settlement complete. Returning to lobby via ServerTravel: %s"), *TravelURL);
 	if (!World->ServerTravel(TravelURL))
 	{
 		UE_LOG(LogProjectA, Warning, TEXT("Rift return ServerTravel failed: %s"), *TravelURL);

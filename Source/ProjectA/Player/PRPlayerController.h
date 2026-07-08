@@ -9,6 +9,7 @@
 class UPRGASDebugWidget;
 class UPRInventoryComponent;
 class UPRInventoryWidget;
+class UPRRiftSettlementWidget;
 class UPRLootTableDataAsset;
 class UGameplayEffect;
 class APRPickupActor;
@@ -70,6 +71,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
 	UPRInventoryWidget* GetInventoryWidget() const { return InventoryWidget.Get(); }
 
+	UFUNCTION(BlueprintPure, Category = "Rift|Settlement")
+	UPRRiftSettlementWidget* GetRiftSettlementWidget() const { return RiftSettlementWidget.Get(); }
+
 	UFUNCTION(BlueprintCallable, Category = "Pickup")
 	APRPickupActor* FindBestPickupCandidate() const;
 
@@ -121,6 +125,8 @@ private:
 	void DestroyGASDebugHUD();
 	void CreateInventoryUI();
 	void DestroyInventoryUI();
+	void CreateRiftSettlementUI();
+	void DestroyRiftSettlementUI();
 	void ApplyInventoryInputMode();
 	void RestoreInventoryInputMode();
 	UPRInventoryComponent* GetLocalInventoryComponent() const;
@@ -155,6 +161,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPRInventoryWidget> InventoryWidget;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Rift|Settlement")
+	TSubclassOf<UPRRiftSettlementWidget> RiftSettlementWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPRRiftSettlementWidget> RiftSettlementWidget;
 
 	bool bInventoryInputModeActive = false;
 	bool bSavedMouseCursorVisibilityForInventory = false;

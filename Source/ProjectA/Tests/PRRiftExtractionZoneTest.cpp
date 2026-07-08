@@ -13,6 +13,9 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/WorldSettings.h"
+#include "Items/PRInventoryComponent.h"
+#include "Items/PRItemTypes.h"
+#include "Player/PRPlayerState.h"
 #include "Tests/AutomationCommon.h"
 #include "UObject/StructOnScope.h"
 #include "UObject/UnrealType.h"
@@ -161,6 +164,14 @@ bool GetExtractionBoolPropertyValue(const UObject* Target, const FName PropertyN
 	const FBoolProperty* Property = Target ? FindFProperty<FBoolProperty>(Target->GetClass(), PropertyName) : nullptr;
 	return Property && Property->GetPropertyValue_InContainer(Target);
 }
+
+FPRItemInstance MakeExtractionSettlementItem(const FName ItemId, const int32 Count)
+{
+	FPRItemInstance Item;
+	Item.ItemId = ItemId;
+	Item.Count = Count;
+	return Item;
+}
 }
 
 bool FPRRiftExtractionZoneTest::RunTest(const FString& Parameters)
@@ -188,12 +199,20 @@ bool FPRRiftExtractionZoneTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Rift GameMode exposes GetReturnToLobbyMapPath"), RiftGameModeClass->FindFunctionByName(TEXT("GetReturnToLobbyMapPath")));
 	TestNotNull(TEXT("Rift GameMode exposes BuildReturnToLobbyTravelURL"), RiftGameModeClass->FindFunctionByName(TEXT("BuildReturnToLobbyTravelURL")));
 	TestNotNull(TEXT("Rift GameMode exposes IsReturnToLobbyTravelPending"), RiftGameModeClass->FindFunctionByName(TEXT("IsReturnToLobbyTravelPending")));
+	TestNotNull(TEXT("Rift GameMode exposes GetReturnToLobbyDelayAfterSettlement"), RiftGameModeClass->FindFunctionByName(TEXT("GetReturnToLobbyDelayAfterSettlement")));
 	TestNotNull(TEXT("Rift GameMode exposes SetReturnToLobbyServerTravelEnabled"), RiftGameModeClass->FindFunctionByName(TEXT("SetReturnToLobbyServerTravelEnabled")));
+	TestNotNull(TEXT("Rift GameMode exposes GenerateSettlementData"), RiftGameModeClass->FindFunctionByName(TEXT("GenerateSettlementData")));
+	TestNotNull(TEXT("Rift GameMode exposes FinalizeRiftSettlement"), RiftGameModeClass->FindFunctionByName(TEXT("FinalizeRiftSettlement")));
 
 	TestExtractionReplicatedProperty(*this, RiftGameStateClass, TEXT("ExtractedPlayerCount"));
 	TestExtractionReplicatedProperty(*this, RiftGameStateClass, TEXT("bExtractionComplete"));
+	TestExtractionReplicatedProperty(*this, RiftGameStateClass, TEXT("SettlementData"));
+	TestExtractionReplicatedProperty(*this, RiftGameStateClass, TEXT("bSettlementReady"));
 	TestNotNull(TEXT("Rift GameState exposes SetExtractedPlayerCount"), RiftGameStateClass->FindFunctionByName(TEXT("SetExtractedPlayerCount")));
 	TestNotNull(TEXT("Rift GameState exposes SetExtractionComplete"), RiftGameStateClass->FindFunctionByName(TEXT("SetExtractionComplete")));
+	TestNotNull(TEXT("Rift GameState exposes GetSettlementData"), RiftGameStateClass->FindFunctionByName(TEXT("GetSettlementData")));
+	TestNotNull(TEXT("Rift GameState exposes IsSettlementReady"), RiftGameStateClass->FindFunctionByName(TEXT("IsSettlementReady")));
+	TestNotNull(TEXT("Rift GameState exposes ResetSettlementData"), RiftGameStateClass->FindFunctionByName(TEXT("ResetSettlementData")));
 
 	const AActor* ExtractionZoneDefaults = Cast<AActor>(ExtractionZoneClass->GetDefaultObject());
 	TestNotNull(TEXT("APRExtractionZone has a default object"), ExtractionZoneDefaults);
@@ -281,7 +300,7 @@ bool FPRRiftExtractionZoneTest::RunTest(const FString& Parameters)
 	APRRiftGameState* RiftGameState = World->GetGameState<APRRiftGameState>();
 	AActor* ExtractionZone = World->SpawnActor<AActor>(ExtractionZoneClass, FVector::ZeroVector, FRotator::ZeroRotator);
 	APlayerController* PlayerController = World->SpawnActor<APlayerController>();
-	APlayerState* PlayerState = World->SpawnActor<APlayerState>();
+	APRPlayerState* PlayerState = World->SpawnActor<APRPlayerState>();
 	ADefaultPawn* PlayerPawn = World->SpawnActor<ADefaultPawn>(FVector(80.0f, 0.0f, 0.0f), FRotator::ZeroRotator);
 
 	TestNotNull(TEXT("Extraction test world owns APRRiftGameMode"), RiftGameMode);
@@ -297,7 +316,22 @@ bool FPRRiftExtractionZoneTest::RunTest(const FString& Parameters)
 
 	PlayerController->SetPlayerState(PlayerState);
 	PlayerController->Possess(PlayerPawn);
+	if (!RiftGameState->PlayerArray.Contains(PlayerState))
+	{
+		RiftGameState->AddPlayerState(PlayerState);
+	}
 	RiftGameState->SetAlivePlayerCount(1);
+	RiftGameState->SetMissionTime(87.5f);
+	RiftGameState->SetRiftStability(72.0f);
+	RiftGameState->SetObjectiveProgress(1.0f);
+
+	UPRInventoryComponent* InventoryComponent = PlayerState->GetInventoryComponent();
+	TestNotNull(TEXT("Extraction settlement player owns inventory"), InventoryComponent);
+	if (InventoryComponent)
+	{
+		TestTrue(TEXT("Can add extracted EnergyCrystal stack"), InventoryComponent->AddItem(MakeExtractionSettlementItem(TEXT("EnergyCrystal"), 2)));
+		TestTrue(TEXT("Can add extracted RiftShard stack"), InventoryComponent->AddItem(MakeExtractionSettlementItem(TEXT("RiftShard"), 1)));
+	}
 
 	FString ReturnToLobbyMapPath;
 	TestTrue(
@@ -346,6 +380,16 @@ bool FPRRiftExtractionZoneTest::RunTest(const FString& Parameters)
 		RuntimePromptWidget ? RuntimePromptWidget->bHiddenInGame : true);
 	TestEqual(TEXT("An already-overlapping player extracts when extraction opens"), GetExtractionIntPropertyValue(RiftGameState, TEXT("ExtractedPlayerCount")), 1);
 	TestTrue(TEXT("All alive players extracted completes extraction"), GetExtractionBoolPropertyValue(RiftGameState, TEXT("bExtractionComplete")));
+	TestTrue(TEXT("All alive players extracted marks settlement ready"), RiftGameState->IsSettlementReady());
+	const FPRRiftSettlementData SettlementData = RiftGameState->GetSettlementData();
+	TestEqual(TEXT("Extraction settlement records success"), SettlementData.Result, EPRRiftMissionResult::Success);
+	TestEqual(TEXT("Extraction settlement records mission time"), SettlementData.MissionTime, 87.5f);
+	TestEqual(TEXT("Extraction settlement records rift stability"), SettlementData.RiftStability, 72.0f);
+	TestEqual(TEXT("Extraction settlement records objective progress"), SettlementData.ObjectiveProgress, 1.0f);
+	TestEqual(TEXT("Extraction settlement records extracted players"), SettlementData.ExtractedPlayerCount, 1);
+	TestEqual(TEXT("Extraction settlement records alive players"), SettlementData.AlivePlayerCount, 1);
+	TestEqual(TEXT("Extraction settlement records carried item count"), SettlementData.ExtractedItemCount, 3);
+	TestEqual(TEXT("Extraction settlement records carried item types"), SettlementData.ExtractedUniqueItemTypes, 2);
 	bool bReturnToLobbyTravelPending = false;
 	TestTrue(
 		TEXT("Can query whether extraction requested lobby travel"),

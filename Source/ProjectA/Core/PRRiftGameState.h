@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Core/PRGameState.h"
+#include "Core/PRRiftSettlementTypes.h"
 #include "PRRiftGameState.generated.h"
 
 UENUM(BlueprintType)
@@ -50,6 +51,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Rift|State")
 	float GetObjectiveProgress() const { return ObjectiveProgress; }
 
+	UFUNCTION(BlueprintPure, Category = "Rift|Settlement")
+	bool IsSettlementReady() const { return bSettlementReady; }
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Settlement")
+	FPRRiftSettlementData GetSettlementData() const { return SettlementData; }
+
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|State")
 	void SetCurrentObjectiveState(EPRRiftObjectiveState InCurrentObjectiveState);
 
@@ -73,6 +80,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|State")
 	void SetObjectiveProgress(float InObjectiveProgress);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Settlement")
+	void SetSettlementData(const FPRRiftSettlementData& InSettlementData);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Settlement")
+	void SetSettlementReady(bool bInSettlementReady);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Settlement")
+	void ResetSettlementData();
 
 protected:
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentObjectiveState, BlueprintReadOnly, Category = "Rift|State")
@@ -99,6 +115,12 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_ObjectiveProgress, BlueprintReadOnly, Category = "Rift|State")
 	float ObjectiveProgress = 0.0f;
 
+	UPROPERTY(ReplicatedUsing = OnRep_SettlementData, BlueprintReadOnly, Category = "Rift|Settlement")
+	FPRRiftSettlementData SettlementData;
+
+	UPROPERTY(ReplicatedUsing = OnRep_SettlementReady, BlueprintReadOnly, Category = "Rift|Settlement")
+	bool bSettlementReady = false;
+
 	UFUNCTION()
 	void OnRep_CurrentObjectiveState();
 
@@ -122,4 +144,10 @@ protected:
 
 	UFUNCTION()
 	void OnRep_ObjectiveProgress();
+
+	UFUNCTION()
+	void OnRep_SettlementData();
+
+	UFUNCTION()
+	void OnRep_SettlementReady();
 };
