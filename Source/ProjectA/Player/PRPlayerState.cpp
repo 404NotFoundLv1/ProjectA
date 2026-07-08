@@ -240,7 +240,7 @@ void APRPlayerState::CopyProjectRiftStateFrom(const APRPlayerState* SourcePlayer
 		return;
 	}
 
-	bIsReady = SourcePlayerState->bIsReady;
+	bIsReady = false;
 	SelectedRoleModule = SourcePlayerState->SelectedRoleModule;
 	PlayerDisplayName = SourcePlayerState->PlayerDisplayName;
 	ShipResources = SourcePlayerState->ShipResources;

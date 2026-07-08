@@ -90,6 +90,16 @@ bool APRShipLobbyGameMode::StartRiftMission(APlayerController* RequestingControl
 	return World->ServerTravel(TravelURL);
 }
 
+void APRShipLobbyGameMode::HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer)
+{
+	Super::HandleStartingNewPlayer_Implementation(NewPlayer);
+
+	if (APRPlayerState* ProjectRiftPlayerState = NewPlayer ? NewPlayer->GetPlayerState<APRPlayerState>() : nullptr)
+	{
+		ProjectRiftPlayerState->SetReady(false);
+	}
+}
+
 bool APRShipLobbyGameMode::IsHostPlayerController(const APlayerController* RequestingController) const
 {
 	return RequestingController && RequestingController->HasAuthority() && RequestingController->IsLocalController();

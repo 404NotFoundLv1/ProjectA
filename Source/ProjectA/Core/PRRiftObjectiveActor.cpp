@@ -291,7 +291,21 @@ APawn* APRRiftObjectiveActor::FindNearbyPromptPawn() const
 		}
 	}
 
-	return LocalPlayerController && LocalPlayerController->IsFocusedInteractionTarget(this)
-		? LocalPlayerController->GetPawn()
+	APawn* LocalPawn = LocalPlayerController ? LocalPlayerController->GetPawn() : nullptr;
+	if (!LocalPawn)
+	{
+		return nullptr;
+	}
+
+	if (ObjectiveState == EPRRiftObjectiveState::NotStarted)
+	{
+		return LocalPlayerController->IsFocusedInteractionTarget(this) ? LocalPawn : nullptr;
+	}
+
+	const float PromptRadius = InteractionSphere
+		? FMath::Max(InteractionRadius, InteractionSphere->GetScaledSphereRadius())
+		: InteractionRadius;
+	return FVector::DistSquared(LocalPawn->GetActorLocation(), GetActorLocation()) <= FMath::Square(PromptRadius)
+		? LocalPawn
 		: nullptr;
 }

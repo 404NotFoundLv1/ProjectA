@@ -263,6 +263,11 @@ bool FPRRiftObjectiveSystemTest::RunTest(const FString& Parameters)
 			BlueprintRuntimePromptWidget && BlueprintRuntimePromptWidget->IsVisible());
 	}
 
+	if (NearbyPawn)
+	{
+		PlayerController->Possess(NearbyPawn);
+	}
+
 	bool bActivated = false;
 	TestTrue(
 		TEXT("Can activate hold objective through reflected API"),
@@ -277,6 +282,19 @@ bool FPRRiftObjectiveSystemTest::RunTest(const FString& Parameters)
 		TEXT("Activated objective prompt changes to an in-progress message"),
 		CallTextFunctionNoParams(HoldObjective, TEXT("GetInteractionPromptText"), ActivePromptText)
 		&& ActivePromptText.ToString().Contains(TEXT("\u4EFB\u52A1\u8FDB\u884C\u4E2D")));
+
+	if (RuntimeObjectivePromptWidget)
+	{
+		RuntimeObjectivePromptWidget->SetHiddenInGame(true);
+		RuntimeObjectivePromptWidget->SetVisibility(false, true);
+	}
+	HoldObjective->Tick(0.0f);
+	TestFalse(
+		TEXT("Active objective keeps its progress prompt visible near the local player"),
+		RuntimeObjectivePromptWidget ? RuntimeObjectivePromptWidget->bHiddenInGame : true);
+	TestTrue(
+		TEXT("Active objective prompt component stays visible near the local player"),
+		RuntimeObjectivePromptWidget && RuntimeObjectivePromptWidget->IsVisible());
 
 	HoldObjective->Tick(15.0f);
 	TestEqual(TEXT("Hold objective tracks elapsed hold time"), GetRiftObjectiveFloatProperty(HoldObjective, TEXT("CurrentHoldTime")), 15.0f);
@@ -293,6 +311,18 @@ bool FPRRiftObjectiveSystemTest::RunTest(const FString& Parameters)
 		TEXT("Completed objective prompt changes to a completed message"),
 		CallTextFunctionNoParams(HoldObjective, TEXT("GetInteractionPromptText"), CompletedPromptText)
 		&& CompletedPromptText.ToString().Contains(TEXT("\u4EFB\u52A1\u5B8C\u6210")));
+	if (RuntimeObjectivePromptWidget)
+	{
+		RuntimeObjectivePromptWidget->SetHiddenInGame(true);
+		RuntimeObjectivePromptWidget->SetVisibility(false, true);
+	}
+	HoldObjective->Tick(0.0f);
+	TestFalse(
+		TEXT("Completed objective keeps its completion prompt visible near the local player"),
+		RuntimeObjectivePromptWidget ? RuntimeObjectivePromptWidget->bHiddenInGame : true);
+	TestTrue(
+		TEXT("Completed objective prompt component stays visible near the local player"),
+		RuntimeObjectivePromptWidget && RuntimeObjectivePromptWidget->IsVisible());
 
 	return true;
 }
