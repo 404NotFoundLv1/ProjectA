@@ -10,6 +10,7 @@
 #include "Items/PRItemDataAsset.h"
 #include "Items/PRItemTypes.h"
 #include "Player/PRPlayerController.h"
+#include "Player/PRPlayerState.h"
 #include "Tests/AutomationCommon.h"
 #include "UI/PRInventoryWidget.h"
 #include "UObject/StructOnScope.h"
@@ -75,6 +76,7 @@ bool FPRInventoryUITest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Inventory widget exposes GetBoundInventory"), InventoryWidgetClass->FindFunctionByName(TEXT("GetBoundInventory")));
 	TestNotNull(TEXT("Inventory widget exposes IsInventoryEmpty"), InventoryWidgetClass->FindFunctionByName(TEXT("IsInventoryEmpty")));
 	TestNotNull(TEXT("Inventory widget exposes GetItemIcon"), InventoryWidgetClass->FindFunctionByName(TEXT("GetItemIcon")));
+	TestNotNull(TEXT("Inventory widget exposes ship resource summary text"), InventoryWidgetClass->FindFunctionByName(TEXT("GetShipResourceSummaryText")));
 
 	UClass* PlayerControllerClass = APRPlayerController::StaticClass();
 	TestNotNull(TEXT("APRPlayerController class exists for inventory UI"), PlayerControllerClass);
@@ -167,6 +169,20 @@ bool FPRInventoryUITest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Cleared widget displays empty inventory"), Widget->IsInventoryEmpty());
 	TestTrue(TEXT("Original inventory can still change after widget unbinds"), Inventory->AddItem(MakeInventoryUITestItem(TEXT("ShieldPack"), 1)));
 	TestEqual(TEXT("Unbound widget is not updated by old inventory"), Widget->GetDisplayedItems().Num(), 0);
+
+	APRPlayerState* ResourcePlayerState = World->SpawnActor<APRPlayerState>();
+	UPRInventoryWidget* ResourceWidget = NewObject<UPRInventoryWidget>(GetTransientPackage(), InventoryWidgetClass);
+	TestNotNull(TEXT("Can spawn player state for ship resource UI"), ResourcePlayerState);
+	TestNotNull(TEXT("Can instantiate ship resource UI widget"), ResourceWidget);
+	if (ResourcePlayerState && ResourceWidget)
+	{
+		TestTrue(TEXT("Can seed extracted ship resource for inventory UI"), ResourcePlayerState->AddShipResource(TEXT("EnergyCrystal"), 5));
+		ResourceWidget->BindInventory(ResourcePlayerState->GetInventoryComponent());
+		TestTrue(
+			TEXT("Inventory UI shows extracted ship resources even when the carried bag is empty"),
+			ResourceWidget->GetShipResourceSummaryText().ToString().Contains(TEXT("EnergyCrystal x5")));
+		TestTrue(TEXT("Ship resource display does not create carried inventory slots"), ResourceWidget->IsInventoryEmpty());
+	}
 
 	UPRInventoryComponent* DataInventory = NewObject<UPRInventoryComponent>(GetTransientPackage());
 	UPRInventoryWidget* DataWidget = NewObject<UPRInventoryWidget>(GetTransientPackage(), InventoryWidgetClass);

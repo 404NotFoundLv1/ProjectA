@@ -40,6 +40,15 @@ struct PROJECTA_API FPRRiftSettlementData
 	UPROPERTY(BlueprintReadOnly, Category = "Rift|Settlement", meta = (ClampMin = "0"))
 	int32 ExtractedUniqueItemTypes = 0;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Rift|Settlement", meta = (ClampMin = "0"))
+	int32 ExtractedResourceCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Rift|Settlement", meta = (ClampMin = "0"))
+	int32 ExtractedUniqueResourceTypes = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Rift|Settlement", meta = (ClampMin = "0"))
+	int32 LostResourceCount = 0;
+
 	bool IsValid() const
 	{
 		return Result != EPRRiftMissionResult::None;

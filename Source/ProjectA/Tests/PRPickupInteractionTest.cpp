@@ -2,6 +2,8 @@
 
 #include "Misc/AutomationTest.h"
 
+#include "Components/WidgetComponent.h"
+#include "Core/PRRiftObjectiveActor.h"
 #include "Engine/World.h"
 #include "GameFramework/DefaultPawn.h"
 #include "GameFramework/Pawn.h"
@@ -13,6 +15,7 @@
 #include "UObject/UnrealType.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPRPickupInteractionTest, "ProjectRift.Items.PickupInteraction", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPRInteractionFocusPromptTest, "ProjectRift.Interaction.FocusPrompt", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 namespace
 {
@@ -136,6 +139,13 @@ bool FPRPickupInteractionTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Successful pickup marks pickup as consumed"), NearbyPickup && NearbyPickup->IsPickedUp());
 	TestTrue(TEXT("Successful pickup destroys the pickup actor"), NearbyPickup && NearbyPickup->IsActorBeingDestroyed());
 
+	APRPlayerController* ReadableRangePlayer = SpawnPickupTestPlayer(*this, World, FVector(100.0, 600.0, 0.0));
+	UPRInventoryComponent* ReadableRangeInventory = GetInventory(ReadableRangePlayer);
+	APRPickupActor* ReadableRangePickup = SpawnPickup(*this, World, FVector(400.0, 600.0, 0.0), MakePickupInteractionTestItem(TEXT("ReadableRangeCrystal"), 1));
+	TestTrue(TEXT("Server accepts pickup at readable interaction range"), ReadableRangePlayer && ReadableRangePlayer->TryPickupOnServer(ReadableRangePickup));
+	TestEqual(TEXT("Readable-range pickup enters inventory"), ReadableRangeInventory ? ReadableRangeInventory->GetItemCount(TEXT("ReadableRangeCrystal")) : INDEX_NONE, 1);
+	TestTrue(TEXT("Readable-range pickup is consumed"), ReadableRangePickup && ReadableRangePickup->IsPickedUp());
+
 	APRPlayerController* RaceWinner = SpawnPickupTestPlayer(*this, World, FVector(300.0, 0.0, 0.0));
 	APRPlayerController* RaceLoser = SpawnPickupTestPlayer(*this, World, FVector(300.0, 80.0, 0.0));
 	UPRInventoryComponent* WinnerInventory = GetInventory(RaceWinner);
@@ -168,6 +178,110 @@ bool FPRPickupInteractionTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Server rejects pickup outside interaction range"), FirstPlayer->TryPickupOnServer(FarPickup));
 	TestEqual(TEXT("Out-of-range item is not added"), FirstInventory->GetItemCount(TEXT("DistantCache")), 0);
 	TestTrue(TEXT("Out-of-range pickup remains available"), FarPickup && FarPickup->CanBePickedUp());
+
+	APRPlayerController* ObjectivePriorityPlayer = SpawnPickupTestPlayer(*this, World, FVector(1800.0, 0.0, 0.0));
+	UPRInventoryComponent* ObjectivePriorityInventory = GetInventory(ObjectivePriorityPlayer);
+	APRRiftObjectiveActor* NearbyObjective = World->SpawnActor<APRRiftObjectiveActor>(FVector(1880.0, 0.0, 0.0), FRotator::ZeroRotator);
+	APRPickupActor* NearbyObjectivePickup = SpawnPickup(*this, World, FVector(1840.0, 0.0, 0.0), MakePickupInteractionTestItem(TEXT("PriorityCrystal"), 1));
+	TestNotNull(TEXT("Can spawn objective beside a pickup for interaction priority"), NearbyObjective);
+	TestNotNull(TEXT("Can spawn pickup beside an objective for interaction priority"), NearbyObjectivePickup);
+	if (ObjectivePriorityPlayer && ObjectivePriorityInventory && NearbyObjective && NearbyObjectivePickup)
+	{
+		ObjectivePriorityPlayer->TryPickup();
+		TestFalse(TEXT("Generic interact does not start a farther objective when closer loot is in range"), NearbyObjective->IsObjectiveActive());
+		TestEqual(TEXT("Generic interact picks up the closer loot target"), ObjectivePriorityInventory->GetItemCount(TEXT("PriorityCrystal")), 1);
+		TestTrue(TEXT("Closer loot is consumed before a farther objective"), NearbyObjectivePickup->IsPickedUp());
+	}
+
+	APRPlayerController* CloserObjectivePlayer = SpawnPickupTestPlayer(*this, World, FVector(2200.0, 0.0, 0.0));
+	UPRInventoryComponent* CloserObjectiveInventory = GetInventory(CloserObjectivePlayer);
+	APRRiftObjectiveActor* CloserObjective = World->SpawnActor<APRRiftObjectiveActor>(FVector(2240.0, 0.0, 0.0), FRotator::ZeroRotator);
+	APRPickupActor* FartherPickup = SpawnPickup(*this, World, FVector(2320.0, 0.0, 0.0), MakePickupInteractionTestItem(TEXT("FartherPriorityCrystal"), 1));
+	TestNotNull(TEXT("Can spawn closer objective for interaction priority"), CloserObjective);
+	TestNotNull(TEXT("Can spawn farther pickup for interaction priority"), FartherPickup);
+	if (CloserObjectivePlayer && CloserObjectiveInventory && CloserObjective && FartherPickup)
+	{
+		CloserObjectivePlayer->TryPickup();
+		TestTrue(TEXT("Generic interact starts the closer objective before farther loot"), CloserObjective->IsObjectiveActive());
+		TestEqual(TEXT("Generic interact does not pick up farther loot first"), CloserObjectiveInventory->GetItemCount(TEXT("FartherPriorityCrystal")), 0);
+		TestTrue(TEXT("Farther loot remains available after closer objective interact"), FartherPickup->CanBePickedUp());
+	}
+
+	return true;
+}
+
+bool FPRInteractionFocusPromptTest::RunTest(const FString& Parameters)
+{
+	FTestWorldWrapper WorldWrapper;
+	TestTrue(TEXT("Focus prompt test world is created"), WorldWrapper.CreateTestWorld(EWorldType::Game));
+	UWorld* World = WorldWrapper.GetTestWorld();
+	if (!World)
+	{
+		return false;
+	}
+
+	APRPlayerController* PlayerController = SpawnPickupTestPlayer(*this, World, FVector::ZeroVector);
+	UPRInventoryComponent* InventoryComponent = GetInventory(PlayerController);
+	APRPickupActor* CloserPickup = SpawnPickup(*this, World, FVector(80.0f, 0.0f, 0.0f), MakePickupInteractionTestItem(TEXT("FocusCrystal"), 1));
+	APRRiftObjectiveActor* FartherObjective = World->SpawnActor<APRRiftObjectiveActor>(FVector(180.0f, 0.0f, 0.0f), FRotator::ZeroRotator);
+
+	TestNotNull(TEXT("Can spawn focus prompt player"), PlayerController);
+	TestNotNull(TEXT("Focus prompt player owns inventory"), InventoryComponent);
+	TestNotNull(TEXT("Can spawn closer focus pickup"), CloserPickup);
+	TestNotNull(TEXT("Can spawn farther focus objective"), FartherObjective);
+	if (!PlayerController || !InventoryComponent || !CloserPickup || !FartherObjective)
+	{
+		return false;
+	}
+
+	UWidgetComponent* PickupPromptWidget = FindObject<UWidgetComponent>(CloserPickup, TEXT("InteractionPromptWidget"));
+	UWidgetComponent* ObjectivePromptWidget = FindObject<UWidgetComponent>(FartherObjective, TEXT("InteractionPromptWidget"));
+	TestNotNull(TEXT("Closer pickup owns prompt widget"), PickupPromptWidget);
+	TestNotNull(TEXT("Farther objective owns prompt widget"), ObjectivePromptWidget);
+	if (!PickupPromptWidget || !ObjectivePromptWidget)
+	{
+		return false;
+	}
+
+	PickupPromptWidget->SetHiddenInGame(true);
+	PickupPromptWidget->SetVisibility(false, true);
+	ObjectivePromptWidget->SetHiddenInGame(true);
+	ObjectivePromptWidget->SetVisibility(false, true);
+
+	CloserPickup->Tick(0.0f);
+	FartherObjective->Tick(0.0f);
+
+	TestFalse(
+		TEXT("Only the focused closer pickup prompt is visible"),
+		PickupPromptWidget->bHiddenInGame);
+	TestTrue(
+		TEXT("Farther objective prompt stays hidden while closer pickup is focused"),
+		ObjectivePromptWidget->bHiddenInGame);
+
+	if (APawn* Pawn = PlayerController->GetPawn())
+	{
+		Pawn->SetActorLocation(FVector(170.0f, 0.0f, 0.0f));
+	}
+
+	PickupPromptWidget->SetHiddenInGame(true);
+	PickupPromptWidget->SetVisibility(false, true);
+	ObjectivePromptWidget->SetHiddenInGame(true);
+	ObjectivePromptWidget->SetVisibility(false, true);
+
+	CloserPickup->Tick(0.0f);
+	FartherObjective->Tick(0.0f);
+
+	TestTrue(
+		TEXT("Pickup prompt hides when the objective becomes the focused target"),
+		PickupPromptWidget->bHiddenInGame);
+	TestFalse(
+		TEXT("Only the focused closer objective prompt is visible"),
+		ObjectivePromptWidget->bHiddenInGame);
+
+	PlayerController->TryPickup();
+	TestTrue(TEXT("Generic interact activates the focused objective"), FartherObjective->IsObjectiveActive());
+	TestEqual(TEXT("Focused objective interact does not pick up non-focused loot"), InventoryComponent->GetItemCount(TEXT("FocusCrystal")), 0);
+	TestTrue(TEXT("Non-focused loot remains available"), CloserPickup->CanBePickedUp());
 
 	return true;
 }

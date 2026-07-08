@@ -72,6 +72,9 @@ void APRRiftGameState::SetSettlementData(const FPRRiftSettlementData& InSettleme
 	SettlementData.ExtractedPlayerCount = FMath::Max(0, SettlementData.ExtractedPlayerCount);
 	SettlementData.ExtractedItemCount = FMath::Max(0, SettlementData.ExtractedItemCount);
 	SettlementData.ExtractedUniqueItemTypes = FMath::Max(0, SettlementData.ExtractedUniqueItemTypes);
+	SettlementData.ExtractedResourceCount = FMath::Max(0, SettlementData.ExtractedResourceCount);
+	SettlementData.ExtractedUniqueResourceTypes = FMath::Max(0, SettlementData.ExtractedUniqueResourceTypes);
+	SettlementData.LostResourceCount = FMath::Max(0, SettlementData.LostResourceCount);
 }
 
 void APRRiftGameState::SetSettlementReady(const bool bInSettlementReady)

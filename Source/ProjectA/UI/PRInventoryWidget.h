@@ -62,6 +62,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
 	FText GetItemTooltipText(const FPRItemInstance& Item) const;
 
+	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
+	FText GetShipResourceSummaryText() const;
+
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	void RequestUseSelectedItem();
 
@@ -94,6 +97,7 @@ private:
 	FReply HandleDropSelectedClicked();
 	void RebuildItemList();
 	void RefreshSelectedItemDetails();
+	void RefreshShipResourceSummary();
 	UPRItemDataAsset* FindItemData(const FPRItemInstance& Item) const;
 	FString BuildItemSummary(const FPRItemInstance& Item) const;
 	FText BuildSelectedItemDetails() const;
@@ -107,4 +111,5 @@ private:
 
 	TSharedPtr<SScrollBox> ItemScrollBox;
 	TSharedPtr<STextBlock> DetailTextBlock;
+	TSharedPtr<STextBlock> ShipResourceSummaryTextBlock;
 };

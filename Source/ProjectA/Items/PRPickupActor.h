@@ -75,6 +75,7 @@ private:
 	void RefreshInteractionPromptWidget();
 	void UpdateInteractionPromptVisibility();
 	APawn* FindNearbyPromptPawn() const;
+	void UpdateInteractionPromptPlacement(const APawn* NearbyPawn);
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Pickup", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> Mesh;

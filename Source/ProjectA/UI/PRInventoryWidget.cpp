@@ -1,8 +1,11 @@
 #include "UI/PRInventoryWidget.h"
 
+#include "Fonts/CompositeFont.h"
 #include "Fonts/SlateFontInfo.h"
 #include "Items/PRInventoryComponent.h"
 #include "Items/PRItemDataAsset.h"
+#include "Misc/Paths.h"
+#include "Player/PRPlayerState.h"
 #include "Styling/CoreStyle.h"
 #include "Engine/Texture2D.h"
 #include "Widgets/Input/SButton.h"
@@ -10,6 +13,20 @@
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Text/STextBlock.h"
+
+namespace
+{
+FSlateFontInfo GetProjectRiftInventoryFont(const float Size)
+{
+	static const TSharedPtr<const FCompositeFont> InventoryFont = MakeShared<FStandaloneCompositeFont>(
+		TEXT("Default"),
+		FPaths::EngineContentDir() / TEXT("Slate/Fonts/DroidSansFallback.ttf"),
+		EFontHinting::Default,
+		EFontLoadingPolicy::LazyLoad);
+
+	return FSlateFontInfo(InventoryFont, Size);
+}
+}
 
 void UPRInventoryWidget::BindInventory(UPRInventoryComponent* InInventoryComponent)
 {
@@ -45,6 +62,7 @@ void UPRInventoryWidget::RefreshInventory()
 
 	RebuildItemList();
 	RefreshSelectedItemDetails();
+	RefreshShipResourceSummary();
 }
 
 void UPRInventoryWidget::SelectDisplayedItem(const int32 ItemIndex)
@@ -156,6 +174,14 @@ FText UPRInventoryWidget::GetItemTooltipText(const FPRItemInstance& Item) const
 	return FText::FromString(FString::Join(Lines, LINE_TERMINATOR));
 }
 
+FText UPRInventoryWidget::GetShipResourceSummaryText() const
+{
+	const UPRInventoryComponent* InventoryComponent = BoundInventory.Get();
+	const APRPlayerState* ProjectRiftPlayerState = InventoryComponent ? Cast<APRPlayerState>(InventoryComponent->GetOwner()) : nullptr;
+	const FString ResourceSummary = ProjectRiftPlayerState ? ProjectRiftPlayerState->BuildShipResourceSummary() : FString(TEXT("None"));
+	return FText::FromString(FString::Printf(TEXT("\u8230\u8239\u8D44\u6E90\uFF1A%s"), *ResourceSummary));
+}
+
 void UPRInventoryWidget::RequestUseSelectedItem()
 {
 	if (HasSelectedItem())
@@ -207,8 +233,18 @@ TSharedRef<SWidget> UPRInventoryWidget::RebuildWidget()
 			[
 				SNew(STextBlock)
 				.ColorAndOpacity(FSlateColor(FLinearColor(0.95f, 0.96f, 0.92f, 1.0f)))
-				.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 18))
+				.Font(GetProjectRiftInventoryFont(18.0f))
 				.Text(FText::FromString(TEXT("Inventory")))
+			]
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.0f, 0.0f, 0.0f, 8.0f)
+			[
+				SAssignNew(ShipResourceSummaryTextBlock, STextBlock)
+				.AutoWrapText(true)
+				.ColorAndOpacity(FSlateColor(FLinearColor(0.46f, 0.95f, 0.88f, 1.0f)))
+				.Font(GetProjectRiftInventoryFont(13.0f))
+				.Text(GetShipResourceSummaryText())
 			]
 			+ SVerticalBox::Slot()
 			.FillHeight(1.0f)
@@ -226,7 +262,7 @@ TSharedRef<SWidget> UPRInventoryWidget::RebuildWidget()
 					SAssignNew(DetailTextBlock, STextBlock)
 					.AutoWrapText(true)
 					.ColorAndOpacity(FSlateColor(FLinearColor(0.88f, 0.9f, 0.86f, 1.0f)))
-					.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 12))
+					.Font(GetProjectRiftInventoryFont(12.0f))
 					.Text(FText::FromString(TEXT("Select an item.")))
 				]
 			]
@@ -245,7 +281,7 @@ TSharedRef<SWidget> UPRInventoryWidget::RebuildWidget()
 						SNew(STextBlock)
 						.Justification(ETextJustify::Center)
 						.ColorAndOpacity(FSlateColor(FLinearColor(0.95f, 0.96f, 0.92f, 1.0f)))
-						.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 13))
+						.Font(GetProjectRiftInventoryFont(13.0f))
 						.Text(FText::FromString(TEXT("Use Selected")))
 					]
 				]
@@ -259,7 +295,7 @@ TSharedRef<SWidget> UPRInventoryWidget::RebuildWidget()
 						SNew(STextBlock)
 						.Justification(ETextJustify::Center)
 						.ColorAndOpacity(FSlateColor(FLinearColor(0.95f, 0.96f, 0.92f, 1.0f)))
-						.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 13))
+						.Font(GetProjectRiftInventoryFont(13.0f))
 						.Text(FText::FromString(TEXT("Drop One")))
 					]
 				]
@@ -268,6 +304,7 @@ TSharedRef<SWidget> UPRInventoryWidget::RebuildWidget()
 
 	RebuildItemList();
 	RefreshSelectedItemDetails();
+	RefreshShipResourceSummary();
 
 	return Widget;
 }
@@ -278,6 +315,7 @@ void UPRInventoryWidget::ReleaseSlateResources(const bool bReleaseChildren)
 
 	ItemScrollBox.Reset();
 	DetailTextBlock.Reset();
+	ShipResourceSummaryTextBlock.Reset();
 }
 
 void UPRInventoryWidget::NativeDestruct()
@@ -330,7 +368,7 @@ void UPRInventoryWidget::RebuildItemList()
 		[
 			SNew(STextBlock)
 			.ColorAndOpacity(FSlateColor(FLinearColor(0.72f, 0.74f, 0.7f, 1.0f)))
-			.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 13))
+			.Font(GetProjectRiftInventoryFont(13.0f))
 			.Text(FText::FromString(TEXT("Empty")))
 		];
 		return;
@@ -350,7 +388,7 @@ void UPRInventoryWidget::RebuildItemList()
 			[
 				SNew(STextBlock)
 				.ColorAndOpacity(FSlateColor(GetItemRarityColor(Item.Rarity)))
-				.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 13))
+				.Font(GetProjectRiftInventoryFont(13.0f))
 				.Text(FText::FromString(BuildItemSummary(Item)))
 			]
 		];
@@ -362,6 +400,14 @@ void UPRInventoryWidget::RefreshSelectedItemDetails()
 	if (DetailTextBlock.IsValid())
 	{
 		DetailTextBlock->SetText(BuildSelectedItemDetails());
+	}
+}
+
+void UPRInventoryWidget::RefreshShipResourceSummary()
+{
+	if (ShipResourceSummaryTextBlock.IsValid())
+	{
+		ShipResourceSummaryTextBlock->SetText(GetShipResourceSummaryText());
 	}
 }
 

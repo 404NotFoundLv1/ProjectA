@@ -146,7 +146,7 @@ bool FPRRiftObjectiveSystemTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("Rift objective prompt tells the player to press F to start the task"),
 		CallTextFunctionNoParams(RiftObjectiveDefaults, TEXT("GetInteractionPromptText"), DefaultPromptText)
-		&& DefaultPromptText.ToString().Contains(TEXT("开始任务")));
+		&& DefaultPromptText.ToString().Contains(TEXT("\u5F00\u59CB\u4EFB\u52A1")));
 	TestTrue(
 		TEXT("Rift objective prompt is lifted above the objective marker"),
 		ObjectivePromptDefaults && ObjectivePromptDefaults->GetRelativeLocation().Z >= 260.0f);
@@ -276,7 +276,7 @@ bool FPRRiftObjectiveSystemTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("Activated objective prompt changes to an in-progress message"),
 		CallTextFunctionNoParams(HoldObjective, TEXT("GetInteractionPromptText"), ActivePromptText)
-		&& ActivePromptText.ToString().Contains(TEXT("进行中")));
+		&& ActivePromptText.ToString().Contains(TEXT("\u4EFB\u52A1\u8FDB\u884C\u4E2D")));
 
 	HoldObjective->Tick(15.0f);
 	TestEqual(TEXT("Hold objective tracks elapsed hold time"), GetRiftObjectiveFloatProperty(HoldObjective, TEXT("CurrentHoldTime")), 15.0f);
@@ -292,7 +292,7 @@ bool FPRRiftObjectiveSystemTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("Completed objective prompt changes to a completed message"),
 		CallTextFunctionNoParams(HoldObjective, TEXT("GetInteractionPromptText"), CompletedPromptText)
-		&& CompletedPromptText.ToString().Contains(TEXT("完成")));
+		&& CompletedPromptText.ToString().Contains(TEXT("\u4EFB\u52A1\u5B8C\u6210")));
 
 	return true;
 }

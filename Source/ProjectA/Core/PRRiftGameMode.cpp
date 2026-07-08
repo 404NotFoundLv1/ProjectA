@@ -9,6 +9,7 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "Items/PRInventoryComponent.h"
+#include "Items/PRItemDataAsset.h"
 #include "Items/PRItemTypes.h"
 #include "Player/PRPlayerState.h"
 #include "ProjectA.h"
@@ -248,18 +249,65 @@ void APRRiftGameMode::FinalizeRiftSettlement(const EPRRiftMissionResult Result)
 
 	if (APRRiftGameState* RiftGameState = GetRiftGameState())
 	{
-		RiftGameState->SetSettlementData(GenerateSettlementData(Result));
+		if (RiftGameState->IsSettlementReady())
+		{
+			return;
+		}
+
+		FPRRiftSettlementData Settlement = GenerateSettlementData(Result);
+		ApplyExtractedResourceRules(Result, Settlement);
+
+		RiftGameState->SetSettlementData(Settlement);
 		RiftGameState->SetSettlementReady(true);
 
-		const FPRRiftSettlementData Settlement = RiftGameState->GetSettlementData();
-		UE_LOG(LogProjectA, Log, TEXT("Rift settlement finalized. Result=%d Time=%.1f Extracted=%d/%d Items=%d Types=%d"),
-			static_cast<int32>(Settlement.Result),
-			Settlement.MissionTime,
-			Settlement.ExtractedPlayerCount,
-			Settlement.AlivePlayerCount,
-			Settlement.ExtractedItemCount,
-			Settlement.ExtractedUniqueItemTypes);
+		const FPRRiftSettlementData FinalSettlement = RiftGameState->GetSettlementData();
+		UE_LOG(LogProjectA, Log, TEXT("Rift settlement finalized. Result=%d Time=%.1f Extracted=%d/%d Items=%d Types=%d Resources=%d ResourceTypes=%d LostResources=%d"),
+			static_cast<int32>(FinalSettlement.Result),
+			FinalSettlement.MissionTime,
+			FinalSettlement.ExtractedPlayerCount,
+			FinalSettlement.AlivePlayerCount,
+			FinalSettlement.ExtractedItemCount,
+			FinalSettlement.ExtractedUniqueItemTypes,
+			FinalSettlement.ExtractedResourceCount,
+			FinalSettlement.ExtractedUniqueResourceTypes,
+			FinalSettlement.LostResourceCount);
 	}
+}
+
+int32 APRRiftGameMode::CalculateRetainedResourceCount(const int32 Count, const EPRRiftMissionResult Result) const
+{
+	const int32 SafeCount = FMath::Max(0, Count);
+	if (SafeCount <= 0)
+	{
+		return 0;
+	}
+
+	if (Result == EPRRiftMissionResult::Success)
+	{
+		return SafeCount;
+	}
+
+	if (Result == EPRRiftMissionResult::Failed)
+	{
+		return FMath::FloorToInt(SafeCount * FMath::Clamp(FailedResourceRetentionRate, 0.0f, 1.0f));
+	}
+
+	return 0;
+}
+
+bool APRRiftGameMode::IsExtractableResourceItem(const FPRItemInstance& Item, UPRInventoryComponent* InventoryComponent) const
+{
+	if (!Item.IsValid())
+	{
+		return false;
+	}
+
+	if (const UPRItemDataAsset* ItemData = InventoryComponent ? InventoryComponent->FindItemData(Item.ItemId) : nullptr)
+	{
+		return ItemData->ItemType == EPRItemType::Material;
+	}
+
+	return IsFallbackMaterialResourceId(Item.ItemId);
 }
 
 void APRRiftGameMode::UpdateAlivePlayerCount()
@@ -481,6 +529,97 @@ void APRRiftGameMode::CountExtractedInventoryItems(int32& OutItemCount, int32& O
 	}
 
 	OutUniqueItemTypes = UniqueItemIds.Num();
+}
+
+void APRRiftGameMode::ApplyExtractedResourceRules(const EPRRiftMissionResult Result, FPRRiftSettlementData& InOutSettlementData)
+{
+	const AGameStateBase* CurrentGameState = GameState;
+	if (!CurrentGameState)
+	{
+		return;
+	}
+
+	TSet<FName> UniqueResourceIds;
+	for (const TObjectPtr<APlayerState>& PlayerState : CurrentGameState->PlayerArray)
+	{
+		if (!ShouldApplyResourceRulesToPlayer(PlayerState.Get(), Result))
+		{
+			continue;
+		}
+
+		ApplyExtractedResourceRulesForPlayer(
+			Cast<APRPlayerState>(PlayerState.Get()),
+			Result,
+			InOutSettlementData,
+			UniqueResourceIds);
+	}
+
+	InOutSettlementData.ExtractedUniqueResourceTypes = UniqueResourceIds.Num();
+}
+
+void APRRiftGameMode::ApplyExtractedResourceRulesForPlayer(
+	APRPlayerState* PlayerState,
+	const EPRRiftMissionResult Result,
+	FPRRiftSettlementData& InOutSettlementData,
+	TSet<FName>& UniqueResourceIds) const
+{
+	UPRInventoryComponent* InventoryComponent = PlayerState ? PlayerState->GetInventoryComponent() : nullptr;
+	if (!PlayerState || !InventoryComponent)
+	{
+		return;
+	}
+
+	const TArray<FPRItemInstance> InventoryItems = InventoryComponent->GetItems();
+	for (const FPRItemInstance& Item : InventoryItems)
+	{
+		if (!IsExtractableResourceItem(Item, InventoryComponent))
+		{
+			continue;
+		}
+
+		const int32 OriginalCount = FMath::Max(0, Item.Count);
+		const int32 RetainedCount = CalculateRetainedResourceCount(OriginalCount, Result);
+		const int32 LostCount = FMath::Max(0, OriginalCount - RetainedCount);
+
+		if (RetainedCount > 0)
+		{
+			PlayerState->AddShipResource(Item.ItemId, RetainedCount);
+			InOutSettlementData.ExtractedResourceCount += RetainedCount;
+			UniqueResourceIds.Add(Item.ItemId);
+		}
+
+		InOutSettlementData.LostResourceCount += LostCount;
+
+		if (!InventoryComponent->RemoveItem(Item.ItemId, OriginalCount))
+		{
+			UE_LOG(LogProjectA, Warning, TEXT("Rift resource extraction could not remove inventory item. Player=%s ItemId=%s Count=%d"),
+				*GetNameSafe(PlayerState),
+				*Item.ItemId.ToString(),
+				OriginalCount);
+		}
+	}
+}
+
+bool APRRiftGameMode::ShouldApplyResourceRulesToPlayer(const APlayerState* PlayerState, const EPRRiftMissionResult Result) const
+{
+	if (!PlayerState || PlayerState->IsOnlyASpectator())
+	{
+		return false;
+	}
+
+	if (Result == EPRRiftMissionResult::Success)
+	{
+		return ExtractedPlayerStates.Contains(TObjectKey<APlayerState>(const_cast<APlayerState*>(PlayerState)));
+	}
+
+	return Result == EPRRiftMissionResult::Failed;
+}
+
+bool APRRiftGameMode::IsFallbackMaterialResourceId(const FName ItemId)
+{
+	return ItemId == FName(TEXT("RiftShard"))
+		|| ItemId == FName(TEXT("EnergyCrystal"))
+		|| ItemId == FName(TEXT("CommonChip"));
 }
 
 void APRRiftGameMode::RequestReturnToLobbyTravel()

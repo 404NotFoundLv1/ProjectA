@@ -80,6 +80,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Rift|Objective")
 	APRRiftObjectiveActor* FindBestRiftObjectiveCandidate() const;
 
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	AActor* FindFocusedInteractionTarget() const;
+
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	bool IsFocusedInteractionTarget(const AActor* TargetActor) const;
+
 	bool TryPickupOnServer(APRPickupActor* PickupActor);
 	bool TryActivateRiftObjectiveOnServer(APRRiftObjectiveActor* ObjectiveActor);
 
@@ -145,7 +151,7 @@ private:
 	bool CanServerActivateRiftObjective(APRRiftObjectiveActor* ObjectiveActor, FString* OutFailureReason = nullptr) const;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Pickup", meta = (ClampMin = "0.0"))
-	float PickupInteractionRadius = 250.0f;
+	float PickupInteractionRadius = 350.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Rift|Objective", meta = (ClampMin = "0.0"))
 	float ObjectiveInteractionRadius = 250.0f;

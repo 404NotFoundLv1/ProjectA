@@ -8,6 +8,8 @@
 
 APRGameModeBase::APRGameModeBase()
 {
+	bUseSeamlessTravel = true;
+
 	static ConstructorHelpers::FClassFinder<APRCharacter> ProjectRiftCharacterClass(TEXT("/Game/ProjectRift/Blueprints/Characters/BP_PRCharacter"));
 	if (ProjectRiftCharacterClass.Succeeded())
 	{

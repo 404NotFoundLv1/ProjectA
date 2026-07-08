@@ -5,9 +5,9 @@
 #include "Components/WidgetComponent.h"
 #include "EngineUtils.h"
 #include "Engine/StaticMesh.h"
-#include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
+#include "Player/PRPlayerController.h"
 #include "ProjectA.h"
 #include "UI/PRInteractionPromptWidget.h"
 #include "UObject/ConstructorHelpers.h"
@@ -33,7 +33,7 @@ APRPickupActor::APRPickupActor()
 
 	InteractionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("InteractionSphere"));
 	InteractionSphere->SetupAttachment(Mesh);
-	InteractionSphere->SetSphereRadius(180.0f);
+	InteractionSphere->SetSphereRadius(350.0f);
 	InteractionSphere->SetCollisionObjectType(ECC_WorldDynamic);
 	InteractionSphere->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	InteractionSphere->SetCollisionResponseToAllChannels(ECR_Ignore);
@@ -44,7 +44,7 @@ APRPickupActor::APRPickupActor()
 
 	InteractionPromptWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("InteractionPromptWidget"));
 	InteractionPromptWidget->SetupAttachment(Mesh);
-	InteractionPromptWidget->SetRelativeLocation(FVector(0.0f, 0.0f, 260.0f));
+	InteractionPromptWidget->SetRelativeLocation(FVector(0.0f, 0.0f, 120.0f));
 	InteractionPromptWidget->SetWidgetSpace(EWidgetSpace::Screen);
 	InteractionPromptWidget->SetDrawSize(FVector2D(360.0f, 72.0f));
 	InteractionPromptWidget->SetPivot(FVector2D(0.5f, 0.5f));
@@ -91,7 +91,7 @@ bool APRPickupActor::CanBePickedUp() const
 
 FText APRPickupActor::GetInteractionPromptText() const
 {
-	return FText::FromString(TEXT("按 F 拾取"));
+	return FText::FromString(TEXT("\u6309 F \u62FE\u53D6"));
 }
 
 void APRPickupActor::SetPickedUp(const bool bNewPickedUp)
@@ -132,12 +132,7 @@ void APRPickupActor::HandleInteractionSphereBeginOverlap(
 	const bool bFromSweep,
 	const FHitResult& SweepResult)
 {
-	if (!Cast<APawn>(OtherActor) || !CanBePickedUp())
-	{
-		return;
-	}
-
-	SetInteractionPromptVisible(true);
+	UpdateInteractionPromptVisibility();
 }
 
 void APRPickupActor::HandleInteractionSphereEndOverlap(
@@ -148,7 +143,7 @@ void APRPickupActor::HandleInteractionSphereEndOverlap(
 {
 	if (Cast<APawn>(OtherActor))
 	{
-		SetInteractionPromptVisible(false);
+		UpdateInteractionPromptVisibility();
 	}
 }
 
@@ -208,8 +203,13 @@ void APRPickupActor::RefreshInteractionPromptWidget()
 
 void APRPickupActor::UpdateInteractionPromptVisibility()
 {
-	APawn* NearbyPawn = CanBePickedUp() ? FindNearbyPromptPawn() : nullptr;
+	APawn* NearbyPawn = FindNearbyPromptPawn();
 	const bool bShouldShowPrompt = NearbyPawn != nullptr;
+
+	if (NearbyPawn)
+	{
+		UpdateInteractionPromptPlacement(NearbyPawn);
+	}
 
 	SetInteractionPromptVisible(bShouldShowPrompt);
 }
@@ -222,31 +222,78 @@ APawn* APRPickupActor::FindNearbyPromptPawn() const
 		return nullptr;
 	}
 
-	const float PromptRadius = InteractionSphere
-		? FMath::Max(InteractionSphere->GetUnscaledSphereRadius(), 1.0f)
-		: 180.0f;
-	const float PromptRadiusSquared = FMath::Square(PromptRadius);
-	const FVector PickupLocation = GetActorLocation();
-
-	auto IsPawnInPromptRange = [&PickupLocation, PromptRadiusSquared](const APawn* Pawn)
+	APRPlayerController* LocalPlayerController = nullptr;
+	for (TActorIterator<APRPlayerController> ControllerIt(World); ControllerIt; ++ControllerIt)
 	{
-		return Pawn && FVector::DistSquared(Pawn->GetActorLocation(), PickupLocation) <= PromptRadiusSquared;
-	};
-
-	if (const APlayerController* LocalPlayerController = World->GetFirstPlayerController())
-	{
-		APawn* LocalPawn = LocalPlayerController->GetPawn();
-		return IsPawnInPromptRange(LocalPawn) ? LocalPawn : nullptr;
-	}
-
-	for (TActorIterator<APawn> PawnIt(World); PawnIt; ++PawnIt)
-	{
-		APawn* CandidatePawn = *PawnIt;
-		if (IsPawnInPromptRange(CandidatePawn))
+		APRPlayerController* CandidateController = *ControllerIt;
+		if (CandidateController && CandidateController->GetLocalPlayer() && CandidateController->GetPawn())
 		{
-			return CandidatePawn;
+			LocalPlayerController = CandidateController;
+			break;
 		}
 	}
 
-	return nullptr;
+	if (!LocalPlayerController)
+	{
+		for (TActorIterator<APRPlayerController> ControllerIt(World); ControllerIt; ++ControllerIt)
+		{
+			APRPlayerController* CandidateController = *ControllerIt;
+			if (CandidateController && CandidateController->IsLocalController() && CandidateController->GetPawn())
+			{
+				LocalPlayerController = CandidateController;
+				break;
+			}
+		}
+	}
+
+	if (!LocalPlayerController)
+	{
+		for (TActorIterator<APRPlayerController> ControllerIt(World); ControllerIt; ++ControllerIt)
+		{
+			APRPlayerController* CandidateController = *ControllerIt;
+			if (CandidateController && CandidateController->GetPawn())
+			{
+				LocalPlayerController = CandidateController;
+				break;
+			}
+		}
+	}
+
+	return LocalPlayerController && LocalPlayerController->IsFocusedInteractionTarget(this)
+		? LocalPlayerController->GetPawn()
+		: nullptr;
+}
+
+void APRPickupActor::UpdateInteractionPromptPlacement(const APawn* NearbyPawn)
+{
+	if (!InteractionPromptWidget)
+	{
+		return;
+	}
+
+	constexpr float PromptVerticalOffset = 45.0f;
+	constexpr float MinHorizontalOffset = 30.0f;
+	constexpr float MaxHorizontalOffset = 90.0f;
+
+	FVector PromptLocation = GetActorLocation() + FVector(0.0f, 0.0f, 120.0f);
+	if (Mesh)
+	{
+		Mesh->UpdateBounds();
+		const FBoxSphereBounds MeshBounds = Mesh->Bounds;
+		PromptLocation = MeshBounds.Origin;
+		PromptLocation.Z = MeshBounds.Origin.Z + MeshBounds.BoxExtent.Z + PromptVerticalOffset;
+
+		if (NearbyPawn)
+		{
+			FVector DirectionToPlayer = NearbyPawn->GetActorLocation() - MeshBounds.Origin;
+			DirectionToPlayer.Z = 0.0f;
+			if (DirectionToPlayer.Normalize())
+			{
+				const float HorizontalOffset = FMath::Clamp(MeshBounds.SphereRadius * 0.35f, MinHorizontalOffset, MaxHorizontalOffset);
+				PromptLocation += DirectionToPlayer * HorizontalOffset;
+			}
+		}
+	}
+
+	InteractionPromptWidget->SetWorldLocation(PromptLocation);
 }

@@ -5,9 +5,9 @@
 #include "Core/PRRiftGameMode.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
-#include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
+#include "Player/PRPlayerController.h"
 #include "UI/PRInteractionPromptWidget.h"
 
 APRRiftObjectiveActor::APRRiftObjectiveActor()
@@ -104,12 +104,12 @@ FText APRRiftObjectiveActor::GetInteractionPromptText() const
 	switch (ObjectiveState)
 	{
 	case EPRRiftObjectiveState::Active:
-		return FText::FromString(FString::Printf(TEXT("任务进行中 %.0f%%"), ObjectiveProgress * 100.0f));
+		return FText::FromString(FString::Printf(TEXT("\u4EFB\u52A1\u8FDB\u884C\u4E2D %.0f%%"), ObjectiveProgress * 100.0f));
 	case EPRRiftObjectiveState::Completed:
-		return FText::FromString(TEXT("任务完成"));
+		return FText::FromString(TEXT("\u4EFB\u52A1\u5B8C\u6210"));
 	case EPRRiftObjectiveState::NotStarted:
 	default:
-		return FText::FromString(TEXT("按 F 开始任务"));
+		return FText::FromString(TEXT("\u6309 F \u5F00\u59CB\u4EFB\u52A1"));
 	}
 }
 
@@ -218,13 +218,7 @@ void APRRiftObjectiveActor::HandleInteractionSphereBeginOverlap(
 	const bool bFromSweep,
 	const FHitResult& SweepResult)
 {
-	if (!Cast<APawn>(OtherActor))
-	{
-		return;
-	}
-
-	RefreshInteractionPromptText();
-	SetInteractionPromptVisible(true);
+	UpdateInteractionPromptVisibility();
 }
 
 void APRRiftObjectiveActor::HandleInteractionSphereEndOverlap(
@@ -235,7 +229,7 @@ void APRRiftObjectiveActor::HandleInteractionSphereEndOverlap(
 {
 	if (Cast<APawn>(OtherActor))
 	{
-		SetInteractionPromptVisible(false);
+		UpdateInteractionPromptVisibility();
 	}
 }
 
@@ -260,31 +254,44 @@ APawn* APRRiftObjectiveActor::FindNearbyPromptPawn() const
 		return nullptr;
 	}
 
-	const float PromptRadius = InteractionSphere
-		? FMath::Max(InteractionRadius, InteractionSphere->GetUnscaledSphereRadius())
-		: InteractionRadius;
-	const float PromptRadiusSquared = FMath::Square(FMath::Max(PromptRadius, 1.0f));
-	const FVector ObjectiveLocation = GetActorLocation();
-
-	auto IsPawnInPromptRange = [&ObjectiveLocation, PromptRadiusSquared](const APawn* Pawn)
+	APRPlayerController* LocalPlayerController = nullptr;
+	for (TActorIterator<APRPlayerController> ControllerIt(World); ControllerIt; ++ControllerIt)
 	{
-		return Pawn && FVector::DistSquared(Pawn->GetActorLocation(), ObjectiveLocation) <= PromptRadiusSquared;
-	};
-
-	if (const APlayerController* LocalPlayerController = World->GetFirstPlayerController())
-	{
-		APawn* LocalPawn = LocalPlayerController->GetPawn();
-		return IsPawnInPromptRange(LocalPawn) ? LocalPawn : nullptr;
-	}
-
-	for (TActorIterator<APawn> PawnIt(World); PawnIt; ++PawnIt)
-	{
-		APawn* CandidatePawn = *PawnIt;
-		if (IsPawnInPromptRange(CandidatePawn))
+		APRPlayerController* CandidateController = *ControllerIt;
+		if (CandidateController && CandidateController->GetLocalPlayer() && CandidateController->GetPawn())
 		{
-			return CandidatePawn;
+			LocalPlayerController = CandidateController;
+			break;
 		}
 	}
 
-	return nullptr;
+	if (!LocalPlayerController)
+	{
+		for (TActorIterator<APRPlayerController> ControllerIt(World); ControllerIt; ++ControllerIt)
+		{
+			APRPlayerController* CandidateController = *ControllerIt;
+			if (CandidateController && CandidateController->IsLocalController() && CandidateController->GetPawn())
+			{
+				LocalPlayerController = CandidateController;
+				break;
+			}
+		}
+	}
+
+	if (!LocalPlayerController)
+	{
+		for (TActorIterator<APRPlayerController> ControllerIt(World); ControllerIt; ++ControllerIt)
+		{
+			APRPlayerController* CandidateController = *ControllerIt;
+			if (CandidateController && CandidateController->GetPawn())
+			{
+				LocalPlayerController = CandidateController;
+				break;
+			}
+		}
+	}
+
+	return LocalPlayerController && LocalPlayerController->IsFocusedInteractionTarget(this)
+		? LocalPlayerController->GetPawn()
+		: nullptr;
 }

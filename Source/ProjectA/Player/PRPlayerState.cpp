@@ -36,6 +36,26 @@ void APRPlayerState::BeginPlay()
 		*GetNameSafe(AttributeSet));
 }
 
+void APRPlayerState::CopyProperties(APlayerState* PlayerState)
+{
+	Super::CopyProperties(PlayerState);
+
+	if (APRPlayerState* TargetPlayerState = Cast<APRPlayerState>(PlayerState))
+	{
+		TargetPlayerState->CopyProjectRiftStateFrom(this);
+	}
+}
+
+void APRPlayerState::OverrideWith(APlayerState* PlayerState)
+{
+	Super::OverrideWith(PlayerState);
+
+	if (const APRPlayerState* SourcePlayerState = Cast<APRPlayerState>(PlayerState))
+	{
+		CopyProjectRiftStateFrom(SourcePlayerState);
+	}
+}
+
 UAbilitySystemComponent* APRPlayerState::GetAbilitySystemComponent() const
 {
 	return AbilitySystemComponent.Get();
@@ -48,6 +68,7 @@ void APRPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(APRPlayerState, bIsReady);
 	DOREPLIFETIME(APRPlayerState, SelectedRoleModule);
 	DOREPLIFETIME(APRPlayerState, PlayerDisplayName);
+	DOREPLIFETIME(APRPlayerState, ShipResources);
 }
 
 void APRPlayerState::SetReady(const bool bReady)
@@ -93,6 +114,89 @@ void APRPlayerState::SetPlayerDisplayName(const FString& InPlayerDisplayName)
 	ForceNetUpdate();
 }
 
+int32 APRPlayerState::GetShipResourceCount(const FName ResourceId) const
+{
+	const int32 ResourceIndex = FindShipResourceIndex(ResourceId);
+	return ResourceIndex == INDEX_NONE ? 0 : FMath::Max(0, ShipResources[ResourceIndex].Count);
+}
+
+bool APRPlayerState::AddShipResource(const FName ResourceId, const int32 Count)
+{
+	if (ResourceId.IsNone() || Count <= 0)
+	{
+		return false;
+	}
+
+	const int32 ResourceIndex = FindShipResourceIndex(ResourceId);
+	if (ResourceIndex == INDEX_NONE)
+	{
+		FPRShipResourceStack& NewResource = ShipResources.AddDefaulted_GetRef();
+		NewResource.ResourceId = ResourceId;
+		NewResource.Count = Count;
+	}
+	else
+	{
+		ShipResources[ResourceIndex].Count = FMath::Max(0, ShipResources[ResourceIndex].Count) + Count;
+	}
+
+	ForceNetUpdate();
+
+	UE_LOG(
+		LogProjectA,
+		Log,
+		TEXT("Ship resource added. Player=%s ResourceId=%s Added=%d Total=%d"),
+		*GetPlayerDisplayName(),
+		*ResourceId.ToString(),
+		Count,
+		GetShipResourceCount(ResourceId));
+
+	return true;
+}
+
+void APRPlayerState::ResetShipResources()
+{
+	if (ShipResources.IsEmpty())
+	{
+		return;
+	}
+
+	ShipResources.Reset();
+	ForceNetUpdate();
+}
+
+FString APRPlayerState::BuildShipResourceSummary() const
+{
+	TArray<FPRShipResourceStack> ValidResources;
+	ValidResources.Reserve(ShipResources.Num());
+	for (const FPRShipResourceStack& Resource : ShipResources)
+	{
+		if (Resource.IsValid())
+		{
+			ValidResources.Add(Resource);
+		}
+	}
+
+	if (ValidResources.IsEmpty())
+	{
+		return TEXT("None");
+	}
+
+	ValidResources.Sort(
+		[](const FPRShipResourceStack& Left, const FPRShipResourceStack& Right)
+		{
+			return Left.ResourceId.ToString() < Right.ResourceId.ToString();
+		});
+
+	TArray<FString> ResourceParts;
+	ResourceParts.Reserve(ValidResources.Num());
+	for (const FPRShipResourceStack& Resource : ValidResources)
+	{
+		ResourceParts.Add(FString::Printf(TEXT("%s x%d"), *Resource.ResourceId.ToString(), Resource.Count));
+	}
+
+	return FString::Join(ResourceParts, TEXT(", "));
+}
+
 void APRPlayerState::OnRep_IsReady()
 {
 	UE_LOG(
@@ -109,4 +213,36 @@ void APRPlayerState::OnRep_PlayerDisplayName()
 	{
 		PlayerDisplayName = TEXT("Player");
 	}
+}
+
+void APRPlayerState::OnRep_ShipResources()
+{
+}
+
+int32 APRPlayerState::FindShipResourceIndex(const FName ResourceId) const
+{
+	if (ResourceId.IsNone())
+	{
+		return INDEX_NONE;
+	}
+
+	return ShipResources.IndexOfByPredicate(
+		[ResourceId](const FPRShipResourceStack& Resource)
+		{
+			return Resource.ResourceId == ResourceId;
+		});
+}
+
+void APRPlayerState::CopyProjectRiftStateFrom(const APRPlayerState* SourcePlayerState)
+{
+	if (!SourcePlayerState)
+	{
+		return;
+	}
+
+	bIsReady = SourcePlayerState->bIsReady;
+	SelectedRoleModule = SourcePlayerState->SelectedRoleModule;
+	PlayerDisplayName = SourcePlayerState->PlayerDisplayName;
+	ShipResources = SourcePlayerState->ShipResources;
+	ForceNetUpdate();
 }

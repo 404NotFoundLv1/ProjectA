@@ -77,6 +77,7 @@ FString GetLobbyReadyLine(const APlayerState* PlayerState)
 	const APRPlayerState* ProjectRiftPlayerState = Cast<APRPlayerState>(PlayerState);
 	const bool bReady = ProjectRiftPlayerState && ProjectRiftPlayerState->IsReady();
 	const FName SelectedRoleModule = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetSelectedRoleModule() : NAME_None;
+	const FString ResourceSummary = ProjectRiftPlayerState ? ProjectRiftPlayerState->BuildShipResourceSummary() : FString(TEXT("None"));
 	FString DisplayName = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetPlayerDisplayName() : FString();
 
 	if (DisplayName.IsEmpty() && PlayerState)
@@ -91,11 +92,12 @@ FString GetLobbyReadyLine(const APlayerState* PlayerState)
 
 	const int32 PlayerId = PlayerState ? PlayerState->GetPlayerId() : INDEX_NONE;
 	return FString::Printf(
-		TEXT("P%d %s: %s | Role: %s"),
+		TEXT("P%d %s: %s | Role: %s | Resources: %s"),
 		PlayerId,
 		*DisplayName,
 		bReady ? TEXT("READY") : TEXT("WAITING"),
-		SelectedRoleModule.IsNone() ? TEXT("None") : *SelectedRoleModule.ToString());
+		SelectedRoleModule.IsNone() ? TEXT("None") : *SelectedRoleModule.ToString(),
+		*ResourceSummary);
 }
 }
 
@@ -200,15 +202,39 @@ void APRPlayerController::StartRiftMission()
 
 void APRPlayerController::TryPickup()
 {
-	APRPickupActor* PickupCandidate = FindBestPickupCandidate();
-	if (!PickupCandidate)
+	AActor* FocusedTarget = FindFocusedInteractionTarget();
+	if (!FocusedTarget)
 	{
-		UE_LOG(LogProjectA, Verbose, TEXT("TryPickup found no nearby pickup for %s."), *GetNameSafe(this));
-		TryActivateRiftObjective();
+		UE_LOG(LogProjectA, Verbose, TEXT("TryPickup found no nearby interactable for %s."), *GetNameSafe(this));
 		return;
 	}
 
-	ServerTryPickup(PickupCandidate);
+	APRPickupActor* PickupCandidate = Cast<APRPickupActor>(FocusedTarget);
+	if (PickupCandidate)
+	{
+		if (HasAuthority())
+		{
+			TryPickupOnServer(PickupCandidate);
+		}
+		else
+		{
+			ServerTryPickup(PickupCandidate);
+		}
+		return;
+	}
+
+	APRRiftObjectiveActor* ObjectiveCandidate = Cast<APRRiftObjectiveActor>(FocusedTarget);
+	if (ObjectiveCandidate)
+	{
+		if (HasAuthority())
+		{
+			TryActivateRiftObjectiveOnServer(ObjectiveCandidate);
+		}
+		else
+		{
+			ServerTryActivateRiftObjective(ObjectiveCandidate);
+		}
+	}
 }
 
 void APRPlayerController::TryActivateRiftObjective()
@@ -220,7 +246,14 @@ void APRPlayerController::TryActivateRiftObjective()
 		return;
 	}
 
-	ServerTryActivateRiftObjective(ObjectiveCandidate);
+	if (HasAuthority())
+	{
+		TryActivateRiftObjectiveOnServer(ObjectiveCandidate);
+	}
+	else
+	{
+		ServerTryActivateRiftObjective(ObjectiveCandidate);
+	}
 }
 
 void APRPlayerController::ToggleInventory()
@@ -350,10 +383,17 @@ APRPickupActor* APRPlayerController::FindBestPickupCandidate() const
 
 	APRPickupActor* BestPickup = nullptr;
 	float BestDistanceSquared = TNumericLimits<float>::Max();
+	const APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	const UPRInventoryComponent* InventoryComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetInventoryComponent() : nullptr;
 	for (const FOverlapResult& Overlap : Overlaps)
 	{
 		APRPickupActor* PickupActor = Cast<APRPickupActor>(Overlap.GetActor());
 		if (!PickupActor || !PickupActor->CanBePickedUp())
+		{
+			continue;
+		}
+
+		if (InventoryComponent && !InventoryComponent->CanAddItem(PickupActor->GetItemInstance()))
 		{
 			continue;
 		}
@@ -412,6 +452,39 @@ APRRiftObjectiveActor* APRPlayerController::FindBestRiftObjectiveCandidate() con
 	}
 
 	return BestObjective;
+}
+
+AActor* APRPlayerController::FindFocusedInteractionTarget() const
+{
+	const APawn* ControlledPawn = GetPawn();
+	if (!ControlledPawn)
+	{
+		return nullptr;
+	}
+
+	APRPickupActor* PickupCandidate = FindBestPickupCandidate();
+	APRRiftObjectiveActor* ObjectiveCandidate = FindBestRiftObjectiveCandidate();
+	if (!PickupCandidate && !ObjectiveCandidate)
+	{
+		return nullptr;
+	}
+
+	const FVector PawnLocation = ControlledPawn->GetActorLocation();
+	const float PickupDistanceSquared = PickupCandidate
+		? FVector::DistSquared(PawnLocation, PickupCandidate->GetActorLocation())
+		: TNumericLimits<float>::Max();
+	const float ObjectiveDistanceSquared = ObjectiveCandidate
+		? FVector::DistSquared(PawnLocation, ObjectiveCandidate->GetActorLocation())
+		: TNumericLimits<float>::Max();
+
+	return PickupDistanceSquared <= ObjectiveDistanceSquared
+		? static_cast<AActor*>(PickupCandidate)
+		: static_cast<AActor*>(ObjectiveCandidate);
+}
+
+bool APRPlayerController::IsFocusedInteractionTarget(const AActor* TargetActor) const
+{
+	return TargetActor && FindFocusedInteractionTarget() == TargetActor;
 }
 
 bool APRPlayerController::TryPickupOnServer(APRPickupActor* PickupActor)

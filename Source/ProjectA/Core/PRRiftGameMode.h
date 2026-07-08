@@ -3,12 +3,15 @@
 #include "CoreMinimal.h"
 #include "Core/PRGameModeBase.h"
 #include "Core/PRRiftGameState.h"
+#include "Items/PRItemTypes.h"
 #include "UObject/ObjectKey.h"
 #include "PRRiftGameMode.generated.h"
 
 class APRRiftObjectiveActor;
 class APRSpawnManager;
+class APRPlayerState;
 class APlayerState;
+class UPRInventoryComponent;
 
 /**
  * Server-authoritative rule set for rift missions.
@@ -92,6 +95,12 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Settlement")
 	void FinalizeRiftSettlement(EPRRiftMissionResult Result);
 
+	UFUNCTION(BlueprintPure, Category = "Rift|Resources")
+	int32 CalculateRetainedResourceCount(int32 Count, EPRRiftMissionResult Result) const;
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Resources")
+	bool IsExtractableResourceItem(const FPRItemInstance& Item, UPRInventoryComponent* InventoryComponent) const;
+
 protected:
 	UFUNCTION(BlueprintPure, Category = "Rift|Mission")
 	APRRiftGameState* GetRiftGameState() const;
@@ -108,11 +117,18 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Extraction", meta = (ClampMin = "0.0"))
 	float ReturnToLobbyDelayAfterSettlement = 4.0f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Resources", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float FailedResourceRetentionRate = 0.5f;
+
 private:
 	void DiscoverSpawnManagers();
 	APRSpawnManager* CreateFallbackSpawnManager(APRRiftObjectiveActor* ObjectiveActor);
 	APlayerState* ResolveExtractionPlayerState(AController* Controller) const;
 	void CountExtractedInventoryItems(int32& OutItemCount, int32& OutUniqueItemTypes) const;
+	void ApplyExtractedResourceRules(EPRRiftMissionResult Result, FPRRiftSettlementData& InOutSettlementData);
+	void ApplyExtractedResourceRulesForPlayer(APRPlayerState* PlayerState, EPRRiftMissionResult Result, FPRRiftSettlementData& InOutSettlementData, TSet<FName>& UniqueResourceIds) const;
+	bool ShouldApplyResourceRulesToPlayer(const APlayerState* PlayerState, EPRRiftMissionResult Result) const;
+	static bool IsFallbackMaterialResourceId(FName ItemId);
 	void RequestReturnToLobbyTravel();
 	void PerformReturnToLobbyTravel();
 

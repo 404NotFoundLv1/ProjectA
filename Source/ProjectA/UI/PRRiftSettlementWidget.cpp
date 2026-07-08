@@ -125,6 +125,8 @@ FText UPRRiftSettlementWidget::BuildSettlementText(const FPRRiftSettlementData& 
 		TEXT("\u64A4\u79BB\u4EBA\u6570\uFF1A%d / %d\n")
 		TEXT("\u4EFB\u52A1\u8FDB\u5EA6\uFF1A%.0f%%\n")
 		TEXT("\u88C2\u9699\u7A33\u5B9A\u5EA6\uFF1A%.0f%%\n")
+		TEXT("\u5E26\u51FA\u8D44\u6E90\uFF1A%d \u4EF6 / %d \u7C7B\n")
+		TEXT("\u635F\u5931\u8D44\u6E90\uFF1A%d \u4EF6\n")
 		TEXT("\u5E26\u51FA\u7269\u54C1\uFF1A%d \u4EF6 / %d \u7C7B\n\n")
 		TEXT("\u5373\u5C06\u8FD4\u56DE\u4E3B\u623F\u95F4..."),
 		ResultText,
@@ -133,6 +135,9 @@ FText UPRRiftSettlementWidget::BuildSettlementText(const FPRRiftSettlementData& 
 		InSettlementData.AlivePlayerCount,
 		InSettlementData.ObjectiveProgress * 100.0f,
 		InSettlementData.RiftStability,
+		InSettlementData.ExtractedResourceCount,
+		InSettlementData.ExtractedUniqueResourceTypes,
+		InSettlementData.LostResourceCount,
 		InSettlementData.ExtractedItemCount,
 		InSettlementData.ExtractedUniqueItemTypes));
 }
