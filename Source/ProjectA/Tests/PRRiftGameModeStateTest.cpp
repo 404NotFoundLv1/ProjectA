@@ -8,6 +8,7 @@
 #include "Core/PRRiftGameState.h"
 #include "Engine/World.h"
 #include "GameMapsSettings.h"
+#include "GameFramework/Actor.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/WorldSettings.h"
@@ -122,6 +123,19 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("L_Rift_Test map asset loads"), RiftTestWorld);
 	AWorldSettings* RiftWorldSettings = RiftTestWorld ? RiftTestWorld->GetWorldSettings() : nullptr;
 	TestNotNull(TEXT("L_Rift_Test has world settings"), RiftWorldSettings);
+	bool bRiftTestHasNavMeshBounds = false;
+	if (RiftTestWorld && RiftTestWorld->PersistentLevel)
+	{
+		for (AActor* Actor : RiftTestWorld->PersistentLevel->Actors)
+		{
+			if (Actor && Actor->GetClass()->GetName() == TEXT("NavMeshBoundsVolume"))
+			{
+				bRiftTestHasNavMeshBounds = true;
+				break;
+			}
+		}
+	}
+	TestTrue(TEXT("L_Rift_Test has a NavMeshBoundsVolume for enemy chase movement"), bRiftTestHasNavMeshBounds);
 
 	const FString RiftMapConfiguredGameModePath = UGameMapsSettings::GetGameModeForMapName(TEXT("L_Rift_Test"));
 	const UClass* RiftMapConfiguredGameModeClass = LoadClass<AGameModeBase>(nullptr, *RiftMapConfiguredGameModePath);

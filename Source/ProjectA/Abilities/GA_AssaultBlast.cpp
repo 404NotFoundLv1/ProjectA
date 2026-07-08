@@ -3,6 +3,7 @@
 #include "Abilities/PRAbilitySystemComponent.h"
 #include "Abilities/PRDamageGameplayEffect.h"
 #include "Characters/PRCharacter.h"
+#include "Enemies/PREnemyCharacter.h"
 #include "Engine/OverlapResult.h"
 #include "GameplayEffect.h"
 #include "GameplayTagsManager.h"
@@ -82,6 +83,18 @@ bool UGA_AssaultBlast::ExecuteBlast(
 	bool bDamagedAnyTarget = false;
 	for (const FOverlapResult& Overlap : Overlaps)
 	{
+		if (APREnemyCharacter* TargetEnemy = Cast<APREnemyCharacter>(Overlap.GetActor()))
+		{
+			const FVector ToTarget = TargetEnemy->GetActorLocation() - AvatarActor->GetActorLocation();
+			if (FVector::DotProduct(Forward, ToTarget.GetSafeNormal()) < 0.1f)
+			{
+				continue;
+			}
+
+			bDamagedAnyTarget |= TargetEnemy->ApplyEnemyDamage(DamageAmount, AvatarActor->GetInstigatorController());
+			continue;
+		}
+
 		APRCharacter* TargetCharacter = Cast<APRCharacter>(Overlap.GetActor());
 		if (!TargetCharacter || TargetCharacter == AvatarActor)
 		{

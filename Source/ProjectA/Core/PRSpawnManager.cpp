@@ -3,21 +3,30 @@
 #include "Core/PREnemySpawnPoint.h"
 #include "Core/PRRiftGameState.h"
 #include "Core/PRRiftObjectiveActor.h"
+#include "Enemies/PREnemyCharacter.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
-#include "GameFramework/DefaultPawn.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
 #include "ProjectA.h"
 #include "TimerManager.h"
+#include "UObject/ConstructorHelpers.h"
 
 APRSpawnManager::APRSpawnManager()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	bReplicates = true;
 
-	SpawnedEnemyClass = ADefaultPawn::StaticClass();
+	static ConstructorHelpers::FClassFinder<APREnemyCharacter> EnemyBlueprintClass(TEXT("/Game/ProjectRift/Blueprints/Enemies/BP_PREnemyCharacter"));
+	if (EnemyBlueprintClass.Succeeded())
+	{
+		SpawnedEnemyClass = EnemyBlueprintClass.Class;
+	}
+	else
+	{
+		SpawnedEnemyClass = APREnemyCharacter::StaticClass();
+	}
 }
 
 void APRSpawnManager::BeginPlay()
@@ -91,7 +100,7 @@ int32 APRSpawnManager::SpawnWave()
 	}
 
 	UWorld* World = GetWorld();
-	UClass* EnemyClass = SpawnedEnemyClass ? SpawnedEnemyClass.Get() : ADefaultPawn::StaticClass();
+	UClass* EnemyClass = SpawnedEnemyClass ? SpawnedEnemyClass.Get() : APREnemyCharacter::StaticClass();
 	if (!World || !EnemyClass)
 	{
 		return 0;

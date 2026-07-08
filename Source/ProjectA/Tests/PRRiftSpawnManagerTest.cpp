@@ -4,6 +4,7 @@
 
 #include "Core/PRRiftGameMode.h"
 #include "Core/PRRiftGameState.h"
+#include "Enemies/PREnemyCharacter.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
@@ -108,7 +109,7 @@ bool CallVoidFunctionNoParams(UObject* Target, const FName FunctionName)
 	return true;
 }
 
-bool CallBoolFunctionWithObjectParam(UObject* Target, const FName FunctionName, const FName ParamName, UObject* ParamValue, bool& bOutResult)
+bool CallSpawnManagerBoolFunctionWithObjectParam(UObject* Target, const FName FunctionName, const FName ParamName, UObject* ParamValue, bool& bOutResult)
 {
 	UFunction* Function = Target ? Target->FindFunction(FunctionName) : nullptr;
 	if (!Function)
@@ -235,7 +236,7 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 	bool bStarted = false;
 	TestTrue(
 		TEXT("GameMode can start spawn managers through reflected API"),
-		CallBoolFunctionWithObjectParam(RiftGameMode, TEXT("StartSpawnManagersForObjective"), TEXT("ObjectiveActor"), nullptr, bStarted));
+		CallSpawnManagerBoolFunctionWithObjectParam(RiftGameMode, TEXT("StartSpawnManagersForObjective"), TEXT("ObjectiveActor"), nullptr, bStarted));
 	TestTrue(TEXT("GameMode starts at least one spawn manager"), bStarted);
 
 	bool bActiveAfterObjective = false;
@@ -254,14 +255,14 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 	for (TActorIterator<AActor> ActorIt(World); ActorIt; ++ActorIt)
 	{
 		AActor* Candidate = *ActorIt;
-		if (Candidate && Candidate->GetOwner() == SpawnManager)
+		if (Candidate && Candidate->IsA(APREnemyCharacter::StaticClass()))
 		{
 			++ReplicatedSpawnedActors;
 			TestTrue(TEXT("Spawned enemy actor is replicated for multiplayer clients"), Candidate->GetIsReplicated());
 			TestTrue(TEXT("Spawned enemy actor replicates movement"), Candidate->IsReplicatingMovement());
 		}
 	}
-	TestEqual(TEXT("All alive spawned enemies are owned by the spawn manager"), ReplicatedSpawnedActors, AliveEnemyCount);
+	TestEqual(TEXT("All alive spawned enemies are basic replicated enemies"), ReplicatedSpawnedActors, AliveEnemyCount);
 
 	int32 ManualWaveSpawned = 0;
 	CallIntFunctionNoParams(SpawnManager, TEXT("SpawnWave"), *this, TEXT("Can manually request a wave"), ManualWaveSpawned);

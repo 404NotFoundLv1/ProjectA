@@ -4,6 +4,7 @@
 #include "Abilities/PRAbilitySystemComponent.h"
 #include "Characters/PRCharacter.h"
 #include "DrawDebugHelpers.h"
+#include "Enemies/PREnemyCharacter.h"
 #include "Engine/OverlapResult.h"
 #include "GameplayAbilitySpec.h"
 #include "GameplayEffect.h"
@@ -112,6 +113,26 @@ bool UGA_PrimaryAttack::ExecuteServerAttack(
 
 	for (const FOverlapResult& Overlap : Overlaps)
 	{
+		if (APREnemyCharacter* TargetEnemy = Cast<APREnemyCharacter>(Overlap.GetActor()))
+		{
+			const FVector ToTarget = TargetEnemy->GetActorLocation() - AvatarActor->GetActorLocation();
+			if (FVector::DotProduct(Forward, ToTarget.GetSafeNormal()) < 0.1f)
+			{
+				continue;
+			}
+
+			if (TargetEnemy->ApplyEnemyDamage(DamageAmount, AvatarActor->GetInstigatorController()))
+			{
+				UE_LOG(
+					LogProjectA,
+					Log,
+					TEXT("Primary attack from %s hit enemy %s."),
+					*GetNameSafe(AvatarActor),
+					*GetNameSafe(TargetEnemy));
+				return true;
+			}
+		}
+
 		APRCharacter* TargetCharacter = Cast<APRCharacter>(Overlap.GetActor());
 		if (!TargetCharacter || TargetCharacter == AvatarActor)
 		{
