@@ -123,6 +123,7 @@ FText UPRRiftSettlementWidget::BuildSettlementText(const FPRRiftSettlementData& 
 		TEXT("\u7ED3\u679C\uFF1A%s\n")
 		TEXT("\u4EFB\u52A1\u65F6\u95F4\uFF1A%.1f s\n")
 		TEXT("\u64A4\u79BB\u4EBA\u6570\uFF1A%d / %d\n")
+		TEXT("\u51FB\u6740\u6570\uFF1A%d\n")
 		TEXT("\u4EFB\u52A1\u8FDB\u5EA6\uFF1A%.0f%%\n")
 		TEXT("\u88C2\u9699\u7A33\u5B9A\u5EA6\uFF1A%.0f%%\n")
 		TEXT("\u5E26\u51FA\u8D44\u6E90\uFF1A%d \u4EF6 / %d \u7C7B\n")
@@ -133,6 +134,7 @@ FText UPRRiftSettlementWidget::BuildSettlementText(const FPRRiftSettlementData& 
 		InSettlementData.MissionTime,
 		InSettlementData.ExtractedPlayerCount,
 		InSettlementData.AlivePlayerCount,
+		InSettlementData.KilledEnemyCount,
 		InSettlementData.ObjectiveProgress * 100.0f,
 		InSettlementData.RiftStability,
 		InSettlementData.ExtractedResourceCount,

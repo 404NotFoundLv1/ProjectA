@@ -10,7 +10,9 @@
 class APRRiftObjectiveActor;
 class APRSpawnManager;
 class APRPlayerState;
+class APREnemyCharacter;
 class APlayerState;
+class APawn;
 class UPRInventoryComponent;
 
 /**
@@ -50,6 +52,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Mission")
 	void CheckExtractionCompletion();
 
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Mission")
+	bool RequestRiftFailure();
+
 	UFUNCTION(BlueprintPure, Category = "Rift|Extraction")
 	FString GetReturnToLobbyMapPath() const { return ReturnToLobbyMapPath; }
 
@@ -86,6 +91,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Spawning")
 	void StopSpawnManagers();
 
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Combat")
+	bool RegisterEnemyKilled(APREnemyCharacter* Enemy, AController* Killer);
+
 	UFUNCTION(BlueprintPure, Category = "Rift|Mission")
 	bool HasRiftMissionStarted() const { return bRiftMissionStarted; }
 
@@ -111,6 +119,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Mission", meta = (ClampMin = "0.0", ClampMax = "100.0"))
 	float InitialRiftStability = 100.0f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Mission", meta = (ClampMin = "0.0"))
+	float RiftStabilityDrainPerSecond = 1.0f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Extraction")
 	FString ReturnToLobbyMapPath = TEXT("/Game/ProjectRift/Maps/L_ShipLobby");
 
@@ -121,6 +132,11 @@ protected:
 	float FailedResourceRetentionRate = 0.5f;
 
 private:
+	bool CheckFailureConditions();
+	bool AreAllActivePlayersDefeated() const;
+	bool IsPlayerStateAliveForRift(const APlayerState* PlayerState) const;
+	APawn* ResolvePawnForPlayerState(const APlayerState* PlayerState) const;
+	void DrainRiftStability(float DeltaSeconds);
 	void DiscoverSpawnManagers();
 	APRSpawnManager* CreateFallbackSpawnManager(APRRiftObjectiveActor* ObjectiveActor);
 	APlayerState* ResolveExtractionPlayerState(AController* Controller) const;
@@ -129,7 +145,7 @@ private:
 	void ApplyExtractedResourceRulesForPlayer(APRPlayerState* PlayerState, EPRRiftMissionResult Result, FPRRiftSettlementData& InOutSettlementData, TSet<FName>& UniqueResourceIds) const;
 	bool ShouldApplyResourceRulesToPlayer(const APlayerState* PlayerState, EPRRiftMissionResult Result) const;
 	static bool IsFallbackMaterialResourceId(FName ItemId);
-	void RequestReturnToLobbyTravel();
+	void RequestReturnToLobbyTravel(EPRRiftMissionResult Result);
 	void PerformReturnToLobbyTravel();
 
 	UPROPERTY(Transient)

@@ -1,7 +1,9 @@
 #include "Core/PRRiftGameMode.h"
 
+#include "Characters/PRCharacter.h"
 #include "Core/PRSpawnManager.h"
 #include "Core/PRRiftObjectiveActor.h"
+#include "Enemies/PREnemyCharacter.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
@@ -38,7 +40,14 @@ void APRRiftGameMode::Tick(const float DeltaSeconds)
 
 	if (APRRiftGameState* RiftGameState = GetRiftGameState())
 	{
+		if (RiftGameState->IsSettlementReady())
+		{
+			return;
+		}
+
 		RiftGameState->SetMissionTime(RiftGameState->GetMissionTime() + DeltaSeconds);
+		DrainRiftStability(DeltaSeconds);
+		CheckFailureConditions();
 	}
 }
 
@@ -79,6 +88,7 @@ bool APRRiftGameMode::StartRiftMission()
 	RiftGameState->SetRiftStability(InitialRiftStability);
 	RiftGameState->SetExtractionAvailable(false);
 	RiftGameState->SetMissionTime(0.0f);
+	RiftGameState->SetKilledEnemyCount(0);
 	UpdateAlivePlayerCount();
 
 	UE_LOG(LogProjectA, Log, TEXT("Rift mission started. Stability=%.1f AlivePlayers=%d"),
@@ -194,9 +204,32 @@ void APRRiftGameMode::CheckExtractionCompletion()
 		RiftGameState->SetExtractionComplete(bAllAlivePlayersExtracted);
 		if (bAllAlivePlayersExtracted && !bWasExtractionComplete)
 		{
-			RequestReturnToLobbyTravel();
+			RequestReturnToLobbyTravel(EPRRiftMissionResult::Success);
 		}
 	}
+}
+
+bool APRRiftGameMode::RequestRiftFailure()
+{
+	if (!HasAuthority() || bReturnToLobbyTravelPending)
+	{
+		return false;
+	}
+
+	APRRiftGameState* RiftGameState = GetRiftGameState();
+	if (!RiftGameState || RiftGameState->IsSettlementReady())
+	{
+		return false;
+	}
+
+	bRiftMissionStarted = false;
+	RiftGameState->SetCurrentObjectiveState(EPRRiftObjectiveState::Failed);
+	RiftGameState->SetExtractionAvailable(false);
+	RiftGameState->SetExtractionComplete(false);
+	StopSpawnManagers();
+	RequestReturnToLobbyTravel(EPRRiftMissionResult::Failed);
+
+	return RiftGameState->IsSettlementReady();
 }
 
 FString APRRiftGameMode::BuildReturnToLobbyTravelURL() const
@@ -233,6 +266,7 @@ FPRRiftSettlementData APRRiftGameMode::GenerateSettlementData(const EPRRiftMissi
 		Settlement.ObjectiveProgress = RiftGameState->GetObjectiveProgress();
 		Settlement.AlivePlayerCount = RiftGameState->GetAlivePlayerCount();
 		Settlement.ExtractedPlayerCount = RiftGameState->GetExtractedPlayerCount();
+		Settlement.KilledEnemyCount = RiftGameState->GetKilledEnemyCount();
 	}
 
 	CountExtractedInventoryItems(Settlement.ExtractedItemCount, Settlement.ExtractedUniqueItemTypes);
@@ -261,11 +295,12 @@ void APRRiftGameMode::FinalizeRiftSettlement(const EPRRiftMissionResult Result)
 		RiftGameState->SetSettlementReady(true);
 
 		const FPRRiftSettlementData FinalSettlement = RiftGameState->GetSettlementData();
-		UE_LOG(LogProjectA, Log, TEXT("Rift settlement finalized. Result=%d Time=%.1f Extracted=%d/%d Items=%d Types=%d Resources=%d ResourceTypes=%d LostResources=%d"),
+		UE_LOG(LogProjectA, Log, TEXT("Rift settlement finalized. Result=%d Time=%.1f Extracted=%d/%d Kills=%d Items=%d Types=%d Resources=%d ResourceTypes=%d LostResources=%d"),
 			static_cast<int32>(FinalSettlement.Result),
 			FinalSettlement.MissionTime,
 			FinalSettlement.ExtractedPlayerCount,
 			FinalSettlement.AlivePlayerCount,
+			FinalSettlement.KilledEnemyCount,
 			FinalSettlement.ExtractedItemCount,
 			FinalSettlement.ExtractedUniqueItemTypes,
 			FinalSettlement.ExtractedResourceCount,
@@ -321,6 +356,7 @@ void APRRiftGameMode::UpdateAlivePlayerCount()
 	{
 		RiftGameState->SetAlivePlayerCount(CountAlivePlayers());
 		CheckExtractionCompletion();
+		CheckFailureConditions();
 	}
 }
 
@@ -404,6 +440,27 @@ bool APRRiftGameMode::StartSpawnManagersForObjective(APRRiftObjectiveActor* Obje
 	return bStartedAny;
 }
 
+bool APRRiftGameMode::RegisterEnemyKilled(APREnemyCharacter* Enemy, AController* Killer)
+{
+	if (!HasAuthority() || !Enemy)
+	{
+		return false;
+	}
+
+	APRRiftGameState* RiftGameState = GetRiftGameState();
+	if (!RiftGameState || RiftGameState->IsSettlementReady())
+	{
+		return false;
+	}
+
+	RiftGameState->IncrementKilledEnemyCount();
+	UE_LOG(LogProjectA, Log, TEXT("Rift enemy kill registered. Enemy=%s Killer=%s Kills=%d"),
+		*GetNameSafe(Enemy),
+		*GetNameSafe(Killer),
+		RiftGameState->GetKilledEnemyCount());
+	return true;
+}
+
 void APRRiftGameMode::StopSpawnManagers()
 {
 	if (!HasAuthority())
@@ -437,13 +494,132 @@ int32 APRRiftGameMode::CountAlivePlayers() const
 	int32 AliveCount = 0;
 	for (const TObjectPtr<APlayerState>& PlayerState : CurrentGameState->PlayerArray)
 	{
-		if (PlayerState && !PlayerState->IsOnlyASpectator())
+		if (PlayerState && !PlayerState->IsOnlyASpectator() && IsPlayerStateAliveForRift(PlayerState.Get()))
 		{
 			++AliveCount;
 		}
 	}
 
 	return AliveCount;
+}
+
+bool APRRiftGameMode::CheckFailureConditions()
+{
+	if (!HasAuthority() || !bRiftMissionStarted || bReturnToLobbyTravelPending)
+	{
+		return false;
+	}
+
+	const APRRiftGameState* RiftGameState = GetRiftGameState();
+	if (!RiftGameState || RiftGameState->IsSettlementReady())
+	{
+		return false;
+	}
+
+	if (RiftGameState->GetRiftStability() <= 0.0f)
+	{
+		return RequestRiftFailure();
+	}
+
+	if (AreAllActivePlayersDefeated())
+	{
+		return RequestRiftFailure();
+	}
+
+	return false;
+}
+
+bool APRRiftGameMode::AreAllActivePlayersDefeated() const
+{
+	const AGameStateBase* CurrentGameState = GameState;
+	if (!CurrentGameState)
+	{
+		return false;
+	}
+
+	bool bFoundEligiblePlayer = false;
+	for (const TObjectPtr<APlayerState>& PlayerState : CurrentGameState->PlayerArray)
+	{
+		APlayerState* RawPlayerState = PlayerState.Get();
+		if (!RawPlayerState || RawPlayerState->IsOnlyASpectator() || ExtractedPlayerStates.Contains(TObjectKey<APlayerState>(RawPlayerState)))
+		{
+			continue;
+		}
+
+		bFoundEligiblePlayer = true;
+		if (IsPlayerStateAliveForRift(RawPlayerState))
+		{
+			return false;
+		}
+	}
+
+	return bFoundEligiblePlayer;
+}
+
+bool APRRiftGameMode::IsPlayerStateAliveForRift(const APlayerState* PlayerState) const
+{
+	if (!PlayerState || PlayerState->IsOnlyASpectator())
+	{
+		return false;
+	}
+
+	const APawn* Pawn = ResolvePawnForPlayerState(PlayerState);
+	const APRCharacter* ProjectRiftCharacter = Cast<APRCharacter>(Pawn);
+	if (ProjectRiftCharacter && !ProjectRiftCharacter->IsAbilitySystemInitialized())
+	{
+		return true;
+	}
+
+	return ProjectRiftCharacter ? ProjectRiftCharacter->IsAlive() : true;
+}
+
+APawn* APRRiftGameMode::ResolvePawnForPlayerState(const APlayerState* PlayerState) const
+{
+	if (!PlayerState)
+	{
+		return nullptr;
+	}
+
+	if (const AController* OwnerController = Cast<AController>(PlayerState->GetOwner()))
+	{
+		if (OwnerController->GetPlayerState<APlayerState>() == PlayerState)
+		{
+			return OwnerController->GetPawn();
+		}
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return nullptr;
+	}
+
+	for (TActorIterator<AController> ControllerIt(World); ControllerIt; ++ControllerIt)
+	{
+		AController* Controller = *ControllerIt;
+		if (Controller && Controller->GetPlayerState<APlayerState>() == PlayerState)
+		{
+			return Controller->GetPawn();
+		}
+	}
+
+	return nullptr;
+}
+
+void APRRiftGameMode::DrainRiftStability(const float DeltaSeconds)
+{
+	if (RiftStabilityDrainPerSecond <= 0.0f || DeltaSeconds <= 0.0f)
+	{
+		return;
+	}
+
+	APRRiftGameState* RiftGameState = GetRiftGameState();
+	if (!RiftGameState || RiftGameState->GetCurrentObjectiveState() != EPRRiftObjectiveState::Active)
+	{
+		return;
+	}
+
+	RiftGameState->SetRiftStability(RiftGameState->GetRiftStability() - RiftStabilityDrainPerSecond * DeltaSeconds);
 }
 
 void APRRiftGameMode::DiscoverSpawnManagers()
@@ -622,14 +798,14 @@ bool APRRiftGameMode::IsFallbackMaterialResourceId(const FName ItemId)
 		|| ItemId == FName(TEXT("CommonChip"));
 }
 
-void APRRiftGameMode::RequestReturnToLobbyTravel()
+void APRRiftGameMode::RequestReturnToLobbyTravel(const EPRRiftMissionResult Result)
 {
 	if (!HasAuthority() || bReturnToLobbyTravelPending)
 	{
 		return;
 	}
 
-	FinalizeRiftSettlement(EPRRiftMissionResult::Success);
+	FinalizeRiftSettlement(Result);
 
 	const FString TravelURL = BuildReturnToLobbyTravelURL();
 	if (TravelURL.IsEmpty())

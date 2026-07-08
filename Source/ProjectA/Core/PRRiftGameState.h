@@ -51,6 +51,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Rift|State")
 	float GetObjectiveProgress() const { return ObjectiveProgress; }
 
+	UFUNCTION(BlueprintPure, Category = "Rift|State")
+	int32 GetKilledEnemyCount() const { return KilledEnemyCount; }
+
 	UFUNCTION(BlueprintPure, Category = "Rift|Settlement")
 	bool IsSettlementReady() const { return bSettlementReady; }
 
@@ -80,6 +83,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|State")
 	void SetObjectiveProgress(float InObjectiveProgress);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|State")
+	void SetKilledEnemyCount(int32 InKilledEnemyCount);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|State")
+	void IncrementKilledEnemyCount();
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Settlement")
 	void SetSettlementData(const FPRRiftSettlementData& InSettlementData);
@@ -115,6 +124,9 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_ObjectiveProgress, BlueprintReadOnly, Category = "Rift|State")
 	float ObjectiveProgress = 0.0f;
 
+	UPROPERTY(ReplicatedUsing = OnRep_KilledEnemyCount, BlueprintReadOnly, Category = "Rift|State")
+	int32 KilledEnemyCount = 0;
+
 	UPROPERTY(ReplicatedUsing = OnRep_SettlementData, BlueprintReadOnly, Category = "Rift|Settlement")
 	FPRRiftSettlementData SettlementData;
 
@@ -144,6 +156,9 @@ protected:
 
 	UFUNCTION()
 	void OnRep_ObjectiveProgress();
+
+	UFUNCTION()
+	void OnRep_KilledEnemyCount();
 
 	UFUNCTION()
 	void OnRep_SettlementData();

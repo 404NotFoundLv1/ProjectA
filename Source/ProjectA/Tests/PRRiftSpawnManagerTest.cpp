@@ -134,6 +134,25 @@ bool CallSpawnManagerBoolFunctionWithObjectParam(UObject* Target, const FName Fu
 
 	return false;
 }
+
+int32 CountPlacedActorsOfClass(const UWorld* World, const UClass* ActorClass)
+{
+	if (!World || !World->PersistentLevel || !ActorClass)
+	{
+		return 0;
+	}
+
+	int32 Count = 0;
+	for (const AActor* Actor : World->PersistentLevel->Actors)
+	{
+		if (Actor && Actor->GetClass()->IsChildOf(ActorClass))
+		{
+			++Count;
+		}
+	}
+
+	return Count;
+}
 }
 
 bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
@@ -141,6 +160,14 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 	UClass* SpawnManagerClass = LoadRiftSpawnRuntimeClass(TEXT("PRSpawnManager"), AActor::StaticClass());
 	UClass* SpawnPointClass = LoadRiftSpawnRuntimeClass(TEXT("PREnemySpawnPoint"), AActor::StaticClass());
 	UClass* RiftGameModeClass = APRRiftGameMode::StaticClass();
+	UClass* SpawnManagerBlueprintClass = StaticLoadClass(
+		AActor::StaticClass(),
+		nullptr,
+		TEXT("/Game/ProjectRift/Blueprints/Rift/BP_PRSpawnManager.BP_PRSpawnManager_C"));
+	UClass* SpawnPointBlueprintClass = StaticLoadClass(
+		AActor::StaticClass(),
+		nullptr,
+		TEXT("/Game/ProjectRift/Blueprints/Rift/BP_PREnemySpawnPoint.BP_PREnemySpawnPoint_C"));
 
 	TestNotNull(TEXT("APRSpawnManager runtime class exists"), SpawnManagerClass);
 	TestNotNull(TEXT("APREnemySpawnPoint runtime class exists"), SpawnPointClass);
@@ -151,6 +178,14 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 
 	TestTrue(TEXT("APRSpawnManager derives from AActor"), SpawnManagerClass->IsChildOf(AActor::StaticClass()));
 	TestTrue(TEXT("APREnemySpawnPoint derives from AActor"), SpawnPointClass->IsChildOf(AActor::StaticClass()));
+	TestNotNull(TEXT("BP_PRSpawnManager blueprint asset exists for explicit map placement"), SpawnManagerBlueprintClass);
+	TestNotNull(TEXT("BP_PREnemySpawnPoint blueprint asset exists for explicit map placement"), SpawnPointBlueprintClass);
+	TestTrue(
+		TEXT("BP_PRSpawnManager derives from APRSpawnManager"),
+		SpawnManagerBlueprintClass && SpawnManagerBlueprintClass->IsChildOf(SpawnManagerClass));
+	TestTrue(
+		TEXT("BP_PREnemySpawnPoint derives from APREnemySpawnPoint"),
+		SpawnPointBlueprintClass && SpawnPointBlueprintClass->IsChildOf(SpawnPointClass));
 	TestNotNull(TEXT("APRSpawnManager exposes StartSpawningForObjective"), SpawnManagerClass->FindFunctionByName(TEXT("StartSpawningForObjective")));
 	TestNotNull(TEXT("APRSpawnManager exposes StopSpawning"), SpawnManagerClass->FindFunctionByName(TEXT("StopSpawning")));
 	TestNotNull(TEXT("APRSpawnManager exposes SpawnWave"), SpawnManagerClass->FindFunctionByName(TEXT("SpawnWave")));
@@ -178,6 +213,16 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 		TestFalse(TEXT("APRSpawnManager uses timers instead of per-frame Tick"), SpawnManagerDefaults->PrimaryActorTick.bCanEverTick);
 		TestTrue(TEXT("APRSpawnManager replicates its active state to clients"), SpawnManagerDefaults->GetIsReplicated());
 	}
+
+	UWorld* RiftTestWorld = LoadObject<UWorld>(nullptr, TEXT("/Game/ProjectRift/Maps/L_Rift_Test.L_Rift_Test"));
+	TestNotNull(TEXT("L_Rift_Test map asset loads for explicit spawn manager check"), RiftTestWorld);
+	TestEqual(
+		TEXT("L_Rift_Test contains exactly one placed rift spawn manager"),
+		CountPlacedActorsOfClass(RiftTestWorld, SpawnManagerClass),
+		1);
+	TestTrue(
+		TEXT("L_Rift_Test contains at least three placed enemy spawn points"),
+		CountPlacedActorsOfClass(RiftTestWorld, SpawnPointClass) >= 3);
 
 	FTestWorldWrapper WorldWrapper;
 	TestTrue(TEXT("Rift spawn manager test world is created"), WorldWrapper.CreateTestWorld(EWorldType::Game));

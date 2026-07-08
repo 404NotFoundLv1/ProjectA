@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 
+#include "Characters/PRCharacter.h"
 #include "Core/PRGameModeBase.h"
 #include "Core/PRGameState.h"
 #include "Core/PRRiftGameMode.h"
@@ -11,7 +12,10 @@
 #include "GameFramework/Actor.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/GameStateBase.h"
+#include "GameFramework/PlayerController.h"
 #include "GameFramework/WorldSettings.h"
+#include "Player/PRPlayerState.h"
+#include "Tests/AutomationCommon.h"
 #include "UObject/UnrealType.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPRRiftGameModeStateTest, "ProjectRift.Rift.GameModeState", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -56,6 +60,7 @@ bool GetBoolPropertyValue(const UObject* Target, const FName PropertyName)
 	const FBoolProperty* Property = Target ? FindFProperty<FBoolProperty>(Target->GetClass(), PropertyName) : nullptr;
 	return Property && Property->GetPropertyValue_InContainer(Target);
 }
+
 }
 
 bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
@@ -84,18 +89,25 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("APRRiftGameMode exposes CompleteCurrentObjective"), RiftGameModeClass->FindFunctionByName(TEXT("CompleteCurrentObjective")));
 	TestNotNull(TEXT("APRRiftGameMode exposes OpenExtraction"), RiftGameModeClass->FindFunctionByName(TEXT("OpenExtraction")));
 	TestNotNull(TEXT("APRRiftGameMode exposes UpdateAlivePlayerCount"), RiftGameModeClass->FindFunctionByName(TEXT("UpdateAlivePlayerCount")));
+	TestNotNull(TEXT("APRRiftGameMode exposes RequestRiftFailure"), RiftGameModeClass->FindFunctionByName(TEXT("RequestRiftFailure")));
+	TestNotNull(TEXT("APRRiftGameMode exposes RegisterEnemyKilled"), RiftGameModeClass->FindFunctionByName(TEXT("RegisterEnemyKilled")));
+	TestNotNull(TEXT("APRRiftGameMode exposes configurable rift stability drain"), FindFProperty<FFloatProperty>(RiftGameModeClass, TEXT("RiftStabilityDrainPerSecond")));
 
 	TestReplicatedProperty(*this, RiftGameStateClass, TEXT("CurrentObjectiveState"));
 	TestReplicatedProperty(*this, RiftGameStateClass, TEXT("RiftStability"));
 	TestReplicatedProperty(*this, RiftGameStateClass, TEXT("bExtractionAvailable"));
 	TestReplicatedProperty(*this, RiftGameStateClass, TEXT("AlivePlayerCount"));
 	TestReplicatedProperty(*this, RiftGameStateClass, TEXT("MissionTime"));
+	TestReplicatedProperty(*this, RiftGameStateClass, TEXT("KilledEnemyCount"));
 
 	TestNotNull(TEXT("APRRiftGameState exposes SetCurrentObjectiveState"), RiftGameStateClass->FindFunctionByName(TEXT("SetCurrentObjectiveState")));
 	TestNotNull(TEXT("APRRiftGameState exposes SetRiftStability"), RiftGameStateClass->FindFunctionByName(TEXT("SetRiftStability")));
 	TestNotNull(TEXT("APRRiftGameState exposes SetExtractionAvailable"), RiftGameStateClass->FindFunctionByName(TEXT("SetExtractionAvailable")));
 	TestNotNull(TEXT("APRRiftGameState exposes SetAlivePlayerCount"), RiftGameStateClass->FindFunctionByName(TEXT("SetAlivePlayerCount")));
 	TestNotNull(TEXT("APRRiftGameState exposes SetMissionTime"), RiftGameStateClass->FindFunctionByName(TEXT("SetMissionTime")));
+	TestNotNull(TEXT("APRRiftGameState exposes SetKilledEnemyCount"), RiftGameStateClass->FindFunctionByName(TEXT("SetKilledEnemyCount")));
+	TestNotNull(TEXT("APRRiftGameState exposes IncrementKilledEnemyCount"), RiftGameStateClass->FindFunctionByName(TEXT("IncrementKilledEnemyCount")));
+	TestNotNull(TEXT("APRRiftGameState exposes GetKilledEnemyCount"), RiftGameStateClass->FindFunctionByName(TEXT("GetKilledEnemyCount")));
 
 	APRRiftGameState* RiftGameState = NewObject<APRRiftGameState>();
 	TestNotNull(TEXT("Can instantiate APRRiftGameState"), RiftGameState);
@@ -105,6 +117,7 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 		TestFalse(TEXT("Extraction starts unavailable"), GetBoolPropertyValue(RiftGameState, TEXT("bExtractionAvailable")));
 		TestEqual(TEXT("Alive player count starts at zero"), GetIntPropertyValue(RiftGameState, TEXT("AlivePlayerCount")), 0);
 		TestEqual(TEXT("Mission time starts at zero"), GetFloatPropertyValue(RiftGameState, TEXT("MissionTime")), 0.0f);
+		TestEqual(TEXT("Killed enemy count starts at zero"), GetIntPropertyValue(RiftGameState, TEXT("KilledEnemyCount")), 0);
 
 		RiftGameState->SetRiftStability(72.5f);
 		TestEqual(TEXT("Rift stability updates"), GetFloatPropertyValue(RiftGameState, TEXT("RiftStability")), 72.5f);
@@ -117,6 +130,11 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 
 		RiftGameState->SetMissionTime(18.0f);
 		TestEqual(TEXT("Mission time updates"), GetFloatPropertyValue(RiftGameState, TEXT("MissionTime")), 18.0f);
+
+		RiftGameState->SetKilledEnemyCount(3);
+		TestEqual(TEXT("Killed enemy count updates"), GetIntPropertyValue(RiftGameState, TEXT("KilledEnemyCount")), 3);
+		RiftGameState->IncrementKilledEnemyCount();
+		TestEqual(TEXT("Killed enemy count increments"), GetIntPropertyValue(RiftGameState, TEXT("KilledEnemyCount")), 4);
 	}
 
 	UWorld* RiftTestWorld = LoadObject<UWorld>(nullptr, TEXT("/Game/ProjectRift/Maps/L_Rift_Test.L_Rift_Test"));
@@ -142,6 +160,109 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("L_Rift_Test resolves APRRiftGameMode for runtime travel"),
 		RiftMapConfiguredGameModeClass && RiftMapConfiguredGameModeClass->IsChildOf(RiftGameModeClass));
+
+	FTestWorldWrapper StabilityWorldWrapper;
+	TestTrue(TEXT("Rift stability failure test world is created"), StabilityWorldWrapper.CreateTestWorld(EWorldType::Game));
+	UWorld* StabilityWorld = StabilityWorldWrapper.GetTestWorld();
+	if (!StabilityWorld)
+	{
+		return false;
+	}
+
+	if (AWorldSettings* WorldSettings = StabilityWorld->GetWorldSettings())
+	{
+		WorldSettings->DefaultGameMode = APRRiftGameMode::StaticClass();
+	}
+
+	TestTrue(TEXT("Rift stability failure test world begins play"), StabilityWorldWrapper.BeginPlayInTestWorld());
+	if (StabilityWorldWrapper.HasFailed())
+	{
+		StabilityWorldWrapper.ForwardErrorMessages(this);
+		return false;
+	}
+
+	APRRiftGameMode* StabilityGameMode = StabilityWorld->GetAuthGameMode<APRRiftGameMode>();
+	APRRiftGameState* StabilityGameState = StabilityWorld->GetGameState<APRRiftGameState>();
+	TestNotNull(TEXT("Stability failure world owns APRRiftGameMode"), StabilityGameMode);
+	TestNotNull(TEXT("Stability failure world owns APRRiftGameState"), StabilityGameState);
+	if (!StabilityGameMode || !StabilityGameState)
+	{
+		return false;
+	}
+
+	StabilityGameMode->SetReturnToLobbyServerTravelEnabled(false);
+	StabilityGameState->SetCurrentObjectiveState(EPRRiftObjectiveState::Active);
+	StabilityGameState->SetRiftStability(1.0f);
+	StabilityGameMode->Tick(2.0f);
+	TestTrue(TEXT("Stability depletion produces a settlement"), StabilityGameState->IsSettlementReady());
+	TestEqual(TEXT("Stability depletion fails the mission"), StabilityGameState->GetSettlementData().Result, EPRRiftMissionResult::Failed);
+	TestEqual(TEXT("Stability depletion marks the objective failed"), StabilityGameState->GetCurrentObjectiveState(), EPRRiftObjectiveState::Failed);
+	TestEqual(TEXT("Stability depletion clamps rift stability to zero"), StabilityGameState->GetRiftStability(), 0.0f);
+	TestTrue(TEXT("Stability depletion requests lobby return travel"), StabilityGameMode->IsReturnToLobbyTravelPending());
+
+	FTestWorldWrapper DownedWorldWrapper;
+	TestTrue(TEXT("All-downed failure test world is created"), DownedWorldWrapper.CreateTestWorld(EWorldType::Game));
+	UWorld* DownedWorld = DownedWorldWrapper.GetTestWorld();
+	if (!DownedWorld)
+	{
+		return false;
+	}
+
+	if (AWorldSettings* WorldSettings = DownedWorld->GetWorldSettings())
+	{
+		WorldSettings->DefaultGameMode = APRRiftGameMode::StaticClass();
+	}
+
+	TestTrue(TEXT("All-downed failure test world begins play"), DownedWorldWrapper.BeginPlayInTestWorld());
+	if (DownedWorldWrapper.HasFailed())
+	{
+		DownedWorldWrapper.ForwardErrorMessages(this);
+		return false;
+	}
+
+	APRRiftGameMode* DownedGameMode = DownedWorld->GetAuthGameMode<APRRiftGameMode>();
+	APRRiftGameState* DownedGameState = DownedWorld->GetGameState<APRRiftGameState>();
+	TestNotNull(TEXT("All-downed world owns APRRiftGameMode"), DownedGameMode);
+	TestNotNull(TEXT("All-downed world owns APRRiftGameState"), DownedGameState);
+	if (!DownedGameMode || !DownedGameState)
+	{
+		return false;
+	}
+
+	DownedGameMode->SetReturnToLobbyServerTravelEnabled(false);
+	APlayerController* PlayerController = DownedWorld->SpawnActor<APlayerController>();
+	APRPlayerState* PlayerState = DownedWorld->SpawnActor<APRPlayerState>();
+	APRCharacter* PlayerCharacter = DownedWorld->SpawnActor<APRCharacter>(FVector::ZeroVector, FRotator::ZeroRotator);
+	TestNotNull(TEXT("All-downed player controller spawned"), PlayerController);
+	TestNotNull(TEXT("All-downed player state spawned"), PlayerState);
+	TestNotNull(TEXT("All-downed player character spawned"), PlayerCharacter);
+	if (!PlayerController || !PlayerState || !PlayerCharacter)
+	{
+		return false;
+	}
+
+	PlayerController->SetPlayerState(PlayerState);
+	PlayerController->Possess(PlayerCharacter);
+	TestTrue(TEXT("All-downed player initializes ASC"), PlayerCharacter->InitializeAbilitySystemFromPlayerState(PlayerState));
+	if (!DownedGameState->PlayerArray.Contains(PlayerState))
+	{
+		DownedGameState->AddPlayerState(PlayerState);
+	}
+	for (TObjectPtr<APlayerState>& ExistingPlayerState : DownedGameState->PlayerArray)
+	{
+		if (ExistingPlayerState && ExistingPlayerState != PlayerState)
+		{
+			ExistingPlayerState->SetIsOnlyASpectator(true);
+		}
+	}
+
+	DownedGameMode->UpdateAlivePlayerCount();
+	TestEqual(TEXT("Living possessed players count as alive before downed state"), DownedGameState->GetAlivePlayerCount(), 1);
+	TestTrue(TEXT("Can put the only rift player into downed state"), PlayerCharacter->EnterDownedState());
+	DownedGameMode->UpdateAlivePlayerCount();
+	TestEqual(TEXT("Downed players no longer count as alive"), DownedGameState->GetAlivePlayerCount(), 0);
+	TestTrue(TEXT("All players down produces a settlement"), DownedGameState->IsSettlementReady());
+	TestEqual(TEXT("All players down fails the mission"), DownedGameState->GetSettlementData().Result, EPRRiftMissionResult::Failed);
 
 	return true;
 }

@@ -7,6 +7,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/WidgetComponent.h"
+#include "Core/PRRiftGameMode.h"
 #include "Enemies/PREnemyAIController.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayEffect.h"
@@ -163,6 +164,14 @@ void APREnemyCharacter::HandleDeath(AController* DeathInstigator)
 	Health = 0.0f;
 	ApplyDeathState();
 	SpawnDeathLoot();
+
+	if (UWorld* World = GetWorld())
+	{
+		if (APRRiftGameMode* RiftGameMode = World->GetAuthGameMode<APRRiftGameMode>())
+		{
+			RiftGameMode->RegisterEnemyKilled(this, DeathInstigator);
+		}
+	}
 
 	UE_LOG(LogProjectA, Log, TEXT("Enemy died. Enemy=%s Instigator=%s"), *GetNameSafe(this), *GetNameSafe(DeathInstigator));
 }

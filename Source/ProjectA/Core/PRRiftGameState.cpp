@@ -18,6 +18,7 @@ void APRRiftGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(APRRiftGameState, AlivePlayerCount);
 	DOREPLIFETIME(APRRiftGameState, MissionTime);
 	DOREPLIFETIME(APRRiftGameState, ObjectiveProgress);
+	DOREPLIFETIME(APRRiftGameState, KilledEnemyCount);
 	DOREPLIFETIME(APRRiftGameState, SettlementData);
 	DOREPLIFETIME(APRRiftGameState, bSettlementReady);
 }
@@ -62,6 +63,16 @@ void APRRiftGameState::SetObjectiveProgress(const float InObjectiveProgress)
 	ObjectiveProgress = FMath::Clamp(InObjectiveProgress, 0.0f, 1.0f);
 }
 
+void APRRiftGameState::SetKilledEnemyCount(const int32 InKilledEnemyCount)
+{
+	KilledEnemyCount = FMath::Max(0, InKilledEnemyCount);
+}
+
+void APRRiftGameState::IncrementKilledEnemyCount()
+{
+	SetKilledEnemyCount(KilledEnemyCount + 1);
+}
+
 void APRRiftGameState::SetSettlementData(const FPRRiftSettlementData& InSettlementData)
 {
 	SettlementData = InSettlementData;
@@ -70,6 +81,7 @@ void APRRiftGameState::SetSettlementData(const FPRRiftSettlementData& InSettleme
 	SettlementData.ObjectiveProgress = FMath::Clamp(SettlementData.ObjectiveProgress, 0.0f, 1.0f);
 	SettlementData.AlivePlayerCount = FMath::Max(0, SettlementData.AlivePlayerCount);
 	SettlementData.ExtractedPlayerCount = FMath::Max(0, SettlementData.ExtractedPlayerCount);
+	SettlementData.KilledEnemyCount = FMath::Max(0, SettlementData.KilledEnemyCount);
 	SettlementData.ExtractedItemCount = FMath::Max(0, SettlementData.ExtractedItemCount);
 	SettlementData.ExtractedUniqueItemTypes = FMath::Max(0, SettlementData.ExtractedUniqueItemTypes);
 	SettlementData.ExtractedResourceCount = FMath::Max(0, SettlementData.ExtractedResourceCount);
@@ -117,6 +129,10 @@ void APRRiftGameState::OnRep_MissionTime()
 }
 
 void APRRiftGameState::OnRep_ObjectiveProgress()
+{
+}
+
+void APRRiftGameState::OnRep_KilledEnemyCount()
 {
 }
 

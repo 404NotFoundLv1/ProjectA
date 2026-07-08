@@ -35,6 +35,9 @@ struct PROJECTA_API FPRRiftSettlementData
 	int32 ExtractedPlayerCount = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Rift|Settlement", meta = (ClampMin = "0"))
+	int32 KilledEnemyCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Rift|Settlement", meta = (ClampMin = "0"))
 	int32 ExtractedItemCount = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Rift|Settlement", meta = (ClampMin = "0"))

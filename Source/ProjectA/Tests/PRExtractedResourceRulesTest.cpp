@@ -12,6 +12,7 @@
 #include "Items/PRItemTypes.h"
 #include "Player/PRPlayerState.h"
 #include "Tests/AutomationCommon.h"
+#include "UObject/StructOnScope.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPRExtractedResourceRulesTest, "ProjectRift.Rift.ExtractedResourceRules", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
@@ -78,6 +79,27 @@ FResourceRulesTestPlayer SpawnResourceRulesTestPlayer(FAutomationTestBase& Test,
 
 	return Result;
 }
+
+bool CallResourceRulesBoolFunctionNoParams(UObject* Target, const FName FunctionName, bool& bOutResult)
+{
+	UFunction* Function = Target ? Target->FindFunction(FunctionName) : nullptr;
+	if (!Function)
+	{
+		return false;
+	}
+
+	FStructOnScope Params(Function);
+	void* ParamsMemory = Params.GetStructMemory();
+	Target->ProcessEvent(Function, ParamsMemory);
+
+	if (FBoolProperty* ReturnValue = FindFProperty<FBoolProperty>(Function, TEXT("ReturnValue")))
+	{
+		bOutResult = ReturnValue->GetPropertyValue_InContainer(ParamsMemory);
+		return true;
+	}
+
+	return false;
+}
 }
 
 bool FPRExtractedResourceRulesTest::RunTest(const FString& Parameters)
@@ -92,6 +114,7 @@ bool FPRExtractedResourceRulesTest::RunTest(const FString& Parameters)
 	UClass* RiftGameModeClass = APRRiftGameMode::StaticClass();
 	TestNotNull(TEXT("Rift GameMode exposes CalculateRetainedResourceCount"), RiftGameModeClass->FindFunctionByName(TEXT("CalculateRetainedResourceCount")));
 	TestNotNull(TEXT("Rift GameMode exposes IsExtractableResourceItem"), RiftGameModeClass->FindFunctionByName(TEXT("IsExtractableResourceItem")));
+	TestNotNull(TEXT("Rift GameMode exposes RequestRiftFailure"), RiftGameModeClass->FindFunctionByName(TEXT("RequestRiftFailure")));
 
 	FTestWorldWrapper WorldWrapper;
 	TestTrue(TEXT("Resource rules test world is created"), WorldWrapper.CreateTestWorld(EWorldType::Game));
@@ -185,23 +208,28 @@ bool FPRExtractedResourceRulesTest::RunTest(const FString& Parameters)
 	UPRItemDataAsset* CommonChipData = MakeResourceRulesItemData(TEXT("CommonChip"), EPRItemType::Material);
 	FailurePlayer.Inventory->SetItemDataAssets({ MaterialData, EquipmentData, ConsumableData, QuestData, CommonChipData });
 
-	RiftGameState->ResetSettlementData();
-	RiftGameState->SetExtractedPlayerCount(0);
-	RiftGameState->SetExtractionComplete(false);
+	TestTrue(TEXT("Can restart mission before testing failure entry"), RiftGameMode->StartRiftMission());
+	RiftGameMode->SetReturnToLobbyServerTravelEnabled(false);
 	if (!RiftGameState->PlayerArray.Contains(FailurePlayer.PlayerState))
 	{
 		RiftGameState->AddPlayerState(FailurePlayer.PlayerState);
 	}
 
-	RiftGameMode->FinalizeRiftSettlement(EPRRiftMissionResult::Failed);
+	bool bFailureRequested = false;
+	TestTrue(
+		TEXT("Can request rift failure through the public failure entry"),
+		CallResourceRulesBoolFunctionNoParams(RiftGameMode, TEXT("RequestRiftFailure"), bFailureRequested));
+	TestTrue(TEXT("Rift failure entry accepts the first failure request"), bFailureRequested);
 	TestEqual(TEXT("Failed extraction keeps half rounded down for odd material count"), FailurePlayer.PlayerState->GetShipResourceCount(TEXT("EnergyCrystal")), 2);
 	TestEqual(TEXT("Failed extraction keeps half of even material count"), FailurePlayer.PlayerState->GetShipResourceCount(TEXT("CommonChip")), 2);
 	TestEqual(TEXT("Failed extraction removes resolved material from inventory"), FailurePlayer.Inventory->GetItemCount(TEXT("EnergyCrystal")), 0);
 	TestEqual(TEXT("Failed extraction removes second material from inventory"), FailurePlayer.Inventory->GetItemCount(TEXT("CommonChip")), 0);
 
 	const FPRRiftSettlementData FailedSettlement = RiftGameState->GetSettlementData();
+	TestEqual(TEXT("Failed settlement records failure result"), FailedSettlement.Result, EPRRiftMissionResult::Failed);
 	TestEqual(TEXT("Failed settlement records retained resources"), FailedSettlement.ExtractedResourceCount, 4);
 	TestEqual(TEXT("Failed settlement records lost resources"), FailedSettlement.LostResourceCount, 5);
+	TestTrue(TEXT("Failure settlement requests return travel"), RiftGameMode->IsReturnToLobbyTravelPending());
 
 	return true;
 }

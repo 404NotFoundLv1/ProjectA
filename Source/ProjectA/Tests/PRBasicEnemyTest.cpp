@@ -8,10 +8,13 @@
 #include "Characters/PRCharacter.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/WidgetComponent.h"
+#include "Core/PRRiftGameMode.h"
+#include "Core/PRRiftGameState.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/WorldSettings.h"
 #include "Items/PRPickupActor.h"
 #include "Player/PRPlayerState.h"
 #include "Tests/AutomationCommon.h"
@@ -194,6 +197,12 @@ int32 CountEnemyTestPickups(UWorld* World)
 
 	return PickupCount;
 }
+
+int32 GetBasicEnemyIntPropertyValue(const UObject* Target, const FName PropertyName)
+{
+	const FIntProperty* Property = Target ? FindFProperty<FIntProperty>(Target->GetClass(), PropertyName) : nullptr;
+	return Property ? Property->GetPropertyValue_InContainer(Target) : 0;
+}
 }
 
 bool FPRBasicEnemyTest::RunTest(const FString& Parameters)
@@ -203,6 +212,7 @@ bool FPRBasicEnemyTest::RunTest(const FString& Parameters)
 	UClass* EnemyHealthBarWidgetClass = LoadBasicEnemyRuntimeClass(TEXT("PREnemyHealthBarWidget"), UUserWidget::StaticClass());
 	UClass* EnemyBlueprintClass = StaticLoadClass(ACharacter::StaticClass(), nullptr, TEXT("/Game/ProjectRift/Blueprints/Enemies/BP_PREnemyCharacter.BP_PREnemyCharacter_C"));
 	UClass* SpawnManagerClass = LoadBasicEnemyRuntimeClass(TEXT("PRSpawnManager"), AActor::StaticClass());
+	UClass* RiftGameModeClass = APRRiftGameMode::StaticClass();
 
 	TestNotNull(TEXT("APREnemyCharacter runtime class exists"), EnemyClass);
 	TestNotNull(TEXT("APREnemyAIController runtime class exists"), EnemyAIControllerClass);
@@ -228,6 +238,7 @@ bool FPRBasicEnemyTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Enemy exposes SpawnDeathLoot"), EnemyClass->FindFunctionByName(TEXT("SpawnDeathLoot")));
 	TestNotNull(TEXT("Enemy AI exposes RefreshTarget"), EnemyAIControllerClass->FindFunctionByName(TEXT("RefreshTarget")));
 	TestNotNull(TEXT("Enemy AI exposes GetCurrentTarget"), EnemyAIControllerClass->FindFunctionByName(TEXT("GetCurrentTarget")));
+	TestNotNull(TEXT("Rift GameMode exposes RegisterEnemyKilled for enemy death notifications"), RiftGameModeClass->FindFunctionByName(TEXT("RegisterEnemyKilled")));
 
 	TestBasicEnemyReplicatedProperty(*this, EnemyClass, TEXT("Health"));
 	TestBasicEnemyReplicatedProperty(*this, EnemyClass, TEXT("bDead"));
@@ -273,10 +284,22 @@ bool FPRBasicEnemyTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
+	if (AWorldSettings* WorldSettings = World->GetWorldSettings())
+	{
+		WorldSettings->DefaultGameMode = APRRiftGameMode::StaticClass();
+	}
+
 	TestTrue(TEXT("Basic enemy test world begins play"), WorldWrapper.BeginPlayInTestWorld());
 	if (WorldWrapper.HasFailed())
 	{
 		WorldWrapper.ForwardErrorMessages(this);
+		return false;
+	}
+
+	APRRiftGameState* RiftGameState = World->GetGameState<APRRiftGameState>();
+	TestNotNull(TEXT("Basic enemy test world owns APRRiftGameState for kill tracking"), RiftGameState);
+	if (!RiftGameState)
+	{
 		return false;
 	}
 
@@ -351,6 +374,7 @@ bool FPRBasicEnemyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Enemy starts with a full health bar percentage"), InitialHealthPercent, 1.0f);
 
 	const int32 PickupsBeforeDeath = CountEnemyTestPickups(World);
+	const int32 KillCountBeforeDeath = GetBasicEnemyIntPropertyValue(RiftGameState, TEXT("KilledEnemyCount"));
 	bool bAppliedDamage = false;
 	TestTrue(TEXT("Can apply lethal damage to enemy"), CallBasicEnemyBoolFunctionWithDamageParams(Enemy, TEXT("ApplyEnemyDamage"), MaxHealth + 25.0f, NearPlayer->GetController(), bAppliedDamage));
 	TestTrue(TEXT("Lethal damage is accepted"), bAppliedDamage);
@@ -362,6 +386,14 @@ bool FPRBasicEnemyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Enemy health clamps to zero after lethal damage"), HealthAfterDeath, 0.0f);
 	TestTrue(TEXT("Enemy enters dead state after lethal damage"), bIsDead);
 	TestTrue(TEXT("Enemy death spawns at least one loot pickup"), CountEnemyTestPickups(World) > PickupsBeforeDeath);
+	TestEqual(TEXT("Enemy death increments the replicated rift kill count"), GetBasicEnemyIntPropertyValue(RiftGameState, TEXT("KilledEnemyCount")), KillCountBeforeDeath + 1);
+
+	bool bAppliedDuplicateLethalDamage = true;
+	TestTrue(
+		TEXT("Can attempt duplicate lethal damage after death"),
+		CallBasicEnemyBoolFunctionWithDamageParams(Enemy, TEXT("ApplyEnemyDamage"), MaxHealth + 25.0f, NearPlayer->GetController(), bAppliedDuplicateLethalDamage));
+	TestFalse(TEXT("Dead enemies reject duplicate lethal damage"), bAppliedDuplicateLethalDamage);
+	TestEqual(TEXT("Duplicate lethal damage does not double-count kills"), GetBasicEnemyIntPropertyValue(RiftGameState, TEXT("KilledEnemyCount")), KillCountBeforeDeath + 1);
 
 	ACharacter* AttackTargetEnemy = World->SpawnActor<ACharacter>(EnemyClass, FVector(3160.0f, 0.0f, 0.0f), FRotator::ZeroRotator);
 	APRPlayerState* AttackerState = World->SpawnActor<APRPlayerState>();
