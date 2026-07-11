@@ -175,7 +175,7 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	{
 		TestEqual(TEXT("Game default map is ship lobby"), Maps->GetGameDefaultMap(), FString(TEXT("/Game/ProjectRift/Maps/L_ShipLobby")));
 		TestEqual(TEXT("Project name is ProjectRift"), Project->ProjectName, FString(TEXT("ProjectRift")));
-		TestEqual(TEXT("Project version is v0.4.8"), Project->ProjectVersion, FString(TEXT("0.4.8")));
+		TestEqual(TEXT("Project version is v0.5.0"), Project->ProjectVersion, FString(TEXT("0.5.0")));
 	}
 
 	TArray<FString> MapsToCook;
@@ -190,15 +190,6 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Cook list contains main menu"), ContainsCookMap(TEXT("/Game/ProjectRift/Maps/L_MainMenu")));
 	TestTrue(TEXT("Cook list contains ship lobby"), ContainsCookMap(TEXT("/Game/ProjectRift/Maps/L_ShipLobby")));
 	TestTrue(TEXT("Cook list contains rift test"), ContainsCookMap(TEXT("/Game/ProjectRift/Maps/L_Rift_Test")));
-
-	TArray<FString> DirectoriesToAlwaysCook;
-	GConfig->GetArray(TEXT("/Script/UnrealEd.ProjectPackagingSettings"), TEXT("DirectoriesToAlwaysCook"), DirectoriesToAlwaysCook, GGameIni);
-	TestTrue(
-		TEXT("Cook baseline includes ProjectRift runtime item data"),
-		DirectoriesToAlwaysCook.ContainsByPredicate([](const FString& Entry)
-		{
-			return Entry.Contains(TEXT("/Game/ProjectRift/Items"));
-		}));
 
 	FTestWorldWrapper StabilityWorldWrapper;
 	TestTrue(TEXT("Rift stability failure test world is created"), StabilityWorldWrapper.CreateTestWorld(EWorldType::Game));

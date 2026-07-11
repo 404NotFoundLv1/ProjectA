@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.5.0] - 2026-07-11
+
+### Added
+
+- Added the project-owned `UPRAssetManager` as the global Unreal AssetManager.
+- Added canonical PrimaryAssetId construction and type-safe synchronous/asynchronous loading for `ProjectRiftItem` and `ProjectRiftLootTable`.
+- Added startup validation that reports registered Primary Asset counts.
+- Added AssetManager, async loading, configuration, Cook-rule, and Inventory-routing regression tests.
+
+### Changed
+
+- Registered the existing Item and LootTable Primary DataAssets through `PrimaryAssetTypesToScan` with `AlwaysCook` rules.
+- Removed the `/Game/ProjectRift/Items` `DirectoriesToAlwaysCook` fallback so AssetManager owns the runtime data Cook contract.
+- Routed Inventory fallback lookup through canonical `ProjectRiftItem:<ItemId>` identifiers instead of constructed object paths.
+- Updated the displayed project version to `0.5.0`.
+
+### Verified
+
+- All 33 ProjectRift automation leaf tests pass.
+- Seven affected Blueprints compile with warnings treated as errors.
+- MCP registry tags report four `ProjectRiftItem` assets and one `ProjectRiftLootTable` asset.
+- Win64 Development Build/Cook/Stage/Pak/Archive completes with AutomationTool exit code 0.
+- The packaged game reports both Primary Asset types with nonzero counts, loads `L_Rift_Test`, and exits without fatal errors or Primary Asset failures.
+
 ## [0.4.8] - 2026-07-11
 
 ### Added

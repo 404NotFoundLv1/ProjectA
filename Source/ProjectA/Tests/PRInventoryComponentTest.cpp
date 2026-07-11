@@ -3,6 +3,7 @@
 #include "Misc/AutomationTest.h"
 
 #include "Components/ActorComponent.h"
+#include "Core/PRAssetManager.h"
 #include "Items/PRInventoryComponent.h"
 #include "Items/PRItemDataAsset.h"
 #include "Net/Serialization/FastArraySerializer.h"
@@ -372,6 +373,10 @@ bool FPRInventoryComponentTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
+	AddExpectedError(
+		TEXT("Primary asset is not registered: ProjectRiftItem:ModdedChip"),
+		EAutomationExpectedErrorFlags::Contains,
+		6);
 	SetIntProperty(TypedInventory, TEXT("MaxSlots"), 2);
 	TestTrue(
 		TEXT("Can add first affixed item instance"),
@@ -400,6 +405,27 @@ bool FPRInventoryComponentTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Stack-limited add keeps total count"), StackLimitInventory->GetItemCount(TEXT("HealthInjector")), 7);
 	TestEqual(TEXT("Stack-limited add splits across slots"), StackLimitInventory->GetInventoryItems().Num(), 2);
 	TestFalse(TEXT("Inventory rejects stackable add that cannot fully fit"), StackLimitInventory->CanAddItem(MakeInventoryComponentTestItem(TEXT("HealthInjector"), 4)));
+
+	UPRAssetManager* AssetManager = UPRAssetManager::Get();
+	TestNotNull(TEXT("ProjectRift AssetManager exists for inventory fallback"), AssetManager);
+	if (AssetManager)
+	{
+		UPRInventoryComponent* ManagerInventory = NewObject<UPRInventoryComponent>(GetTransientPackage());
+		TestNotNull(TEXT("Can instantiate manager-backed inventory"), ManagerInventory);
+		UPRItemDataAsset* ManagerHealthData = AssetManager->LoadItemDataSync(TEXT("HealthInjector"));
+		TestEqual(
+			TEXT("Inventory and AssetManager resolve the same registered item object"),
+			ManagerInventory ? ManagerInventory->FindItemData(TEXT("HealthInjector")) : nullptr,
+			ManagerHealthData);
+
+		AddExpectedError(
+			TEXT("Primary asset is not registered: ProjectRiftItem:ManagerAlias"),
+			EAutomationExpectedErrorFlags::Contains,
+			1);
+		TestNull(
+			TEXT("Inventory rejects an unregistered PrimaryAssetId"),
+			ManagerInventory ? ManagerInventory->FindItemData(TEXT("ManagerAlias")) : nullptr);
+	}
 
 	return true;
 }

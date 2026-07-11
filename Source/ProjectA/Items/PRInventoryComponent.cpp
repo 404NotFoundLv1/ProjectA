@@ -1,5 +1,6 @@
 #include "Items/PRInventoryComponent.h"
 
+#include "Core/PRAssetManager.h"
 #include "GameFramework/Actor.h"
 #include "Items/PRItemDataAsset.h"
 #include "Net/UnrealNetwork.h"
@@ -262,9 +263,12 @@ UPRItemDataAsset* UPRInventoryComponent::FindItemData(const FName ItemId) const
 		}
 	}
 
-	const FString ItemName = ItemId.ToString();
-	const FString AssetPath = FString::Printf(TEXT("/Game/ProjectRift/Items/DA_%s.DA_%s"), *ItemName, *ItemName);
-	return LoadObject<UPRItemDataAsset>(nullptr, *AssetPath);
+	if (UPRAssetManager* AssetManager = UPRAssetManager::Get())
+	{
+		return AssetManager->LoadItemDataSync(ItemId);
+	}
+
+	return nullptr;
 }
 
 int32 UPRInventoryComponent::GetMaxStackCount(const FName ItemId) const

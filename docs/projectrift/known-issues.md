@@ -1,5 +1,13 @@
 # ProjectRift known issues
 
+## v0.5.0 acceptance-relevant items
+
+- The packaged NullRHI smoke test still logs the existing Gameplay Ability System warning because `GameplayCueNotifyPaths` is not explicitly narrowed. v0.5.0 does not add GameplayCue assets and does not change this unrelated configuration.
+- The automated benchmark exit still logs the existing CrowdManager warning after exit has been requested. MCP inspection confirms the Rift test map retains its navigation data; verify normal navigation during manual gameplay acceptance.
+- The startup AssetManager validation logs counts for configured types. A zero count is a warning and does not abort editor startup, so future asset-directory changes must keep the automated discovery and package tests.
+- Synchronous loading remains in the existing Inventory fallback path for compatibility. v0.5.0 provides an asynchronous foundation but does not convert Inventory or UI to an all-async lifecycle.
+- UAT reports unavailable SDKs for non-Win64 platforms while validating platforms. Win64 remains valid and the Win64 Development package succeeds.
+
 ## v0.4.8 acceptance-relevant items
 
 - The packaged NullRHI smoke test logs a Gameplay Ability System warning because `GameplayCueNotifyPaths` is not explicitly narrowed. There are no ProjectRift GameplayCue assets in this slice, so this is currently a search-performance warning rather than a functional failure.
@@ -10,4 +18,4 @@
 
 ## Release gate
 
-Do not accept v0.4.8 until the manual matrix in `v0.4.8-test-record.md` passes. Do not begin the next small version before explicit user authorization.
+Do not accept v0.5.0 until the manual matrix in `v0.5.0-test-record.md` passes. Do not begin the next small version before explicit user authorization.
