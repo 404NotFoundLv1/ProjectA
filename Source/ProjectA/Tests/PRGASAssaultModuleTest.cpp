@@ -11,9 +11,9 @@
 #include "Abilities/PRGameplayAbility.h"
 #include "Abilities/PRTemporaryShieldGameplayEffect.h"
 #include "Characters/PRCharacter.h"
+#include "Core/PRGameplayTags.h"
 #include "GameplayAbilitySpec.h"
 #include "GameplayEffect.h"
-#include "GameplayTagsManager.h"
 #include "GameFramework/PlayerController.h"
 #include "Player/PRPlayerState.h"
 #include "Tests/AutomationCommon.h"
@@ -169,7 +169,7 @@ bool FPRGASAssaultModuleTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
-	const FGameplayTag DownedStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Downed"), false);
+	const FGameplayTag DownedStateTag = ProjectRiftGameplayTags::State_Downed;
 	TestTrue(TEXT("State.Downed tag is configured"), DownedStateTag.IsValid());
 	if (DownedStateTag.IsValid())
 	{

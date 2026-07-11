@@ -10,6 +10,7 @@
 #include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
 #include "ProjectA.h"
+#include "Settings/PRProjectSettings.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -77,7 +78,14 @@ bool APRSpawnManager::StartSpawningForObjective(APRRiftObjectiveActor* Objective
 	DiscoverSpawnPoints();
 	SpawnWave();
 
-	const float SafeWaveInterval = FMath::Max(0.1f, WaveInterval);
+	const UPRProjectSettings* ProjectSettings = GetDefault<UPRProjectSettings>();
+	if (!ProjectSettings)
+	{
+		UE_LOG(LogProjectA, Error, TEXT("ProjectRift project settings are unavailable while starting the spawn wave timer; using the code default interval."));
+	}
+	const float SafeWaveInterval = ProjectSettings
+		? FMath::Max(0.1f, ProjectSettings->WaveInterval)
+		: 6.0f;
 	GetWorldTimerManager().SetTimer(WaveTimerHandle, this, &APRSpawnManager::HandleWaveTimerElapsed, SafeWaveInterval, true);
 
 	UE_LOG(LogProjectA, Log, TEXT("Rift spawn manager started. Manager=%s WaveInterval=%.1f SpawnPoints=%d"),
@@ -126,6 +134,14 @@ int32 APRSpawnManager::SpawnWave()
 	PruneDeadEnemies();
 
 	const int32 CurrentAliveCount = GetAliveEnemyCount();
+	const UPRProjectSettings* ProjectSettings = GetDefault<UPRProjectSettings>();
+	if (!ProjectSettings)
+	{
+		UE_LOG(LogProjectA, Error, TEXT("ProjectRift project settings are unavailable while calculating the alive enemy cap; using the code default."));
+	}
+	const int32 MaxAliveEnemies = ProjectSettings
+		? FMath::Max(1, ProjectSettings->MaxAliveEnemies)
+		: 8;
 	const int32 SpawnBudget = FMath::Max(0, MaxAliveEnemies - CurrentAliveCount);
 	const int32 SpawnCount = FMath::Min(GetDesiredEnemiesPerWave(), SpawnBudget);
 	if (SpawnCount <= 0)
@@ -213,7 +229,18 @@ void APRSpawnManager::HandleWaveTimerElapsed()
 int32 APRSpawnManager::GetDesiredEnemiesPerWave() const
 {
 	const int32 AlivePlayerCount = FMath::Max(1, GetAlivePlayerCountForScaling());
-	return FMath::Max(0, BaseEnemiesPerWave) + FMath::Max(0, AlivePlayerCount - 1) * FMath::Max(0, EnemiesPerAdditionalPlayer);
+	const UPRProjectSettings* ProjectSettings = GetDefault<UPRProjectSettings>();
+	if (!ProjectSettings)
+	{
+		UE_LOG(LogProjectA, Error, TEXT("ProjectRift project settings are unavailable while calculating enemies per wave; using code defaults."));
+	}
+	const int32 BaseEnemiesPerWave = ProjectSettings
+		? FMath::Max(0, ProjectSettings->BaseEnemiesPerWave)
+		: 2;
+	const int32 EnemiesPerAdditionalPlayer = ProjectSettings
+		? FMath::Max(0, ProjectSettings->EnemiesPerAdditionalPlayer)
+		: 1;
+	return BaseEnemiesPerWave + FMath::Max(0, AlivePlayerCount - 1) * EnemiesPerAdditionalPlayer;
 }
 
 int32 APRSpawnManager::GetAlivePlayerCountForScaling() const

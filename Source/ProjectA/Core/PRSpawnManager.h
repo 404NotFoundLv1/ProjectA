@@ -50,18 +50,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Spawning")
 	TSubclassOf<AActor> SpawnedEnemyClass;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rift|Spawning", meta = (ClampMin = "0"))
-	int32 BaseEnemiesPerWave = 2;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rift|Spawning", meta = (ClampMin = "0"))
-	int32 EnemiesPerAdditionalPlayer = 1;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rift|Spawning", meta = (ClampMin = "1"))
-	int32 MaxAliveEnemies = 8;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rift|Spawning", meta = (ClampMin = "0.1"))
-	float WaveInterval = 6.0f;
-
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Rift|Spawning")
 	bool bSpawningActive = false;
 

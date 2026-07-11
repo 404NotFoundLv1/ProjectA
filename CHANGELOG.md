@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.5.1] - 2026-07-11
+
+### Added
+
+- Added a native `ProjectRiftGameplayTags` contract for all 15 current input, role, damage, state, and cooldown tags.
+- Added `UPRProjectSettings` under Project Settings > ProjectRift > Gameplay as the unique source for 11 Vertical Slice mission, objective, spawn, and extraction tuning values.
+- Added native-tag, settings metadata/config, runtime settings-consumer, and removed-Actor-property regression coverage.
+
+### Changed
+
+- Replaced production string-based GameplayTag requests with native constants, including the `Data.Damage` SetByCaller contract.
+- Removed the duplicate `ProjectRiftGameplayTags.ini` declarations and their staging allow-list entry.
+- Routed Rift GameMode, objective, hold duration, spawn scaling/cap/interval, and extraction radius through project settings with defensive runtime clamps.
+- Removed the corresponding Actor/Blueprint tuning storage while preserving the existing public getters, authority rules, replication, and mission flow.
+- Updated the displayed project version to `0.5.1`.
+
+### Verified
+
+- ProjectAEditor and ProjectA Win64 Development targets build successfully.
+- All 35 ProjectRift automation leaf tests pass; 28 without warnings and 7 with existing warnings.
+- Ten affected Blueprints compile with warnings treated as errors, all inspected assets/maps are clean, and `/Game/ProjectRift` contains no redirectors.
+- Win64 Development Build/Cook/Stage/Pak/Archive completes with AutomationTool exit code 0.
+- The packaged NullRHI smoke reaches `L_ShipLobby` without fatal, assertion, GameplayTag, settings, or RHI errors.
+
 ## [0.5.0] - 2026-07-11
 
 ### Added

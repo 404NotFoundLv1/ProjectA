@@ -5,6 +5,7 @@
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/WidgetComponent.h"
+#include "Core/PRExtractionZone.h"
 #include "Core/PRRiftGameMode.h"
 #include "Core/PRRiftGameState.h"
 #include "Engine/World.h"
@@ -17,6 +18,7 @@
 #include "Items/PRItemTypes.h"
 #include "Player/PRPlayerState.h"
 #include "Tests/AutomationCommon.h"
+#include "Tests/PRProjectSettingsTestUtils.h"
 #include "UObject/StructOnScope.h"
 #include "UObject/UnrealType.h"
 
@@ -176,6 +178,9 @@ FPRItemInstance MakeExtractionSettlementItem(const FName ItemId, const int32 Cou
 
 bool FPRRiftExtractionZoneTest::RunTest(const FString& Parameters)
 {
+	ProjectRiftTests::FScopedProjectSettingsOverride SettingsOverride;
+	SettingsOverride->ExtractionRadius = 410.0f;
+
 	UClass* ExtractionZoneClass = LoadExtractionTestClass(TEXT("PRExtractionZone"), AActor::StaticClass());
 	UClass* RiftGameModeClass = APRRiftGameMode::StaticClass();
 	UClass* RiftGameStateClass = APRRiftGameState::StaticClass();
@@ -191,6 +196,7 @@ bool FPRRiftExtractionZoneTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Extraction zone exposes TryExtractPawn"), ExtractionZoneClass->FindFunctionByName(TEXT("TryExtractPawn")));
 	TestNotNull(TEXT("Extraction zone exposes GetExtractionRadius"), ExtractionZoneClass->FindFunctionByName(TEXT("GetExtractionRadius")));
 	TestNotNull(TEXT("Extraction zone exposes GetInteractionPromptText"), ExtractionZoneClass->FindFunctionByName(TEXT("GetInteractionPromptText")));
+	TestNull(TEXT("Extraction radius is no longer an ExtractionZone Actor property"), ExtractionZoneClass->FindPropertyByName(TEXT("ExtractionRadius")));
 
 	TestNotNull(TEXT("Rift GameMode exposes RegisterPlayerExtracted"), RiftGameModeClass->FindFunctionByName(TEXT("RegisterPlayerExtracted")));
 	TestNotNull(TEXT("Rift GameMode exposes IsPlayerExtracted"), RiftGameModeClass->FindFunctionByName(TEXT("IsPlayerExtracted")));
@@ -312,6 +318,22 @@ bool FPRRiftExtractionZoneTest::RunTest(const FString& Parameters)
 	if (!RiftGameMode || !RiftGameState || !ExtractionZone || !PlayerController || !PlayerState || !PlayerPawn)
 	{
 		return false;
+	}
+	APRExtractionZone* TypedExtractionZone = Cast<APRExtractionZone>(ExtractionZone);
+	const USphereComponent* RuntimeExtractionSphere = FindObject<USphereComponent>(ExtractionZone, TEXT("ExtractionSphere"));
+	TestEqual(TEXT("Extraction getter uses project settings radius"), TypedExtractionZone ? TypedExtractionZone->GetExtractionRadius() : 0.0f, 410.0f);
+	TestEqual(TEXT("Extraction sphere uses project settings radius"), RuntimeExtractionSphere ? RuntimeExtractionSphere->GetUnscaledSphereRadius() : 0.0f, 410.0f);
+	SettingsOverride->ExtractionRadius = -20.0f;
+	if (TypedExtractionZone)
+	{
+		TypedExtractionZone->OnConstruction(TypedExtractionZone->GetActorTransform());
+	}
+	TestEqual(TEXT("Extraction radius clamps to one"), TypedExtractionZone ? TypedExtractionZone->GetExtractionRadius() : 0.0f, 1.0f);
+	TestEqual(TEXT("Extraction sphere applies the clamped radius"), RuntimeExtractionSphere ? RuntimeExtractionSphere->GetUnscaledSphereRadius() : 0.0f, 1.0f);
+	SettingsOverride->ExtractionRadius = 410.0f;
+	if (TypedExtractionZone)
+	{
+		TypedExtractionZone->OnConstruction(TypedExtractionZone->GetActorTransform());
 	}
 
 	PlayerController->SetPlayerState(PlayerState);

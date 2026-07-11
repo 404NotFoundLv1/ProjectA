@@ -8,6 +8,8 @@
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
 #include "Player/PRPlayerController.h"
+#include "ProjectA.h"
+#include "Settings/PRProjectSettings.h"
 #include "UI/PRInteractionPromptWidget.h"
 
 APRRiftObjectiveActor::APRRiftObjectiveActor()
@@ -20,7 +22,7 @@ APRRiftObjectiveActor::APRRiftObjectiveActor()
 
 	InteractionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("InteractionSphere"));
 	InteractionSphere->SetupAttachment(SceneRoot);
-	InteractionSphere->SetSphereRadius(InteractionRadius);
+	InteractionSphere->SetSphereRadius(GetInteractionRadius());
 	InteractionSphere->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	InteractionSphere->SetCollisionObjectType(ECC_WorldDynamic);
 	InteractionSphere->SetCollisionResponseToAllChannels(ECR_Ignore);
@@ -40,6 +42,28 @@ APRRiftObjectiveActor::APRRiftObjectiveActor()
 	InteractionPromptWidget->SetGenerateOverlapEvents(false);
 	InteractionPromptWidget->SetHiddenInGame(true);
 	InteractionPromptWidget->SetVisibility(false, true);
+}
+
+void APRRiftObjectiveActor::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	if (InteractionSphere)
+	{
+		InteractionSphere->SetSphereRadius(GetInteractionRadius());
+	}
+}
+
+float APRRiftObjectiveActor::GetInteractionRadius() const
+{
+	const UPRProjectSettings* ProjectSettings = GetDefault<UPRProjectSettings>();
+	if (!ProjectSettings)
+	{
+		UE_LOG(LogProjectA, Error, TEXT("ProjectRift project settings are unavailable while reading the objective interaction radius; using the code default."));
+	}
+	return ProjectSettings
+		? FMath::Max(1.0f, ProjectSettings->ObjectiveInteractionRadius)
+		: 250.0f;
 }
 
 void APRRiftObjectiveActor::Tick(const float DeltaSeconds)
@@ -302,6 +326,7 @@ APawn* APRRiftObjectiveActor::FindNearbyPromptPawn() const
 		return LocalPlayerController->IsFocusedInteractionTarget(this) ? LocalPawn : nullptr;
 	}
 
+	const float InteractionRadius = GetInteractionRadius();
 	const float PromptRadius = InteractionSphere
 		? FMath::Max(InteractionRadius, InteractionSphere->GetScaledSphereRadius())
 		: InteractionRadius;

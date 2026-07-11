@@ -7,11 +7,11 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/WidgetComponent.h"
+#include "Core/PRGameplayTags.h"
 #include "Core/PRRiftGameMode.h"
 #include "Enemies/PREnemyAIController.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayEffect.h"
-#include "GameplayTagsManager.h"
 #include "Items/PRLootTableDataAsset.h"
 #include "Items/PRLootTableLibrary.h"
 #include "Items/PRPickupActor.h"
@@ -210,7 +210,7 @@ bool APREnemyCharacter::ApplyDamageToProjectRiftCharacter(AActor* TargetActor)
 		return false;
 	}
 
-	const FGameplayTag DamageTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Data.Damage"), false);
+	const FGameplayTag DamageTag = ProjectRiftGameplayTags::Data_Damage;
 	if (!DamageTag.IsValid())
 	{
 		return false;

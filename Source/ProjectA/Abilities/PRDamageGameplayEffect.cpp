@@ -1,15 +1,15 @@
 #include "Abilities/PRDamageGameplayEffect.h"
 
 #include "Abilities/PRAttributeSet.h"
-#include "GameplayTagsManager.h"
+#include "Core/PRGameplayTags.h"
 
 UPRDamageGameplayEffect::UPRDamageGameplayEffect()
 {
 	DurationPolicy = EGameplayEffectDurationType::Instant;
 
 	FSetByCallerFloat DamageMagnitude;
-	DamageMagnitude.DataName = TEXT("Data.Damage");
-	DamageMagnitude.DataTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Data.Damage"), false);
+	DamageMagnitude.DataName = NAME_None;
+	DamageMagnitude.DataTag = ProjectRiftGameplayTags::Data_Damage;
 
 	FGameplayModifierInfo DamageModifier;
 	DamageModifier.Attribute = UPRAttributeSet::GetDamageAttribute();

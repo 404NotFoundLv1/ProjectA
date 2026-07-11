@@ -1,5 +1,13 @@
 # ProjectRift known issues
 
+## v0.5.1 acceptance-relevant items
+
+- The project settings values are now global and unique. Actor and Blueprint instance overrides for the 11 migrated fields no longer exist; acceptance should change values through Project Settings > ProjectRift > Gameplay and restore the approved defaults before committing.
+- The packaged NullRHI smoke test still logs the existing Gameplay Ability System warning because `GameplayCueNotifyPaths` is not explicitly narrowed. v0.5.1 adds no GameplayCue assets and does not change this unrelated configuration.
+- A graphical packaged smoke reached `L_ShipLobby`, then logged D3D12 compute-PSO allocation errors under current machine memory pressure. The follow-up NullRHI smoke was clean. Manual acceptance must include a normal graphical launch on the target machine.
+- Automation validates the configured values through CDO overrides and restores them after each test. It does not replace a human check that Project Settings edits persist after an editor restart.
+- UAT reports unavailable SDKs for non-Win64 platforms while validating platforms. Win64 remains valid and the Win64 Development package succeeds.
+
 ## v0.5.0 acceptance-relevant items
 
 - The packaged NullRHI smoke test still logs the existing Gameplay Ability System warning because `GameplayCueNotifyPaths` is not explicitly narrowed. v0.5.0 does not add GameplayCue assets and does not change this unrelated configuration.
@@ -18,4 +26,4 @@
 
 ## Release gate
 
-Do not accept v0.5.0 until the manual matrix in `v0.5.0-test-record.md` passes. Do not begin the next small version before explicit user authorization.
+Do not accept v0.5.1 until the manual matrix in `v0.5.1-test-record.md` passes. Do not begin the next small version before explicit user authorization.

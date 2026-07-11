@@ -33,7 +33,7 @@ public:
 	bool TryExtractPawn(APawn* ExtractingPawn);
 
 	UFUNCTION(BlueprintPure, Category = "Rift|Extraction")
-	float GetExtractionRadius() const { return ExtractionRadius; }
+	float GetExtractionRadius() const;
 
 	UFUNCTION(BlueprintPure, Category = "Rift|Extraction")
 	FText GetInteractionPromptText() const;
@@ -61,9 +61,6 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Rift|Extraction")
 	TObjectPtr<UWidgetComponent> InteractionPromptWidget;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Extraction", meta = (ClampMin = "0.0"))
-	float ExtractionRadius = 320.0f;
 
 	UFUNCTION()
 	void HandleExtractionSphereBeginOverlap(

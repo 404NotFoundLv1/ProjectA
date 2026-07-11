@@ -12,6 +12,7 @@
 #include "Items/PRItemTypes.h"
 #include "Player/PRPlayerState.h"
 #include "Tests/AutomationCommon.h"
+#include "Tests/PRProjectSettingsTestUtils.h"
 #include "UObject/StructOnScope.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPRExtractedResourceRulesTest, "ProjectRift.Rift.ExtractedResourceRules", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -104,6 +105,9 @@ bool CallResourceRulesBoolFunctionNoParams(UObject* Target, const FName Function
 
 bool FPRExtractedResourceRulesTest::RunTest(const FString& Parameters)
 {
+	ProjectRiftTests::FScopedProjectSettingsOverride SettingsOverride;
+	SettingsOverride->FailedResourceRetentionRate = 0.25f;
+
 	UClass* PlayerStateClass = APRPlayerState::StaticClass();
 	TestNotNull(TEXT("PlayerState exposes GetShipResourceCount"), PlayerStateClass->FindFunctionByName(TEXT("GetShipResourceCount")));
 	TestNotNull(TEXT("PlayerState exposes GetShipResources"), PlayerStateClass->FindFunctionByName(TEXT("GetShipResources")));
@@ -231,15 +235,15 @@ bool FPRExtractedResourceRulesTest::RunTest(const FString& Parameters)
 		TEXT("Can request rift failure through the public failure entry"),
 		CallResourceRulesBoolFunctionNoParams(RiftGameMode, TEXT("RequestRiftFailure"), bFailureRequested));
 	TestTrue(TEXT("Rift failure entry accepts the first failure request"), bFailureRequested);
-	TestEqual(TEXT("Failed extraction keeps half rounded down for odd material count"), FailurePlayer.PlayerState->GetShipResourceCount(TEXT("EnergyCrystal")), 2);
-	TestEqual(TEXT("Failed extraction keeps half of even material count"), FailurePlayer.PlayerState->GetShipResourceCount(TEXT("CommonChip")), 2);
+	TestEqual(TEXT("Failed extraction uses configured retention for odd material count"), FailurePlayer.PlayerState->GetShipResourceCount(TEXT("EnergyCrystal")), 1);
+	TestEqual(TEXT("Failed extraction uses configured retention for even material count"), FailurePlayer.PlayerState->GetShipResourceCount(TEXT("CommonChip")), 1);
 	TestEqual(TEXT("Failed extraction removes resolved material from inventory"), FailurePlayer.Inventory->GetItemCount(TEXT("EnergyCrystal")), 0);
 	TestEqual(TEXT("Failed extraction removes second material from inventory"), FailurePlayer.Inventory->GetItemCount(TEXT("CommonChip")), 0);
 
 	const FPRRiftSettlementData FailedSettlement = RiftGameState->GetSettlementData();
 	TestEqual(TEXT("Failed settlement records failure result"), FailedSettlement.Result, EPRRiftMissionResult::Failed);
-	TestEqual(TEXT("Failed settlement records retained resources"), FailedSettlement.ExtractedResourceCount, 4);
-	TestEqual(TEXT("Failed settlement records lost resources"), FailedSettlement.LostResourceCount, 5);
+	TestEqual(TEXT("Failed settlement records retained resources"), FailedSettlement.ExtractedResourceCount, 2);
+	TestEqual(TEXT("Failed settlement records lost resources"), FailedSettlement.LostResourceCount, 7);
 	TestTrue(TEXT("Failure settlement requests return travel"), RiftGameMode->IsReturnToLobbyTravelPending());
 	const int32 EnergyAfterFailure = FailurePlayer.PlayerState->GetShipResourceCount(TEXT("EnergyCrystal"));
 	const int32 ChipAfterFailure = FailurePlayer.PlayerState->GetShipResourceCount(TEXT("CommonChip"));

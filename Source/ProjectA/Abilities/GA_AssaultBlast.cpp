@@ -3,10 +3,10 @@
 #include "Abilities/PRAbilitySystemComponent.h"
 #include "Abilities/PRDamageGameplayEffect.h"
 #include "Characters/PRCharacter.h"
+#include "Core/PRGameplayTags.h"
 #include "Enemies/PREnemyCharacter.h"
 #include "Engine/OverlapResult.h"
 #include "GameplayEffect.h"
-#include "GameplayTagsManager.h"
 #include "ProjectA.h"
 
 UGA_AssaultBlast::UGA_AssaultBlast()
@@ -73,7 +73,7 @@ bool UGA_AssaultBlast::ExecuteBlast(
 		return false;
 	}
 
-	const FGameplayTag DamageTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Data.Damage"), false);
+	const FGameplayTag DamageTag = ProjectRiftGameplayTags::Data_Damage;
 	if (!DamageTag.IsValid())
 	{
 		UE_LOG(LogProjectA, Warning, TEXT("Assault blast skipped for %s: Data.Damage tag is missing."), *GetNameSafe(AvatarActor));

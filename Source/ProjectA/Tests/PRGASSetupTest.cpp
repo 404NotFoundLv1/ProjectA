@@ -4,7 +4,7 @@
 
 #include "AbilitySystemComponent.h"
 #include "Abilities/GameplayAbility.h"
-#include "GameplayTagsManager.h"
+#include "Core/PRGameplayTags.h"
 #include "GameplayTask.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPRGASSetupTest, "ProjectRift.GAS.Setup", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -15,11 +15,11 @@ bool FPRGASSetupTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("GameplayAbility class is available"), UGameplayAbility::StaticClass());
 	TestNotNull(TEXT("GameplayTask class is available"), UGameplayTask::StaticClass());
 
-	const FGameplayTag PrimaryInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Primary"), false);
-	const FGameplayTag AssaultRoleTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Ability.Role.Assault"), false);
-	const FGameplayTag DeadStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Dead"), false);
-	const FGameplayTag DamageDataTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Data.Damage"), false);
-	const FGameplayTag SkillQCooldownTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Cooldown.Skill.Q"), false);
+	const FGameplayTag PrimaryInputTag = ProjectRiftGameplayTags::Input_Ability_Primary;
+	const FGameplayTag AssaultRoleTag = ProjectRiftGameplayTags::Ability_Role_Assault;
+	const FGameplayTag DeadStateTag = ProjectRiftGameplayTags::State_Dead;
+	const FGameplayTag DamageDataTag = ProjectRiftGameplayTags::Data_Damage;
+	const FGameplayTag SkillQCooldownTag = ProjectRiftGameplayTags::Cooldown_Skill_Q;
 
 	TestTrue(TEXT("Input ability tags are configured"), PrimaryInputTag.IsValid());
 	TestTrue(TEXT("Role ability tags are configured"), AssaultRoleTag.IsValid());

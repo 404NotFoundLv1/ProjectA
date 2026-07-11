@@ -22,6 +22,7 @@ class PROJECTA_API APRRiftObjectiveActor : public AActor
 public:
 	APRRiftObjectiveActor();
 
+	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -47,7 +48,7 @@ public:
 	float GetObjectiveProgress() const { return ObjectiveProgress; }
 
 	UFUNCTION(BlueprintPure, Category = "Rift|Objective")
-	float GetInteractionRadius() const { return InteractionRadius; }
+	float GetInteractionRadius() const;
 
 	UFUNCTION(BlueprintPure, Category = "Rift|Objective")
 	FText GetInteractionPromptText() const;
@@ -76,9 +77,6 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Rift|Objective")
 	TObjectPtr<UWidgetComponent> InteractionPromptWidget;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Objective", meta = (ClampMin = "0.0"))
-	float InteractionRadius = 250.0f;
 
 	UPROPERTY(ReplicatedUsing = OnRep_ObjectiveState, BlueprintReadOnly, Category = "Rift|Objective")
 	EPRRiftObjectiveState ObjectiveState = EPRRiftObjectiveState::NotStarted;

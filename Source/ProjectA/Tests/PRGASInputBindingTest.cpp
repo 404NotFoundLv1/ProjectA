@@ -9,8 +9,8 @@
 #include "Abilities/PRAbilitySystemComponent.h"
 #include "Abilities/PRAttributeSet.h"
 #include "Characters/PRCharacter.h"
+#include "Core/PRGameplayTags.h"
 #include "GameplayAbilitySpec.h"
-#include "GameplayTagsManager.h"
 #include "GameFramework/PlayerController.h"
 #include "Player/PRPlayerState.h"
 #include "Tests/AutomationCommon.h"
@@ -57,10 +57,10 @@ bool FPRGASInputBindingTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("APRCharacter exposes E release input"), CharacterClass->FindFunctionByName(TEXT("DoSkillEReleased")));
 	TestNotNull(TEXT("APRCharacter exposes R release input"), CharacterClass->FindFunctionByName(TEXT("DoSkillRReleased")));
 
-	const FGameplayTag PrimaryInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Primary"), false);
-	const FGameplayTag QInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.Q"), false);
-	const FGameplayTag EInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.E"), false);
-	const FGameplayTag RInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.R"), false);
+	const FGameplayTag PrimaryInputTag = ProjectRiftGameplayTags::Input_Ability_Primary;
+	const FGameplayTag QInputTag = ProjectRiftGameplayTags::Input_Ability_Skill_Q;
+	const FGameplayTag EInputTag = ProjectRiftGameplayTags::Input_Ability_Skill_E;
+	const FGameplayTag RInputTag = ProjectRiftGameplayTags::Input_Ability_Skill_R;
 	TestTrue(TEXT("Primary input tag is configured"), PrimaryInputTag.IsValid());
 	TestTrue(TEXT("Q input tag is configured"), QInputTag.IsValid());
 	TestTrue(TEXT("E input tag is configured"), EInputTag.IsValid());

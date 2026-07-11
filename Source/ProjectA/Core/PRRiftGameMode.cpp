@@ -15,6 +15,7 @@
 #include "Items/PRItemTypes.h"
 #include "Player/PRPlayerState.h"
 #include "ProjectA.h"
+#include "Settings/PRProjectSettings.h"
 
 APRRiftGameMode::APRRiftGameMode()
 {
@@ -106,7 +107,15 @@ bool APRRiftGameMode::StartRiftMission()
 	StopSpawnManagers();
 	RiftGameState->SetCurrentObjectiveState(EPRRiftObjectiveState::NotStarted);
 	RiftGameState->SetObjectiveProgress(0.0f);
-	RiftGameState->SetRiftStability(InitialRiftStability);
+	const UPRProjectSettings* ProjectSettings = GetDefault<UPRProjectSettings>();
+	if (!ProjectSettings)
+	{
+		UE_LOG(LogProjectA, Error, TEXT("ProjectRift project settings are unavailable while starting a Rift mission; using the code default stability."));
+	}
+	const float InitialStability = ProjectSettings
+		? FMath::Clamp(ProjectSettings->InitialRiftStability, 0.0f, 100.0f)
+		: 100.0f;
+	RiftGameState->SetRiftStability(InitialStability);
 	RiftGameState->SetExtractionAvailable(false);
 	RiftGameState->SetMissionTime(0.0f);
 	RiftGameState->SetKilledEnemyCount(0);
@@ -279,6 +288,18 @@ void APRRiftGameMode::SetReturnToLobbyServerTravelEnabled(const bool bEnabled)
 	bReturnToLobbyServerTravelEnabled = bEnabled;
 }
 
+float APRRiftGameMode::GetReturnToLobbyDelayAfterSettlement() const
+{
+	const UPRProjectSettings* ProjectSettings = GetDefault<UPRProjectSettings>();
+	if (!ProjectSettings)
+	{
+		UE_LOG(LogProjectA, Error, TEXT("ProjectRift project settings are unavailable while reading the settlement return delay; using the code default."));
+	}
+	return ProjectSettings
+		? FMath::Max(0.0f, ProjectSettings->ReturnToLobbyDelayAfterSettlement)
+		: 4.0f;
+}
+
 FPRRiftSettlementData APRRiftGameMode::GenerateSettlementData(const EPRRiftMissionResult Result) const
 {
 	FPRRiftSettlementData Settlement;
@@ -357,7 +378,15 @@ int32 APRRiftGameMode::CalculateRetainedResourceCount(const int32 Count, const E
 
 	if (Result == EPRRiftMissionResult::Failed)
 	{
-		return FMath::FloorToInt(SafeCount * FMath::Clamp(FailedResourceRetentionRate, 0.0f, 1.0f));
+		const UPRProjectSettings* ProjectSettings = GetDefault<UPRProjectSettings>();
+		if (!ProjectSettings)
+		{
+			UE_LOG(LogProjectA, Error, TEXT("ProjectRift project settings are unavailable while calculating failed resource retention; using the code default."));
+		}
+		const float RetentionRate = ProjectSettings
+			? FMath::Clamp(ProjectSettings->FailedResourceRetentionRate, 0.0f, 1.0f)
+			: 0.5f;
+		return FMath::FloorToInt(SafeCount * RetentionRate);
 	}
 
 	return 0;
@@ -650,7 +679,15 @@ APawn* APRRiftGameMode::ResolvePawnForPlayerState(const APlayerState* PlayerStat
 
 void APRRiftGameMode::DrainRiftStability(const float DeltaSeconds)
 {
-	if (RiftStabilityDrainPerSecond <= 0.0f || DeltaSeconds <= 0.0f)
+	const UPRProjectSettings* ProjectSettings = GetDefault<UPRProjectSettings>();
+	if (!ProjectSettings)
+	{
+		UE_LOG(LogProjectA, Error, TEXT("ProjectRift project settings are unavailable while draining Rift stability; using the code default."));
+	}
+	const float DrainPerSecond = ProjectSettings
+		? FMath::Max(0.0f, ProjectSettings->RiftStabilityDrainPerSecond)
+		: 1.0f;
+	if (DrainPerSecond <= 0.0f || DeltaSeconds <= 0.0f)
 	{
 		return;
 	}
@@ -661,7 +698,7 @@ void APRRiftGameMode::DrainRiftStability(const float DeltaSeconds)
 		return;
 	}
 
-	RiftGameState->SetRiftStability(RiftGameState->GetRiftStability() - RiftStabilityDrainPerSecond * DeltaSeconds);
+	RiftGameState->SetRiftStability(RiftGameState->GetRiftStability() - DrainPerSecond * DeltaSeconds);
 }
 
 void APRRiftGameMode::DiscoverSpawnManagers()
@@ -879,16 +916,17 @@ void APRRiftGameMode::RequestReturnToLobbyTravel(const EPRRiftMissionResult Resu
 		return;
 	}
 
-	if (ReturnToLobbyDelayAfterSettlement > 0.0f)
+	const float ReturnDelay = GetReturnToLobbyDelayAfterSettlement();
+	if (ReturnDelay > 0.0f)
 	{
 		UE_LOG(LogProjectA, Log, TEXT("Rift extraction completed. Showing settlement for %.1f seconds before return travel: %s"),
-			ReturnToLobbyDelayAfterSettlement,
+			ReturnDelay,
 			*TravelURL);
 		World->GetTimerManager().SetTimer(
 			ReturnToLobbyTravelTimerHandle,
 			this,
 			&APRRiftGameMode::PerformReturnToLobbyTravel,
-			ReturnToLobbyDelayAfterSettlement,
+			ReturnDelay,
 			false);
 		return;
 	}

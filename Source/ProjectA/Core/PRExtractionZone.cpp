@@ -9,6 +9,8 @@
 #include "EngineUtils.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
+#include "ProjectA.h"
+#include "Settings/PRProjectSettings.h"
 #include "UI/PRInteractionPromptWidget.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -34,7 +36,7 @@ APRExtractionZone::APRExtractionZone()
 
 	ExtractionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("ExtractionSphere"));
 	ExtractionSphere->SetupAttachment(SceneRoot);
-	ExtractionSphere->SetSphereRadius(ExtractionRadius);
+	ExtractionSphere->SetSphereRadius(GetExtractionRadius());
 	ExtractionSphere->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	ExtractionSphere->SetCollisionObjectType(ECC_WorldDynamic);
 	ExtractionSphere->SetCollisionResponseToAllChannels(ECR_Ignore);
@@ -56,7 +58,7 @@ APRExtractionZone::APRExtractionZone()
 	InteractionPromptWidget->SetVisibility(false, true);
 
 	const float CylinderRadius = 50.0f;
-	const float MarkerScale = FMath::Max(ExtractionRadius / CylinderRadius, 0.1f);
+	const float MarkerScale = FMath::Max(GetExtractionRadius() / CylinderRadius, 0.1f);
 	ZoneMarkerMesh->SetRelativeScale3D(FVector(MarkerScale, MarkerScale, 0.04f));
 	ZoneMarkerMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 2.0f));
 }
@@ -67,16 +69,28 @@ void APRExtractionZone::OnConstruction(const FTransform& Transform)
 
 	if (ExtractionSphere)
 	{
-		ExtractionSphere->SetSphereRadius(ExtractionRadius);
+		ExtractionSphere->SetSphereRadius(GetExtractionRadius());
 	}
 
 	if (ZoneMarkerMesh)
 	{
 		const float CylinderRadius = 50.0f;
-		const float MarkerScale = FMath::Max(ExtractionRadius / CylinderRadius, 0.1f);
+		const float MarkerScale = FMath::Max(GetExtractionRadius() / CylinderRadius, 0.1f);
 		ZoneMarkerMesh->SetRelativeScale3D(FVector(MarkerScale, MarkerScale, 0.04f));
 		ZoneMarkerMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 2.0f));
 	}
+}
+
+float APRExtractionZone::GetExtractionRadius() const
+{
+	const UPRProjectSettings* ProjectSettings = GetDefault<UPRProjectSettings>();
+	if (!ProjectSettings)
+	{
+		UE_LOG(LogProjectA, Error, TEXT("ProjectRift project settings are unavailable while reading the extraction radius; using the code default."));
+	}
+	return ProjectSettings
+		? FMath::Max(1.0f, ProjectSettings->ExtractionRadius)
+		: 320.0f;
 }
 
 void APRExtractionZone::Tick(const float DeltaSeconds)
@@ -104,6 +118,7 @@ bool APRExtractionZone::CanExtractPawn(APawn* ExtractingPawn) const
 		return false;
 	}
 
+	const float ExtractionRadius = GetExtractionRadius();
 	const float PromptRadius = ExtractionSphere
 		? FMath::Max(ExtractionRadius, ExtractionSphere->GetUnscaledSphereRadius())
 		: ExtractionRadius;
@@ -227,6 +242,7 @@ APawn* APRExtractionZone::FindNearbyPromptPawn() const
 		return nullptr;
 	}
 
+	const float ExtractionRadius = GetExtractionRadius();
 	const float PromptRadius = ExtractionSphere
 		? FMath::Max(ExtractionRadius, ExtractionSphere->GetUnscaledSphereRadius())
 		: ExtractionRadius;

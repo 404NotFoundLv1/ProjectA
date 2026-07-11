@@ -66,7 +66,7 @@ public:
 	bool IsReturnToLobbyTravelPending() const { return bReturnToLobbyTravelPending; }
 
 	UFUNCTION(BlueprintPure, Category = "Rift|Extraction")
-	float GetReturnToLobbyDelayAfterSettlement() const { return ReturnToLobbyDelayAfterSettlement; }
+	float GetReturnToLobbyDelayAfterSettlement() const;
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Extraction")
 	void SetReturnToLobbyServerTravelEnabled(bool bEnabled);
@@ -126,20 +126,8 @@ protected:
 	UFUNCTION(BlueprintPure, Category = "Rift|Mission")
 	int32 CountAlivePlayers() const;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Mission", meta = (ClampMin = "0.0", ClampMax = "100.0"))
-	float InitialRiftStability = 100.0f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Mission", meta = (ClampMin = "0.0"))
-	float RiftStabilityDrainPerSecond = 1.0f;
-
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Extraction")
 	FString ReturnToLobbyMapPath = TEXT("/Game/ProjectRift/Maps/L_ShipLobby");
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Extraction", meta = (ClampMin = "0.0"))
-	float ReturnToLobbyDelayAfterSettlement = 4.0f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Resources", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float FailedResourceRetentionRate = 0.5f;
 
 private:
 	bool CheckFailureConditions();

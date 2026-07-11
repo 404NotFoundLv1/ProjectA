@@ -9,12 +9,12 @@
 #include "Abilities/PRDefaultAttributesGameplayEffect.h"
 #include "Abilities/PRAttributeSet.h"
 #include "Components/TextRenderComponent.h"
+#include "Core/PRGameplayTags.h"
 #include "EnhancedInputComponent.h"
 #include "Engine/Engine.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerState.h"
 #include "GameplayAbilitySpec.h"
-#include "GameplayTagsManager.h"
 #include "InputAction.h"
 #include "Player/PRPlayerController.h"
 #include "Player/PRPlayerState.h"
@@ -270,7 +270,7 @@ bool APRCharacter::GrantDefaultAbilities()
 		return false;
 	}
 
-	const FGameplayTag PrimaryInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Primary"), false);
+	const FGameplayTag PrimaryInputTag = ProjectRiftGameplayTags::Input_Ability_Primary;
 	bool bGrantedAnyAbility = false;
 	for (const TSubclassOf<UGameplayAbility> AbilityClass : DefaultAbilityClasses)
 	{
@@ -324,9 +324,9 @@ bool APRCharacter::GrantSelectedRoleModuleAbilities()
 		return false;
 	}
 
-	const FGameplayTag QInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.Q"), false);
-	const FGameplayTag EInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.E"), false);
-	const FGameplayTag RInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.R"), false);
+	const FGameplayTag QInputTag = ProjectRiftGameplayTags::Input_Ability_Skill_Q;
+	const FGameplayTag EInputTag = ProjectRiftGameplayTags::Input_Ability_Skill_E;
+	const FGameplayTag RInputTag = ProjectRiftGameplayTags::Input_Ability_Skill_R;
 
 	bool bGrantedAllAbilities = true;
 	bGrantedAllAbilities &= GrantAbilityIfMissing(AssaultChargeAbilityClass, QInputTag);
@@ -388,7 +388,7 @@ bool APRCharacter::EnterDownedState()
 		return true;
 	}
 
-	const FGameplayTag DownedStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Downed"), false);
+	const FGameplayTag DownedStateTag = ProjectRiftGameplayTags::State_Downed;
 	if (DownedStateTag.IsValid())
 	{
 		AbilitySystemComponent->AddLooseGameplayTag(DownedStateTag, 1, EGameplayTagReplicationState::TagOnly);
@@ -420,8 +420,8 @@ bool APRCharacter::RespawnFromDowned()
 
 	ClearAutoRespawnTimer();
 
-	const FGameplayTag DownedStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Downed"), false);
-	const FGameplayTag DeadStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Dead"), false);
+	const FGameplayTag DownedStateTag = ProjectRiftGameplayTags::State_Downed;
+	const FGameplayTag DeadStateTag = ProjectRiftGameplayTags::State_Dead;
 	if (DownedStateTag.IsValid())
 	{
 		AbilitySystemComponent->RemoveLooseGameplayTag(DownedStateTag, 1, EGameplayTagReplicationState::TagOnly);
@@ -450,7 +450,7 @@ bool APRCharacter::IsDowned() const
 		return false;
 	}
 
-	const FGameplayTag DownedStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Downed"), false);
+	const FGameplayTag DownedStateTag = ProjectRiftGameplayTags::State_Downed;
 	return DownedStateTag.IsValid() && AbilitySystemComponent->HasMatchingGameplayTag(DownedStateTag);
 }
 
@@ -707,13 +707,13 @@ void APRCharacter::DoPrimaryAttack()
 {
 	ShowInputDebugMessage(this, TEXT("PrimaryAttack"));
 
-	const FGameplayTag PrimaryInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Primary"), false);
+	const FGameplayTag PrimaryInputTag = ProjectRiftGameplayTags::Input_Ability_Primary;
 	ActivateAbilityInputTag(PrimaryInputTag, TEXT("PrimaryAttack"));
 }
 
 void APRCharacter::DoPrimaryAttackReleased()
 {
-	const FGameplayTag PrimaryInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Primary"), false);
+	const FGameplayTag PrimaryInputTag = ProjectRiftGameplayTags::Input_Ability_Primary;
 	ReleaseAbilityInputTag(PrimaryInputTag, TEXT("PrimaryAttack"));
 }
 
@@ -725,39 +725,39 @@ void APRCharacter::DoDodge()
 void APRCharacter::DoSkillQ()
 {
 	ShowInputDebugMessage(this, TEXT("Skill Q"));
-	const FGameplayTag QInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.Q"), false);
+	const FGameplayTag QInputTag = ProjectRiftGameplayTags::Input_Ability_Skill_Q;
 	ActivateAbilityInputTag(QInputTag, TEXT("Skill Q"));
 }
 
 void APRCharacter::DoSkillQReleased()
 {
-	const FGameplayTag QInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.Q"), false);
+	const FGameplayTag QInputTag = ProjectRiftGameplayTags::Input_Ability_Skill_Q;
 	ReleaseAbilityInputTag(QInputTag, TEXT("Skill Q"));
 }
 
 void APRCharacter::DoSkillE()
 {
 	ShowInputDebugMessage(this, TEXT("Skill E"));
-	const FGameplayTag EInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.E"), false);
+	const FGameplayTag EInputTag = ProjectRiftGameplayTags::Input_Ability_Skill_E;
 	ActivateAbilityInputTag(EInputTag, TEXT("Skill E"));
 }
 
 void APRCharacter::DoSkillEReleased()
 {
-	const FGameplayTag EInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.E"), false);
+	const FGameplayTag EInputTag = ProjectRiftGameplayTags::Input_Ability_Skill_E;
 	ReleaseAbilityInputTag(EInputTag, TEXT("Skill E"));
 }
 
 void APRCharacter::DoSkillR()
 {
 	ShowInputDebugMessage(this, TEXT("Skill R"));
-	const FGameplayTag RInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.R"), false);
+	const FGameplayTag RInputTag = ProjectRiftGameplayTags::Input_Ability_Skill_R;
 	ActivateAbilityInputTag(RInputTag, TEXT("Skill R"));
 }
 
 void APRCharacter::DoSkillRReleased()
 {
-	const FGameplayTag RInputTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Input.Ability.Skill.R"), false);
+	const FGameplayTag RInputTag = ProjectRiftGameplayTags::Input_Ability_Skill_R;
 	ReleaseAbilityInputTag(RInputTag, TEXT("Skill R"));
 }
 

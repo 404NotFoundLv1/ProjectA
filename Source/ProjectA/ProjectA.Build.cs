@@ -21,6 +21,7 @@ public class ProjectA : ModuleRules
 			"GameplayAbilities",
 			"GameplayTags",
 			"GameplayTasks",
+			"DeveloperSettings",
 			"NetCore",
 			"UMG",
 			"Slate",

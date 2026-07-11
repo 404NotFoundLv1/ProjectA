@@ -5,10 +5,10 @@
 #include "Abilities/PRAbilitySystemComponent.h"
 #include "Abilities/PRAttributeSet.h"
 #include "Characters/PRCharacter.h"
+#include "Core/PRGameplayTags.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameplayEffect.h"
-#include "GameplayTagsManager.h"
 #include "Player/PRPlayerState.h"
 #include "Tests/AutomationCommon.h"
 #include "UObject/StrongObjectPtr.h"
@@ -49,7 +49,7 @@ bool ApplyDamageForDownedRespawnTest(FAutomationTestBase& Test, APRPlayerState* 
 		return false;
 	}
 
-	const FGameplayTag DamageTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Data.Damage"), false);
+	const FGameplayTag DamageTag = ProjectRiftGameplayTags::Data_Damage;
 	Test.TestTrue(TEXT("Data.Damage SetByCaller tag exists"), DamageTag.IsValid());
 	if (!DamageTag.IsValid())
 	{
@@ -130,7 +130,7 @@ bool FPRGASDownedRespawnTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
-	const FGameplayTag DownedStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Downed"), false);
+	const FGameplayTag DownedStateTag = ProjectRiftGameplayTags::State_Downed;
 	TestTrue(TEXT("State.Downed tag is configured"), DownedStateTag.IsValid());
 
 	AttackerAttributes->SetHealth(40.0f);

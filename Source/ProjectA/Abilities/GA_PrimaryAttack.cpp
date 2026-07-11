@@ -3,12 +3,12 @@
 #include "Abilities/PRDamageGameplayEffect.h"
 #include "Abilities/PRAbilitySystemComponent.h"
 #include "Characters/PRCharacter.h"
+#include "Core/PRGameplayTags.h"
 #include "DrawDebugHelpers.h"
 #include "Enemies/PREnemyCharacter.h"
 #include "Engine/OverlapResult.h"
 #include "GameplayAbilitySpec.h"
 #include "GameplayEffect.h"
-#include "GameplayTagsManager.h"
 #include "ProjectA.h"
 
 UGA_PrimaryAttack::UGA_PrimaryAttack()
@@ -18,13 +18,13 @@ UGA_PrimaryAttack::UGA_PrimaryAttack()
 	DamageAmount = 10.0f;
 	DamageEffectClass = UPRDamageGameplayEffect::StaticClass();
 
-	const FGameplayTag DeadStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Dead"), false);
+	const FGameplayTag DeadStateTag = ProjectRiftGameplayTags::State_Dead;
 	if (DeadStateTag.IsValid())
 	{
 		ActivationBlockedTags.AddTag(DeadStateTag);
 	}
 
-	const FGameplayTag DownedStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Downed"), false);
+	const FGameplayTag DownedStateTag = ProjectRiftGameplayTags::State_Downed;
 	if (DownedStateTag.IsValid())
 	{
 		ActivationBlockedTags.AddTag(DownedStateTag);
@@ -44,13 +44,13 @@ bool UGA_PrimaryAttack::CanActivateAbility(
 	}
 
 	const UAbilitySystemComponent* AbilitySystemComponent = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
-	const FGameplayTag DeadStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Dead"), false);
+	const FGameplayTag DeadStateTag = ProjectRiftGameplayTags::State_Dead;
 	if (DeadStateTag.IsValid() && AbilitySystemComponent && AbilitySystemComponent->HasMatchingGameplayTag(DeadStateTag))
 	{
 		return false;
 	}
 
-	const FGameplayTag DownedStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Downed"), false);
+	const FGameplayTag DownedStateTag = ProjectRiftGameplayTags::State_Downed;
 	return !DownedStateTag.IsValid() || !AbilitySystemComponent || !AbilitySystemComponent->HasMatchingGameplayTag(DownedStateTag);
 }
 
@@ -164,7 +164,7 @@ bool UGA_PrimaryAttack::ExecuteServerAttack(
 			return false;
 		}
 
-		const FGameplayTag DamageTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("Data.Damage"), false);
+		const FGameplayTag DamageTag = ProjectRiftGameplayTags::Data_Damage;
 		if (!DamageTag.IsValid())
 		{
 			UE_LOG(LogProjectA, Warning, TEXT("Primary attack skipped for %s: Data.Damage tag is missing."), *GetNameSafe(AvatarActor));

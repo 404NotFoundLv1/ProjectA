@@ -1,6 +1,8 @@
 #include "Core/PRHoldObjectiveActor.h"
 
 #include "Net/UnrealNetwork.h"
+#include "ProjectA.h"
+#include "Settings/PRProjectSettings.h"
 
 APRHoldObjectiveActor::APRHoldObjectiveActor()
 {
@@ -16,7 +18,7 @@ void APRHoldObjectiveActor::Tick(const float DeltaSeconds)
 		return;
 	}
 
-	const float SafeHoldDuration = FMath::Max(0.1f, HoldDuration);
+	const float SafeHoldDuration = GetHoldDuration();
 	SetCurrentHoldTime(CurrentHoldTime + DeltaSeconds);
 	SetObjectiveProgress(CurrentHoldTime / SafeHoldDuration);
 
@@ -24,6 +26,18 @@ void APRHoldObjectiveActor::Tick(const float DeltaSeconds)
 	{
 		CompleteObjective();
 	}
+}
+
+float APRHoldObjectiveActor::GetHoldDuration() const
+{
+	const UPRProjectSettings* ProjectSettings = GetDefault<UPRProjectSettings>();
+	if (!ProjectSettings)
+	{
+		UE_LOG(LogProjectA, Error, TEXT("ProjectRift project settings are unavailable while reading the hold objective duration; using the code default."));
+	}
+	return ProjectSettings
+		? FMath::Max(0.1f, ProjectSettings->ObjectiveHoldDuration)
+		: 30.0f;
 }
 
 void APRHoldObjectiveActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -45,5 +59,5 @@ void APRHoldObjectiveActor::OnRep_CurrentHoldTime()
 
 void APRHoldObjectiveActor::SetCurrentHoldTime(const float InCurrentHoldTime)
 {
-	CurrentHoldTime = FMath::Clamp(InCurrentHoldTime, 0.0f, FMath::Max(0.1f, HoldDuration));
+	CurrentHoldTime = FMath::Clamp(InCurrentHoldTime, 0.0f, GetHoldDuration());
 }

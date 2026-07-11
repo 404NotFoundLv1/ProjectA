@@ -2,15 +2,19 @@
 
 #include "Misc/AutomationTest.h"
 
+#include "Components/SphereComponent.h"
 #include "Components/WidgetComponent.h"
+#include "Core/PRHoldObjectiveActor.h"
 #include "Core/PRRiftGameMode.h"
 #include "Core/PRRiftGameState.h"
+#include "Core/PRRiftObjectiveActor.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/DefaultPawn.h"
 #include "GameFramework/WorldSettings.h"
 #include "Player/PRPlayerController.h"
 #include "Tests/AutomationCommon.h"
+#include "Tests/PRProjectSettingsTestUtils.h"
 #include "UObject/StructOnScope.h"
 #include "UObject/UnrealType.h"
 
@@ -107,6 +111,10 @@ uint8 GetRiftObjectiveEnumProperty(const UObject* Target, const FName PropertyNa
 
 bool FPRRiftObjectiveSystemTest::RunTest(const FString& Parameters)
 {
+	ProjectRiftTests::FScopedProjectSettingsOverride SettingsOverride;
+	SettingsOverride->ObjectiveHoldDuration = 10.0f;
+	SettingsOverride->ObjectiveInteractionRadius = 175.0f;
+
 	UClass* RiftObjectiveClass = LoadRiftObjectiveTestClass(TEXT("PRRiftObjectiveActor"), AActor::StaticClass());
 	UClass* HoldObjectiveClass = LoadRiftObjectiveTestClass(TEXT("PRHoldObjectiveActor"), AActor::StaticClass());
 
@@ -124,6 +132,8 @@ bool FPRRiftObjectiveSystemTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Objective exposes GetInteractionPromptText"), RiftObjectiveClass->FindFunctionByName(TEXT("GetInteractionPromptText")));
 	TestNotNull(TEXT("Hold objective exposes GetHoldDuration"), HoldObjectiveClass->FindFunctionByName(TEXT("GetHoldDuration")));
 	TestNotNull(TEXT("Hold objective exposes GetCurrentHoldTime"), HoldObjectiveClass->FindFunctionByName(TEXT("GetCurrentHoldTime")));
+	TestNull(TEXT("Interaction radius is no longer an Objective Actor property"), RiftObjectiveClass->FindPropertyByName(TEXT("InteractionRadius")));
+	TestNull(TEXT("Hold duration is no longer a Hold Objective Actor property"), HoldObjectiveClass->FindPropertyByName(TEXT("HoldDuration")));
 
 	TestRiftObjectiveReplicatedProperty(*this, RiftObjectiveClass, TEXT("ObjectiveState"));
 	TestRiftObjectiveReplicatedProperty(*this, RiftObjectiveClass, TEXT("ObjectiveProgress"));
@@ -212,6 +222,26 @@ bool FPRRiftObjectiveSystemTest::RunTest(const FString& Parameters)
 	{
 		return false;
 	}
+	APRHoldObjectiveActor* TypedHoldObjective = Cast<APRHoldObjectiveActor>(HoldObjective);
+	const USphereComponent* RuntimeInteractionSphere = FindObject<USphereComponent>(HoldObjective, TEXT("InteractionSphere"));
+	TestEqual(TEXT("Objective getter uses project settings radius"), TypedHoldObjective ? TypedHoldObjective->GetInteractionRadius() : 0.0f, 175.0f);
+	TestEqual(TEXT("Objective interaction sphere uses project settings radius"), RuntimeInteractionSphere ? RuntimeInteractionSphere->GetUnscaledSphereRadius() : 0.0f, 175.0f);
+	TestEqual(TEXT("Hold duration getter uses project settings"), TypedHoldObjective ? TypedHoldObjective->GetHoldDuration() : 0.0f, 10.0f);
+	SettingsOverride->ObjectiveInteractionRadius = -50.0f;
+	if (TypedHoldObjective)
+	{
+		TypedHoldObjective->OnConstruction(TypedHoldObjective->GetActorTransform());
+	}
+	TestEqual(TEXT("Objective interaction radius clamps to one"), TypedHoldObjective ? TypedHoldObjective->GetInteractionRadius() : 0.0f, 1.0f);
+	TestEqual(TEXT("Objective sphere applies the clamped radius"), RuntimeInteractionSphere ? RuntimeInteractionSphere->GetUnscaledSphereRadius() : 0.0f, 1.0f);
+	SettingsOverride->ObjectiveInteractionRadius = 175.0f;
+	if (TypedHoldObjective)
+	{
+		TypedHoldObjective->OnConstruction(TypedHoldObjective->GetActorTransform());
+	}
+	SettingsOverride->ObjectiveHoldDuration = 0.0f;
+	TestEqual(TEXT("Hold duration clamps to one tenth of a second"), TypedHoldObjective ? TypedHoldObjective->GetHoldDuration() : 0.0f, 0.1f);
+	SettingsOverride->ObjectiveHoldDuration = 10.0f;
 
 	ADefaultPawn* NearbyPawn = World->SpawnActor<ADefaultPawn>(FVector(140.0f, 0.0f, 0.0f), FRotator::ZeroRotator);
 	TestNotNull(TEXT("Can spawn nearby pawn for objective prompt"), NearbyPawn);
@@ -296,12 +326,12 @@ bool FPRRiftObjectiveSystemTest::RunTest(const FString& Parameters)
 		TEXT("Active objective prompt component stays visible near the local player"),
 		RuntimeObjectivePromptWidget && RuntimeObjectivePromptWidget->IsVisible());
 
-	HoldObjective->Tick(15.0f);
-	TestEqual(TEXT("Hold objective tracks elapsed hold time"), GetRiftObjectiveFloatProperty(HoldObjective, TEXT("CurrentHoldTime")), 15.0f);
+	HoldObjective->Tick(5.0f);
+	TestEqual(TEXT("Hold objective tracks elapsed hold time"), GetRiftObjectiveFloatProperty(HoldObjective, TEXT("CurrentHoldTime")), 5.0f);
 	TestEqual(TEXT("Hold objective reports half progress"), GetRiftObjectiveFloatProperty(HoldObjective, TEXT("ObjectiveProgress")), 0.5f);
 	TestEqual(TEXT("GameState replicates half objective progress"), GetRiftObjectiveFloatProperty(RiftGameState, TEXT("ObjectiveProgress")), 0.5f);
 
-	HoldObjective->Tick(15.1f);
+	HoldObjective->Tick(5.1f);
 	TestEqual(TEXT("Hold objective completes at full progress"), GetRiftObjectiveFloatProperty(HoldObjective, TEXT("ObjectiveProgress")), 1.0f);
 	TestEqual(TEXT("Objective completes after hold duration"), GetRiftObjectiveEnumProperty(HoldObjective, TEXT("ObjectiveState")), static_cast<uint8>(EPRRiftObjectiveState::Completed));
 	TestEqual(TEXT("GameState objective completes"), static_cast<uint8>(RiftGameState->GetCurrentObjectiveState()), static_cast<uint8>(EPRRiftObjectiveState::Completed));

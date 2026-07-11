@@ -4,12 +4,14 @@
 
 #include "Core/PRRiftGameMode.h"
 #include "Core/PRRiftGameState.h"
+#include "Core/PRSpawnManager.h"
 #include "Enemies/PREnemyCharacter.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/WorldSettings.h"
 #include "Tests/AutomationCommon.h"
+#include "Tests/PRProjectSettingsTestUtils.h"
 #include "UObject/StructOnScope.h"
 #include "UObject/UnrealType.h"
 
@@ -21,30 +23,6 @@ UClass* LoadRiftSpawnRuntimeClass(const TCHAR* ClassName, UClass* ExpectedBaseCl
 {
 	const FString ClassPath = FString::Printf(TEXT("/Script/ProjectA.%s"), ClassName);
 	return StaticLoadClass(ExpectedBaseClass, nullptr, *ClassPath);
-}
-
-bool SetIntPropertyValue(UObject* Target, const FName PropertyName, const int32 Value)
-{
-	FIntProperty* Property = Target ? FindFProperty<FIntProperty>(Target->GetClass(), PropertyName) : nullptr;
-	if (!Property)
-	{
-		return false;
-	}
-
-	Property->SetPropertyValue_InContainer(Target, Value);
-	return true;
-}
-
-bool SetFloatPropertyValue(UObject* Target, const FName PropertyName, const float Value)
-{
-	FFloatProperty* Property = Target ? FindFProperty<FFloatProperty>(Target->GetClass(), PropertyName) : nullptr;
-	if (!Property)
-	{
-		return false;
-	}
-
-	Property->SetPropertyValue_InContainer(Target, Value);
-	return true;
 }
 
 bool CallBoolFunctionNoParams(UObject* Target, const FName FunctionName, bool& bOutResult)
@@ -157,6 +135,12 @@ int32 CountPlacedActorsOfClass(const UWorld* World, const UClass* ActorClass)
 
 bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 {
+	ProjectRiftTests::FScopedProjectSettingsOverride SettingsOverride;
+	SettingsOverride->BaseEnemiesPerWave = 1;
+	SettingsOverride->EnemiesPerAdditionalPlayer = 1;
+	SettingsOverride->MaxAliveEnemies = 3;
+	SettingsOverride->WaveInterval = 0.2f;
+
 	UClass* SpawnManagerClass = LoadRiftSpawnRuntimeClass(TEXT("PRSpawnManager"), AActor::StaticClass());
 	UClass* SpawnPointClass = LoadRiftSpawnRuntimeClass(TEXT("PREnemySpawnPoint"), AActor::StaticClass());
 	UClass* RiftGameModeClass = APRRiftGameMode::StaticClass();
@@ -197,6 +181,10 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("APREnemySpawnPoint exposes GetSpawnTransform"), SpawnPointClass->FindFunctionByName(TEXT("GetSpawnTransform")));
 	TestNotNull(TEXT("APRRiftGameMode exposes StartSpawnManagersForObjective"), RiftGameModeClass->FindFunctionByName(TEXT("StartSpawnManagersForObjective")));
 	TestNotNull(TEXT("APRRiftGameMode exposes StopSpawnManagers"), RiftGameModeClass->FindFunctionByName(TEXT("StopSpawnManagers")));
+	TestNull(TEXT("Base enemies is no longer a SpawnManager Actor property"), SpawnManagerClass->FindPropertyByName(TEXT("BaseEnemiesPerWave")));
+	TestNull(TEXT("Additional enemies is no longer a SpawnManager Actor property"), SpawnManagerClass->FindPropertyByName(TEXT("EnemiesPerAdditionalPlayer")));
+	TestNull(TEXT("Max alive is no longer a SpawnManager Actor property"), SpawnManagerClass->FindPropertyByName(TEXT("MaxAliveEnemies")));
+	TestNull(TEXT("Wave interval is no longer a SpawnManager Actor property"), SpawnManagerClass->FindPropertyByName(TEXT("WaveInterval")));
 
 	UFunction* StartSpawningFunction = SpawnManagerClass->FindFunctionByName(TEXT("StartSpawningForObjective"));
 	TestTrue(
@@ -263,11 +251,6 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
-	TestTrue(TEXT("Can configure base enemies per wave"), SetIntPropertyValue(SpawnManager, TEXT("BaseEnemiesPerWave"), 1));
-	TestTrue(TEXT("Can configure enemies per extra player"), SetIntPropertyValue(SpawnManager, TEXT("EnemiesPerAdditionalPlayer"), 1));
-	TestTrue(TEXT("Can configure max alive enemies"), SetIntPropertyValue(SpawnManager, TEXT("MaxAliveEnemies"), 3));
-	TestTrue(TEXT("Can configure wave interval"), SetFloatPropertyValue(SpawnManager, TEXT("WaveInterval"), 0.2f));
-
 	bool bActiveBeforeObjective = true;
 	TestTrue(TEXT("Can query inactive spawn manager state"), CallBoolFunctionNoParams(SpawnManager, TEXT("IsSpawningActive"), bActiveBeforeObjective));
 	TestFalse(TEXT("Spawn manager starts inactive"), bActiveBeforeObjective);
@@ -324,6 +307,36 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 	bool bWaveTimerActiveAfterStop = true;
 	TestTrue(TEXT("Can query stopped wave timer state"), CallBoolFunctionNoParams(SpawnManager, TEXT("IsWaveTimerActive"), bWaveTimerActiveAfterStop));
 	TestFalse(TEXT("Wave timer is cleared when spawning stops"), bWaveTimerActiveAfterStop);
+
+	SettingsOverride->BaseEnemiesPerWave = -4;
+	SettingsOverride->EnemiesPerAdditionalPlayer = -3;
+	SettingsOverride->MaxAliveEnemies = 8;
+	SettingsOverride->WaveInterval = -1.0f;
+	APRSpawnManager* ClampedSpawnManager = World->SpawnActor<APRSpawnManager>(FVector(1200.0f, 0.0f, 0.0f), FRotator::ZeroRotator);
+	TestNotNull(TEXT("Can spawn manager for invalid settings clamp coverage"), ClampedSpawnManager);
+	if (!ClampedSpawnManager)
+	{
+		return false;
+	}
+
+	TestTrue(TEXT("Spawn manager starts with invalid settings safely clamped"), ClampedSpawnManager->StartSpawningForObjective(nullptr));
+	TestEqual(TEXT("Negative base and additional enemy counts clamp to zero"), ClampedSpawnManager->GetAliveEnemyCount(), 0);
+	SettingsOverride->BaseEnemiesPerWave = 1;
+	SettingsOverride->EnemiesPerAdditionalPlayer = -3;
+	SettingsOverride->MaxAliveEnemies = 2;
+	TestTrue(TEXT("Wave timer remains active after clamping an invalid interval"), ClampedSpawnManager->IsWaveTimerActive());
+	TestEqual(TEXT("A manual wave can run after invalid settings are clamped"), ClampedSpawnManager->SpawnWave(), 1);
+	TestEqual(TEXT("First clamped manual wave increments the wave count"), ClampedSpawnManager->GetSpawnedWaveCount(), 1);
+	TestEqual(TEXT("Negative additional enemy scaling clamps to zero"), ClampedSpawnManager->GetAliveEnemyCount(), 1);
+	ClampedSpawnManager->StopSpawning();
+
+	SettingsOverride->BaseEnemiesPerWave = 5;
+	SettingsOverride->EnemiesPerAdditionalPlayer = 5;
+	SettingsOverride->MaxAliveEnemies = 0;
+	SettingsOverride->WaveInterval = 0.2f;
+	TestTrue(TEXT("Spawn manager restarts for alive-cap clamp coverage"), ClampedSpawnManager->StartSpawningForObjective(nullptr));
+	TestEqual(TEXT("Invalid max alive enemy setting clamps to one"), ClampedSpawnManager->GetAliveEnemyCount(), 1);
+	ClampedSpawnManager->StopSpawning();
 
 	return true;
 }

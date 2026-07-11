@@ -6,9 +6,9 @@
 #include "Abilities/PRAbilitySystemComponent.h"
 #include "Abilities/PRAttributeSet.h"
 #include "Characters/PRCharacter.h"
+#include "Core/PRGameplayTags.h"
 #include "GameplayAbilitySpec.h"
 #include "GameplayEffect.h"
-#include "GameplayTagsManager.h"
 #include "GameFramework/PlayerController.h"
 #include "Player/PRPlayerState.h"
 #include "Tests/AutomationCommon.h"
@@ -124,7 +124,7 @@ bool FPRGASPrimaryAttackAbilityTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Primary attack lowers target shield first"), TargetAttributes->GetShield(), 40.0f);
 	TestEqual(TEXT("Primary attack leaves health while shield absorbs damage"), TargetAttributes->GetHealth(), 100.0f);
 
-	const FGameplayTag DeadStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Dead"), false);
+	const FGameplayTag DeadStateTag = ProjectRiftGameplayTags::State_Dead;
 	TestTrue(TEXT("Dead state tag is configured"), DeadStateTag.IsValid());
 	if (DeadStateTag.IsValid())
 	{

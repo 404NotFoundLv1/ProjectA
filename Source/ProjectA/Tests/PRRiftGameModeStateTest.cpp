@@ -18,6 +18,7 @@
 #include "GameFramework/WorldSettings.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Player/PRPlayerState.h"
+#include "Tests/PRProjectSettingsTestUtils.h"
 #include "Tests/AutomationCommon.h"
 #include "UObject/UnrealType.h"
 
@@ -68,6 +69,12 @@ bool GetBoolPropertyValue(const UObject* Target, const FName PropertyName)
 
 bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 {
+	ProjectRiftTests::FScopedProjectSettingsOverride SettingsOverride;
+	SettingsOverride->InitialRiftStability = 87.5f;
+	SettingsOverride->RiftStabilityDrainPerSecond = 2.0f;
+	SettingsOverride->FailedResourceRetentionRate = 0.25f;
+	SettingsOverride->ReturnToLobbyDelayAfterSettlement = 0.25f;
+
 	UClass* RiftGameModeClass = LoadProjectRiftRuntimeClass(TEXT("PRRiftGameMode"), AGameModeBase::StaticClass());
 	UClass* RiftGameStateClass = LoadProjectRiftRuntimeClass(TEXT("PRRiftGameState"), AGameStateBase::StaticClass());
 
@@ -97,7 +104,11 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("APRRiftGameMode exposes GetCurrentRunId"), RiftGameModeClass->FindFunctionByName(TEXT("GetCurrentRunId")));
 	TestNotNull(TEXT("APRRiftGameMode exposes GetCurrentSettlementId"), RiftGameModeClass->FindFunctionByName(TEXT("GetCurrentSettlementId")));
 	TestNotNull(TEXT("APRRiftGameMode exposes GetMissionId"), RiftGameModeClass->FindFunctionByName(TEXT("GetMissionId")));
-	TestNotNull(TEXT("APRRiftGameMode exposes configurable rift stability drain"), FindFProperty<FFloatProperty>(RiftGameModeClass, TEXT("RiftStabilityDrainPerSecond")));
+	TestNull(TEXT("Initial stability is no longer an Actor property"), RiftGameModeClass->FindPropertyByName(TEXT("InitialRiftStability")));
+	TestNull(TEXT("Stability drain is no longer an Actor property"), RiftGameModeClass->FindPropertyByName(TEXT("RiftStabilityDrainPerSecond")));
+	TestNull(TEXT("Failed retention is no longer an Actor property"), RiftGameModeClass->FindPropertyByName(TEXT("FailedResourceRetentionRate")));
+	TestNull(TEXT("Return delay is no longer an Actor property"), RiftGameModeClass->FindPropertyByName(TEXT("ReturnToLobbyDelayAfterSettlement")));
+	TestNotNull(TEXT("APRRiftGameMode keeps its return delay getter"), RiftGameModeClass->FindFunctionByName(TEXT("GetReturnToLobbyDelayAfterSettlement")));
 
 	TestReplicatedProperty(*this, RiftGameStateClass, TEXT("CurrentObjectiveState"));
 	TestReplicatedProperty(*this, RiftGameStateClass, TEXT("RiftStability"));
@@ -175,7 +186,7 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	{
 		TestEqual(TEXT("Game default map is ship lobby"), Maps->GetGameDefaultMap(), FString(TEXT("/Game/ProjectRift/Maps/L_ShipLobby")));
 		TestEqual(TEXT("Project name is ProjectRift"), Project->ProjectName, FString(TEXT("ProjectRift")));
-		TestEqual(TEXT("Project version is v0.5.0"), Project->ProjectVersion, FString(TEXT("0.5.0")));
+		TestEqual(TEXT("Project version is v0.5.1"), Project->ProjectVersion, FString(TEXT("0.5.1")));
 	}
 
 	TArray<FString> MapsToCook;
@@ -219,13 +230,31 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	{
 		return false;
 	}
+	TestEqual(TEXT("Mission starts from project settings stability"), StabilityGameState->GetRiftStability(), 87.5f);
+	TestEqual(TEXT("Return delay comes from project settings"), StabilityGameMode->GetReturnToLobbyDelayAfterSettlement(), 0.25f);
+	SettingsOverride->ReturnToLobbyDelayAfterSettlement = -2.0f;
+	TestEqual(TEXT("Negative return delay clamps to zero"), StabilityGameMode->GetReturnToLobbyDelayAfterSettlement(), 0.0f);
+	SettingsOverride->ReturnToLobbyDelayAfterSettlement = 0.25f;
+	SettingsOverride->FailedResourceRetentionRate = 2.0f;
+	TestEqual(TEXT("Failed retention clamps above one"), StabilityGameMode->CalculateRetainedResourceCount(4, EPRRiftMissionResult::Failed), 4);
+	SettingsOverride->FailedResourceRetentionRate = -1.0f;
+	TestEqual(TEXT("Failed retention clamps below zero"), StabilityGameMode->CalculateRetainedResourceCount(4, EPRRiftMissionResult::Failed), 0);
+	SettingsOverride->FailedResourceRetentionRate = 0.25f;
 
 	const FGuid FirstRunId = StabilityGameMode->GetCurrentRunId();
 	TestTrue(TEXT("BeginPlay creates a valid run id"), FirstRunId.IsValid());
 	TestTrue(TEXT("Mission owns a valid settlement id"), StabilityGameMode->GetCurrentSettlementId().IsValid());
 	TestFalse(TEXT("Mission id is configured"), StabilityGameMode->GetMissionId().IsNone());
-	TestTrue(TEXT("Restarting the mission succeeds"), StabilityGameMode->StartRiftMission());
+	SettingsOverride->InitialRiftStability = 150.0f;
+	TestTrue(TEXT("Restarting with high stability succeeds"), StabilityGameMode->StartRiftMission());
+	TestEqual(TEXT("Initial stability clamps above 100"), StabilityGameState->GetRiftStability(), 100.0f);
 	TestNotEqual(TEXT("Restarting rotates the run id"), StabilityGameMode->GetCurrentRunId(), FirstRunId);
+	SettingsOverride->InitialRiftStability = -10.0f;
+	TestTrue(TEXT("Restarting with negative stability succeeds"), StabilityGameMode->StartRiftMission());
+	TestEqual(TEXT("Initial stability clamps below zero"), StabilityGameState->GetRiftStability(), 0.0f);
+	SettingsOverride->InitialRiftStability = 87.5f;
+	TestTrue(TEXT("Restoring approved test stability succeeds"), StabilityGameMode->StartRiftMission());
+	TestEqual(TEXT("Restored initial stability is applied"), StabilityGameState->GetRiftStability(), 87.5f);
 
 	APREnemyCharacter* CountedEnemy = StabilityWorld->SpawnActor<APREnemyCharacter>();
 	TestNotNull(TEXT("Can spawn enemy for duplicate kill test"), CountedEnemy);
@@ -239,7 +268,12 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	StabilityGameMode->SetReturnToLobbyServerTravelEnabled(false);
 	StabilityGameState->SetCurrentObjectiveState(EPRRiftObjectiveState::Active);
 	StabilityGameState->SetRiftStability(1.0f);
-	StabilityGameMode->Tick(2.0f);
+	SettingsOverride->RiftStabilityDrainPerSecond = -1.0f;
+	StabilityGameMode->Tick(0.75f);
+	TestEqual(TEXT("Negative stability drain clamps to zero"), StabilityGameState->GetRiftStability(), 1.0f);
+	TestFalse(TEXT("Clamped negative drain does not fail the mission"), StabilityGameState->IsSettlementReady());
+	SettingsOverride->RiftStabilityDrainPerSecond = 2.0f;
+	StabilityGameMode->Tick(0.75f);
 	TestTrue(TEXT("Stability depletion produces a settlement"), StabilityGameState->IsSettlementReady());
 	TestEqual(TEXT("Stability depletion fails the mission"), StabilityGameState->GetSettlementData().Result, EPRRiftMissionResult::Failed);
 	TestEqual(TEXT("Stability depletion marks the objective failed"), StabilityGameState->GetCurrentObjectiveState(), EPRRiftObjectiveState::Failed);

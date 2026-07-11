@@ -2,7 +2,7 @@
 
 #include "AbilitySystemComponent.h"
 #include "Abilities/PRAttributeSet.h"
-#include "GameplayTagsManager.h"
+#include "Core/PRGameplayTags.h"
 
 namespace
 {
@@ -13,13 +13,13 @@ bool HasAnyBlockedLifeState(const UAbilitySystemComponent* AbilitySystemComponen
 		return true;
 	}
 
-	const FGameplayTag DeadStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Dead"), false);
+	const FGameplayTag DeadStateTag = ProjectRiftGameplayTags::State_Dead;
 	if (DeadStateTag.IsValid() && AbilitySystemComponent->HasMatchingGameplayTag(DeadStateTag))
 	{
 		return true;
 	}
 
-	const FGameplayTag DownedStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Downed"), false);
+	const FGameplayTag DownedStateTag = ProjectRiftGameplayTags::State_Downed;
 	return DownedStateTag.IsValid() && AbilitySystemComponent->HasMatchingGameplayTag(DownedStateTag);
 }
 }
@@ -30,13 +30,13 @@ UGA_AssaultGameplayAbility::UGA_AssaultGameplayAbility()
 	CooldownSeconds = 0.0f;
 	LastActivationTime = -1.0;
 
-	const FGameplayTag DeadStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Dead"), false);
+	const FGameplayTag DeadStateTag = ProjectRiftGameplayTags::State_Dead;
 	if (DeadStateTag.IsValid())
 	{
 		ActivationBlockedTags.AddTag(DeadStateTag);
 	}
 
-	const FGameplayTag DownedStateTag = UGameplayTagsManager::Get().RequestGameplayTag(TEXT("State.Downed"), false);
+	const FGameplayTag DownedStateTag = ProjectRiftGameplayTags::State_Downed;
 	if (DownedStateTag.IsValid())
 	{
 		ActivationBlockedTags.AddTag(DownedStateTag);
