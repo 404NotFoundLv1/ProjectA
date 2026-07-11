@@ -17,6 +17,15 @@ struct PROJECTA_API FPRRiftSettlementData
 	GENERATED_BODY()
 
 	UPROPERTY(BlueprintReadOnly, Category = "Rift|Settlement")
+	FName MissionId = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Rift|Settlement")
+	FGuid RunId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Rift|Settlement")
+	FGuid SettlementId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Rift|Settlement")
 	EPRRiftMissionResult Result = EPRRiftMissionResult::None;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Rift|Settlement", meta = (ClampMin = "0.0"))

@@ -29,6 +29,22 @@ void APRRiftGameMode::BeginPlay()
 	StartRiftMission();
 }
 
+void APRRiftGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	LogFlowPhase(TEXT("EndPlay"));
+	GetWorldTimerManager().ClearTimer(ReturnToLobbyTravelTimerHandle);
+	StopSpawnManagers();
+	SpawnManagers.Reset();
+	ActiveObjective = nullptr;
+	ExtractedPlayerStates.Reset();
+	CountedKilledEnemies.Reset();
+	bRiftMissionStarted = false;
+	bReturnToLobbyTravelPending = false;
+	bSettlementFinalizationInProgress = false;
+
+	Super::EndPlay(EndPlayReason);
+}
+
 void APRRiftGameMode::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -79,6 +95,11 @@ bool APRRiftGameMode::StartRiftMission()
 		return false;
 	}
 
+	CurrentRunId = FGuid::NewGuid();
+	CurrentSettlementId = FGuid::NewGuid();
+	FinalizedRunId.Invalidate();
+	bSettlementFinalizationInProgress = false;
+	CountedKilledEnemies.Reset();
 	bRiftMissionStarted = true;
 	ActiveObjective = nullptr;
 	ResetExtractionState();
@@ -94,6 +115,7 @@ bool APRRiftGameMode::StartRiftMission()
 	UE_LOG(LogProjectA, Log, TEXT("Rift mission started. Stability=%.1f AlivePlayers=%d"),
 		RiftGameState->GetRiftStability(),
 		RiftGameState->GetAlivePlayerCount());
+	LogFlowPhase(TEXT("MissionStarted"));
 
 	return true;
 }
@@ -124,6 +146,7 @@ void APRRiftGameMode::OpenExtraction()
 	if (APRRiftGameState* RiftGameState = GetRiftGameState())
 	{
 		RiftGameState->SetExtractionAvailable(true);
+		LogFlowPhase(TEXT("ExtractionOpened"));
 		CheckExtractionCompletion();
 	}
 }
@@ -150,6 +173,7 @@ bool APRRiftGameMode::RegisterPlayerExtracted(AController* ExtractingController)
 
 	ExtractedPlayerStates.Add(PlayerKey);
 	RiftGameState->SetExtractedPlayerCount(ExtractedPlayerStates.Num());
+	LogFlowPhase(TEXT("PlayerExtracted"), ExtractingPlayerState);
 	CheckExtractionCompletion();
 
 	UE_LOG(LogProjectA, Log, TEXT("Rift player extracted: %s (%d/%d)"),
@@ -227,6 +251,7 @@ bool APRRiftGameMode::RequestRiftFailure()
 	RiftGameState->SetExtractionAvailable(false);
 	RiftGameState->SetExtractionComplete(false);
 	StopSpawnManagers();
+	LogFlowPhase(TEXT("MissionFailed"));
 	RequestReturnToLobbyTravel(EPRRiftMissionResult::Failed);
 
 	return RiftGameState->IsSettlementReady();
@@ -257,6 +282,9 @@ void APRRiftGameMode::SetReturnToLobbyServerTravelEnabled(const bool bEnabled)
 FPRRiftSettlementData APRRiftGameMode::GenerateSettlementData(const EPRRiftMissionResult Result) const
 {
 	FPRRiftSettlementData Settlement;
+	Settlement.MissionId = MissionId;
+	Settlement.RunId = CurrentRunId;
+	Settlement.SettlementId = CurrentSettlementId;
 	Settlement.Result = Result;
 
 	if (const APRRiftGameState* RiftGameState = GetRiftGameState())
@@ -276,23 +304,28 @@ FPRRiftSettlementData APRRiftGameMode::GenerateSettlementData(const EPRRiftMissi
 
 void APRRiftGameMode::FinalizeRiftSettlement(const EPRRiftMissionResult Result)
 {
-	if (!HasAuthority())
+	if (!HasAuthority() || !CurrentRunId.IsValid() || !CurrentSettlementId.IsValid())
 	{
 		return;
 	}
 
 	if (APRRiftGameState* RiftGameState = GetRiftGameState())
 	{
-		if (RiftGameState->IsSettlementReady())
+		if (bSettlementFinalizationInProgress || FinalizedRunId == CurrentRunId || RiftGameState->IsSettlementReady())
 		{
+			LogFlowPhase(TEXT("SettlementDuplicateIgnored"));
 			return;
 		}
 
+		bSettlementFinalizationInProgress = true;
 		FPRRiftSettlementData Settlement = GenerateSettlementData(Result);
 		ApplyExtractedResourceRules(Result, Settlement);
 
 		RiftGameState->SetSettlementData(Settlement);
 		RiftGameState->SetSettlementReady(true);
+		FinalizedRunId = CurrentRunId;
+		bSettlementFinalizationInProgress = false;
+		LogFlowPhase(TEXT("SettlementFinalized"));
 
 		const FPRRiftSettlementData FinalSettlement = RiftGameState->GetSettlementData();
 		UE_LOG(LogProjectA, Log, TEXT("Rift settlement finalized. Result=%d Time=%.1f Extracted=%d/%d Kills=%d Items=%d Types=%d Resources=%d ResourceTypes=%d LostResources=%d"),
@@ -369,6 +402,7 @@ void APRRiftGameMode::HandleObjectiveActivated(APRRiftObjectiveActor* ObjectiveA
 
 	ActiveObjective = ObjectiveActor;
 	StartSpawnManagersForObjective(ObjectiveActor);
+	LogFlowPhase(TEXT("ObjectiveActivated"));
 
 	if (APRRiftGameState* RiftGameState = GetRiftGameState())
 	{
@@ -409,6 +443,7 @@ void APRRiftGameMode::HandleObjectiveCompleted(APRRiftObjectiveActor* ObjectiveA
 
 	ActiveObjective = ObjectiveActor;
 	StopSpawnManagers();
+	LogFlowPhase(TEXT("ObjectiveCompleted"));
 	CompleteCurrentObjective();
 }
 
@@ -452,6 +487,13 @@ bool APRRiftGameMode::RegisterEnemyKilled(APREnemyCharacter* Enemy, AController*
 	{
 		return false;
 	}
+
+	const TObjectKey<APREnemyCharacter> EnemyKey(Enemy);
+	if (CountedKilledEnemies.Contains(EnemyKey))
+	{
+		return false;
+	}
+	CountedKilledEnemies.Add(EnemyKey);
 
 	RiftGameState->IncrementKilledEnemyCount();
 	UE_LOG(LogProjectA, Log, TEXT("Rift enemy kill registered. Enemy=%s Killer=%s Kills=%d"),
@@ -806,6 +848,12 @@ void APRRiftGameMode::RequestReturnToLobbyTravel(const EPRRiftMissionResult Resu
 	}
 
 	FinalizeRiftSettlement(Result);
+	const APRRiftGameState* RiftGameState = GetRiftGameState();
+	if (!RiftGameState || !RiftGameState->IsSettlementReady())
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Rift return travel aborted because settlement was not finalized."));
+		return;
+	}
 
 	const FString TravelURL = BuildReturnToLobbyTravelURL();
 	if (TravelURL.IsEmpty())
@@ -816,6 +864,7 @@ void APRRiftGameMode::RequestReturnToLobbyTravel(const EPRRiftMissionResult Resu
 
 	bReturnToLobbyTravelPending = true;
 	StopSpawnManagers();
+	LogFlowPhase(TEXT("ReturnScheduled"));
 
 	if (!bReturnToLobbyServerTravelEnabled)
 	{
@@ -869,8 +918,24 @@ void APRRiftGameMode::PerformReturnToLobbyTravel()
 	}
 
 	UE_LOG(LogProjectA, Log, TEXT("Rift settlement complete. Returning to lobby via ServerTravel: %s"), *TravelURL);
+	LogFlowPhase(TEXT("ReturnExecuting"));
 	if (!World->ServerTravel(TravelURL))
 	{
 		UE_LOG(LogProjectA, Warning, TEXT("Rift return ServerTravel failed: %s"), *TravelURL);
+		LogFlowPhase(TEXT("ReturnFailed"));
 	}
+}
+
+void APRRiftGameMode::LogFlowPhase(const TCHAR* Phase, const APlayerState* PlayerState) const
+{
+	UE_LOG(
+		LogProjectRiftFlow,
+		Log,
+		TEXT("MissionId=%s RunId=%s SettlementId=%s PlayerId=%d Phase=%s NetMode=%d"),
+		*MissionId.ToString(),
+		*CurrentRunId.ToString(EGuidFormats::DigitsWithHyphens),
+		*CurrentSettlementId.ToString(EGuidFormats::DigitsWithHyphens),
+		PlayerState ? PlayerState->GetPlayerId() : INDEX_NONE,
+		Phase ? Phase : TEXT("Unknown"),
+		static_cast<int32>(GetNetMode()));
 }

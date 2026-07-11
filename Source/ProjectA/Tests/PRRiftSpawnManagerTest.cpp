@@ -192,6 +192,7 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("APRSpawnManager exposes GetAliveEnemyCount"), SpawnManagerClass->FindFunctionByName(TEXT("GetAliveEnemyCount")));
 	TestNotNull(TEXT("APRSpawnManager exposes GetSpawnedWaveCount"), SpawnManagerClass->FindFunctionByName(TEXT("GetSpawnedWaveCount")));
 	TestNotNull(TEXT("APRSpawnManager exposes IsSpawningActive"), SpawnManagerClass->FindFunctionByName(TEXT("IsSpawningActive")));
+	TestNotNull(TEXT("APRSpawnManager exposes IsWaveTimerActive"), SpawnManagerClass->FindFunctionByName(TEXT("IsWaveTimerActive")));
 	TestNotNull(TEXT("APRSpawnManager exposes DiscoverSpawnPoints"), SpawnManagerClass->FindFunctionByName(TEXT("DiscoverSpawnPoints")));
 	TestNotNull(TEXT("APREnemySpawnPoint exposes GetSpawnTransform"), SpawnPointClass->FindFunctionByName(TEXT("GetSpawnTransform")));
 	TestNotNull(TEXT("APRRiftGameMode exposes StartSpawnManagersForObjective"), RiftGameModeClass->FindFunctionByName(TEXT("StartSpawnManagersForObjective")));
@@ -287,6 +288,9 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 	bool bActiveAfterObjective = false;
 	TestTrue(TEXT("Can query active spawn manager state"), CallBoolFunctionNoParams(SpawnManager, TEXT("IsSpawningActive"), bActiveAfterObjective));
 	TestTrue(TEXT("Spawn manager activates when a rift objective starts"), bActiveAfterObjective);
+	bool bWaveTimerActive = false;
+	TestTrue(TEXT("Can query active wave timer state"), CallBoolFunctionNoParams(SpawnManager, TEXT("IsWaveTimerActive"), bWaveTimerActive));
+	TestTrue(TEXT("Wave timer runs while spawning is active"), bWaveTimerActive);
 
 	int32 SpawnedWaveCount = 0;
 	CallIntFunctionNoParams(SpawnManager, TEXT("GetSpawnedWaveCount"), *this, TEXT("Can query spawned wave count"), SpawnedWaveCount);
@@ -317,6 +321,9 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 	bool bActiveAfterStop = true;
 	TestTrue(TEXT("Can query stopped spawn manager state"), CallBoolFunctionNoParams(SpawnManager, TEXT("IsSpawningActive"), bActiveAfterStop));
 	TestFalse(TEXT("Spawn manager stops when the objective flow ends"), bActiveAfterStop);
+	bool bWaveTimerActiveAfterStop = true;
+	TestTrue(TEXT("Can query stopped wave timer state"), CallBoolFunctionNoParams(SpawnManager, TEXT("IsWaveTimerActive"), bWaveTimerActiveAfterStop));
+	TestFalse(TEXT("Wave timer is cleared when spawning stops"), bWaveTimerActiveAfterStop);
 
 	return true;
 }

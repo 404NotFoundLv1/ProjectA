@@ -19,6 +19,7 @@ public:
 	APRSpawnManager();
 
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Spawning")
@@ -41,6 +42,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Rift|Spawning")
 	bool IsSpawningActive() const { return bSpawningActive; }
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Spawning")
+	bool IsWaveTimerActive() const;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Spawning")

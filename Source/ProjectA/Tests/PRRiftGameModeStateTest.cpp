@@ -7,13 +7,16 @@
 #include "Core/PRGameState.h"
 #include "Core/PRRiftGameMode.h"
 #include "Core/PRRiftGameState.h"
+#include "Enemies/PREnemyCharacter.h"
 #include "Engine/World.h"
+#include "GeneralProjectSettings.h"
 #include "GameMapsSettings.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/WorldSettings.h"
+#include "Misc/ConfigCacheIni.h"
 #include "Player/PRPlayerState.h"
 #include "Tests/AutomationCommon.h"
 #include "UObject/UnrealType.h"
@@ -91,6 +94,9 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("APRRiftGameMode exposes UpdateAlivePlayerCount"), RiftGameModeClass->FindFunctionByName(TEXT("UpdateAlivePlayerCount")));
 	TestNotNull(TEXT("APRRiftGameMode exposes RequestRiftFailure"), RiftGameModeClass->FindFunctionByName(TEXT("RequestRiftFailure")));
 	TestNotNull(TEXT("APRRiftGameMode exposes RegisterEnemyKilled"), RiftGameModeClass->FindFunctionByName(TEXT("RegisterEnemyKilled")));
+	TestNotNull(TEXT("APRRiftGameMode exposes GetCurrentRunId"), RiftGameModeClass->FindFunctionByName(TEXT("GetCurrentRunId")));
+	TestNotNull(TEXT("APRRiftGameMode exposes GetCurrentSettlementId"), RiftGameModeClass->FindFunctionByName(TEXT("GetCurrentSettlementId")));
+	TestNotNull(TEXT("APRRiftGameMode exposes GetMissionId"), RiftGameModeClass->FindFunctionByName(TEXT("GetMissionId")));
 	TestNotNull(TEXT("APRRiftGameMode exposes configurable rift stability drain"), FindFProperty<FFloatProperty>(RiftGameModeClass, TEXT("RiftStabilityDrainPerSecond")));
 
 	TestReplicatedProperty(*this, RiftGameStateClass, TEXT("CurrentObjectiveState"));
@@ -161,6 +167,39 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 		TEXT("L_Rift_Test resolves APRRiftGameMode for runtime travel"),
 		RiftMapConfiguredGameModeClass && RiftMapConfiguredGameModeClass->IsChildOf(RiftGameModeClass));
 
+	const UGameMapsSettings* Maps = GetDefault<UGameMapsSettings>();
+	const UGeneralProjectSettings* Project = GetDefault<UGeneralProjectSettings>();
+	TestNotNull(TEXT("Game maps settings are available"), Maps);
+	TestNotNull(TEXT("General project settings are available"), Project);
+	if (Maps && Project)
+	{
+		TestEqual(TEXT("Game default map is ship lobby"), Maps->GetGameDefaultMap(), FString(TEXT("/Game/ProjectRift/Maps/L_ShipLobby")));
+		TestEqual(TEXT("Project name is ProjectRift"), Project->ProjectName, FString(TEXT("ProjectRift")));
+		TestEqual(TEXT("Project version is v0.4.8"), Project->ProjectVersion, FString(TEXT("0.4.8")));
+	}
+
+	TArray<FString> MapsToCook;
+	GConfig->GetArray(TEXT("/Script/UnrealEd.ProjectPackagingSettings"), TEXT("MapsToCook"), MapsToCook, GGameIni);
+	const auto ContainsCookMap = [&MapsToCook](const TCHAR* MapPath)
+	{
+		return MapsToCook.ContainsByPredicate([MapPath](const FString& Entry)
+		{
+			return Entry.Contains(MapPath);
+		});
+	};
+	TestTrue(TEXT("Cook list contains main menu"), ContainsCookMap(TEXT("/Game/ProjectRift/Maps/L_MainMenu")));
+	TestTrue(TEXT("Cook list contains ship lobby"), ContainsCookMap(TEXT("/Game/ProjectRift/Maps/L_ShipLobby")));
+	TestTrue(TEXT("Cook list contains rift test"), ContainsCookMap(TEXT("/Game/ProjectRift/Maps/L_Rift_Test")));
+
+	TArray<FString> DirectoriesToAlwaysCook;
+	GConfig->GetArray(TEXT("/Script/UnrealEd.ProjectPackagingSettings"), TEXT("DirectoriesToAlwaysCook"), DirectoriesToAlwaysCook, GGameIni);
+	TestTrue(
+		TEXT("Cook baseline includes ProjectRift runtime item data"),
+		DirectoriesToAlwaysCook.ContainsByPredicate([](const FString& Entry)
+		{
+			return Entry.Contains(TEXT("/Game/ProjectRift/Items"));
+		}));
+
 	FTestWorldWrapper StabilityWorldWrapper;
 	TestTrue(TEXT("Rift stability failure test world is created"), StabilityWorldWrapper.CreateTestWorld(EWorldType::Game));
 	UWorld* StabilityWorld = StabilityWorldWrapper.GetTestWorld();
@@ -188,6 +227,22 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	if (!StabilityGameMode || !StabilityGameState)
 	{
 		return false;
+	}
+
+	const FGuid FirstRunId = StabilityGameMode->GetCurrentRunId();
+	TestTrue(TEXT("BeginPlay creates a valid run id"), FirstRunId.IsValid());
+	TestTrue(TEXT("Mission owns a valid settlement id"), StabilityGameMode->GetCurrentSettlementId().IsValid());
+	TestFalse(TEXT("Mission id is configured"), StabilityGameMode->GetMissionId().IsNone());
+	TestTrue(TEXT("Restarting the mission succeeds"), StabilityGameMode->StartRiftMission());
+	TestNotEqual(TEXT("Restarting rotates the run id"), StabilityGameMode->GetCurrentRunId(), FirstRunId);
+
+	APREnemyCharacter* CountedEnemy = StabilityWorld->SpawnActor<APREnemyCharacter>();
+	TestNotNull(TEXT("Can spawn enemy for duplicate kill test"), CountedEnemy);
+	if (CountedEnemy)
+	{
+		TestTrue(TEXT("First enemy death notification is counted"), StabilityGameMode->RegisterEnemyKilled(CountedEnemy, nullptr));
+		TestFalse(TEXT("Duplicate enemy death notification is ignored"), StabilityGameMode->RegisterEnemyKilled(CountedEnemy, nullptr));
+		TestEqual(TEXT("Duplicate enemy notification leaves kill count at one"), StabilityGameState->GetKilledEnemyCount(), 1);
 	}
 
 	StabilityGameMode->SetReturnToLobbyServerTravelEnabled(false);

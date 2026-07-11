@@ -6,3 +6,4 @@
 IMPLEMENT_PRIMARY_GAME_MODULE( FDefaultGameModuleImpl, ProjectA, "ProjectA" );
 
 DEFINE_LOG_CATEGORY(LogProjectA)
+DEFINE_LOG_CATEGORY(LogProjectRiftFlow)

@@ -27,6 +27,7 @@ public:
 	APRRiftGameMode();
 
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
@@ -97,6 +98,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Rift|Mission")
 	bool HasRiftMissionStarted() const { return bRiftMissionStarted; }
 
+	UFUNCTION(BlueprintPure, Category = "Rift|Diagnostics")
+	FGuid GetCurrentRunId() const { return CurrentRunId; }
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Diagnostics")
+	FGuid GetCurrentSettlementId() const { return CurrentSettlementId; }
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Diagnostics")
+	FName GetMissionId() const { return MissionId; }
+
 	UFUNCTION(BlueprintPure, Category = "Rift|Settlement")
 	FPRRiftSettlementData GenerateSettlementData(EPRRiftMissionResult Result) const;
 
@@ -147,6 +157,10 @@ private:
 	static bool IsFallbackMaterialResourceId(FName ItemId);
 	void RequestReturnToLobbyTravel(EPRRiftMissionResult Result);
 	void PerformReturnToLobbyTravel();
+	void LogFlowPhase(const TCHAR* Phase, const APlayerState* PlayerState = nullptr) const;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Rift|Diagnostics")
+	FName MissionId = FName(TEXT("Mission.Rift.Test.Hold"));
 
 	UPROPERTY(Transient)
 	TObjectPtr<APRRiftObjectiveActor> ActiveObjective;
@@ -157,6 +171,11 @@ private:
 	bool bRiftMissionStarted = false;
 	bool bReturnToLobbyTravelPending = false;
 	bool bReturnToLobbyServerTravelEnabled = true;
+	bool bSettlementFinalizationInProgress = false;
+	FGuid CurrentRunId;
+	FGuid CurrentSettlementId;
+	FGuid FinalizedRunId;
 	TSet<TObjectKey<APlayerState>> ExtractedPlayerStates;
+	TSet<TObjectKey<APREnemyCharacter>> CountedKilledEnemies;
 	FTimerHandle ReturnToLobbyTravelTimerHandle;
 };

@@ -194,6 +194,17 @@ bool FPRExtractedResourceRulesTest::RunTest(const FString& Parameters)
 	const FPRRiftSettlementData SuccessSettlement = RiftGameState->GetSettlementData();
 	TestEqual(TEXT("Settlement records successful extracted resources"), SuccessSettlement.ExtractedResourceCount, 5);
 	TestEqual(TEXT("Settlement records no successful resource loss"), SuccessSettlement.LostResourceCount, 0);
+	const FGuid SuccessfulRunId = SuccessSettlement.RunId;
+	const FGuid SuccessfulSettlementId = SuccessSettlement.SettlementId;
+	TestTrue(TEXT("Successful settlement has a run id"), SuccessfulRunId.IsValid());
+	TestTrue(TEXT("Successful settlement has a settlement id"), SuccessfulSettlementId.IsValid());
+	TestFalse(TEXT("Successful settlement has a mission id"), SuccessSettlement.MissionId.IsNone());
+
+	RiftGameMode->FinalizeRiftSettlement(EPRRiftMissionResult::Success);
+	const FPRRiftSettlementData DuplicateSuccessSettlement = RiftGameState->GetSettlementData();
+	TestEqual(TEXT("Duplicate settlement keeps the same run id"), DuplicateSuccessSettlement.RunId, SuccessfulRunId);
+	TestEqual(TEXT("Duplicate settlement keeps the same settlement id"), DuplicateSuccessSettlement.SettlementId, SuccessfulSettlementId);
+	TestEqual(TEXT("Duplicate settlement does not grant resources twice"), SuccessPlayer.PlayerState->GetShipResourceCount(TEXT("EnergyCrystal")), 5);
 
 	FResourceRulesTestPlayer FailurePlayer = SpawnResourceRulesTestPlayer(*this, World, FVector(200.0f, 0.0f, 0.0f));
 	if (!FailurePlayer.PlayerState || !FailurePlayer.Inventory)
@@ -230,6 +241,11 @@ bool FPRExtractedResourceRulesTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Failed settlement records retained resources"), FailedSettlement.ExtractedResourceCount, 4);
 	TestEqual(TEXT("Failed settlement records lost resources"), FailedSettlement.LostResourceCount, 5);
 	TestTrue(TEXT("Failure settlement requests return travel"), RiftGameMode->IsReturnToLobbyTravelPending());
+	const int32 EnergyAfterFailure = FailurePlayer.PlayerState->GetShipResourceCount(TEXT("EnergyCrystal"));
+	const int32 ChipAfterFailure = FailurePlayer.PlayerState->GetShipResourceCount(TEXT("CommonChip"));
+	TestFalse(TEXT("Duplicate failure request is rejected"), RiftGameMode->RequestRiftFailure());
+	TestEqual(TEXT("Duplicate failure does not grant EnergyCrystal twice"), FailurePlayer.PlayerState->GetShipResourceCount(TEXT("EnergyCrystal")), EnergyAfterFailure);
+	TestEqual(TEXT("Duplicate failure does not grant CommonChip twice"), FailurePlayer.PlayerState->GetShipResourceCount(TEXT("CommonChip")), ChipAfterFailure);
 
 	return true;
 }

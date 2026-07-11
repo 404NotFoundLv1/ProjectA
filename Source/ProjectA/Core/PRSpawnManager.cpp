@@ -39,6 +39,24 @@ void APRSpawnManager::BeginPlay()
 	}
 }
 
+void APRSpawnManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (HasAuthority())
+	{
+		StopSpawning();
+	}
+	else
+	{
+		GetWorldTimerManager().ClearTimer(WaveTimerHandle);
+		AliveEnemies.Reset();
+		SpawnPoints.Reset();
+		ActiveObjective = nullptr;
+		NextSpawnPointIndex = 0;
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
 void APRSpawnManager::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -80,6 +98,22 @@ void APRSpawnManager::StopSpawning()
 	bSpawningActive = false;
 	ActiveObjective = nullptr;
 	GetWorldTimerManager().ClearTimer(WaveTimerHandle);
+	for (const TObjectPtr<AActor>& AliveEnemy : AliveEnemies)
+	{
+		if (IsValid(AliveEnemy))
+		{
+			AliveEnemy->OnDestroyed.RemoveDynamic(this, &APRSpawnManager::HandleSpawnedActorDestroyed);
+		}
+	}
+	AliveEnemies.Reset();
+	SpawnPoints.Reset();
+	NextSpawnPointIndex = 0;
+}
+
+bool APRSpawnManager::IsWaveTimerActive() const
+{
+	const UWorld* World = GetWorld();
+	return World && World->GetTimerManager().IsTimerActive(WaveTimerHandle);
 }
 
 int32 APRSpawnManager::SpawnWave()
