@@ -5,6 +5,7 @@
 #include "Items/PRInventoryComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "ProjectA.h"
+#include "Progression/PRMissionProgressionDataAsset.h"
 
 APRPlayerState::APRPlayerState()
 	: bIsReady(false)
@@ -66,6 +67,8 @@ void APRPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(APRPlayerState, bIsReady);
+	DOREPLIFETIME(APRPlayerState, bMultiplayerProfileBound);
+	DOREPLIFETIME_CONDITION(APRPlayerState, BoundProfileId, COND_OwnerOnly);
 	DOREPLIFETIME(APRPlayerState, SelectedRoleModule);
 	DOREPLIFETIME(APRPlayerState, PlayerDisplayName);
 	DOREPLIFETIME(APRPlayerState, ShipResources);
@@ -73,6 +76,11 @@ void APRPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 
 void APRPlayerState::SetReady(const bool bReady)
 {
+	if (bReady && !bMultiplayerProfileBound)
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Ready state rejected because no multiplayer profile is bound. Player=%s"), *GetPlayerDisplayName());
+		return;
+	}
 	if (bIsReady == bReady)
 	{
 		return;
@@ -87,6 +95,57 @@ void APRPlayerState::SetReady(const bool bReady)
 		TEXT("Lobby ready state changed: %s is %s"),
 		*GetPlayerDisplayName(),
 		bIsReady ? TEXT("Ready") : TEXT("Not Ready"));
+}
+
+bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjection& Projection, FString& OutDiagnostic)
+{
+	if (!Projection.IsValid(&OutDiagnostic) || !InventoryComponent)
+	{
+		return false;
+	}
+
+	TArray<FPRShipResourceStack> RuntimeResources;
+	RuntimeResources.Reserve(Projection.ResourceWallet.Num());
+	for (const FPRProfileResourceBalance& Balance : Projection.ResourceWallet)
+	{
+		FPRShipResourceStack& RuntimeResource = RuntimeResources.AddDefaulted_GetRef();
+		RuntimeResource.ResourceId = Balance.ResourceId;
+		RuntimeResource.Count = Balance.Count;
+	}
+	if (!InventoryComponent->ReplaceInventoryItems(Projection.BackpackItems)
+		|| !ReplaceShipResources(RuntimeResources))
+	{
+		OutDiagnostic = TEXT("PlayerState rejected validated multiplayer profile runtime data.");
+		return false;
+	}
+
+	BoundProfileId = Projection.ProfileId;
+	bMultiplayerProfileBound = true;
+	BoundStoryProgress = Projection.Story;
+	MissionStartBackpackItems = Projection.BackpackItems;
+	MissionStartResourceWallet = Projection.ResourceWallet;
+	MissionStartRoleId = Projection.SelectedRoleId;
+	SetPlayerDisplayName(Projection.DisplayName);
+	SetSelectedRoleModule(Projection.SelectedRoleId);
+	ForceNetUpdate();
+	return true;
+}
+
+void APRPlayerState::ClearMultiplayerProfileBinding()
+{
+	bIsReady = false;
+	bMultiplayerProfileBound = false;
+	BoundProfileId.Invalidate();
+	BoundStoryProgress = FPRProfileStoryProgress();
+	MissionStartBackpackItems.Reset();
+	MissionStartResourceWallet.Reset();
+	MissionStartRoleId = NAME_None;
+	ForceNetUpdate();
+}
+
+bool APRPlayerState::ApplyMissionCompletion(const UPRMissionProgressionDataAsset* Mission)
+{
+	return Mission && Mission->ApplyCompletion(BoundStoryProgress);
 }
 
 void APRPlayerState::SetSelectedRoleModule(const FName InSelectedRoleModule)
@@ -257,6 +316,20 @@ void APRPlayerState::CopyProjectRiftStateFrom(const APRPlayerState* SourcePlayer
 	}
 
 	bIsReady = false;
+	bMultiplayerProfileBound = SourcePlayerState->bMultiplayerProfileBound;
+	BoundProfileId = SourcePlayerState->BoundProfileId;
+	BoundStoryProgress = SourcePlayerState->BoundStoryProgress;
+	MissionStartBackpackItems = SourcePlayerState->MissionStartBackpackItems;
+	MissionStartResourceWallet = SourcePlayerState->MissionStartResourceWallet;
+	MissionStartRoleId = SourcePlayerState->MissionStartRoleId;
+	if (InventoryComponent && SourcePlayerState->InventoryComponent)
+	{
+		if (!InventoryComponent->ReplaceInventoryItems(SourcePlayerState->InventoryComponent->GetInventoryItems()))
+		{
+			UE_LOG(LogProjectA, Error, TEXT("Inventory state failed to copy during seamless PlayerState replacement. Source=%s Target=%s"),
+				*GetNameSafe(SourcePlayerState), *GetNameSafe(this));
+		}
+	}
 	SelectedRoleModule = SourcePlayerState->SelectedRoleModule;
 	PlayerDisplayName = SourcePlayerState->PlayerDisplayName;
 	ShipResources = SourcePlayerState->ShipResources;

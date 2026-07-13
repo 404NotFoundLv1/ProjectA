@@ -3,6 +3,7 @@
 #include "Misc/AutomationTest.h"
 #include "Player/PRPlayerController.h"
 #include "Player/PRPlayerState.h"
+#include "Multiplayer/PRMultiplayerProfileTypes.h"
 #include "UObject/UnrealType.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPRLobbyReadyStateTest, "ProjectRift.Lobby.ReadyState", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -28,6 +29,11 @@ bool FPRLobbyReadyStateTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Players have a fallback lobby display name"), PlayerStateDefaults->GetPlayerDisplayName().IsEmpty());
 
 	APRPlayerState* MutablePlayerState = NewObject<APRPlayerState>();
+	FPRMultiplayerProfileProjection Projection;
+	Projection.ProfileId = FGuid::NewGuid();
+	Projection.DisplayName = TEXT("Test Pilot");
+	FString BindingDiagnostic;
+	TestTrue(TEXT("Ready-state test profile binds first"), MutablePlayerState->BindMultiplayerProfile(Projection, BindingDiagnostic));
 	MutablePlayerState->SetReady(true);
 	MutablePlayerState->SetSelectedRoleModule(TEXT("Role.Engineer"));
 	MutablePlayerState->SetPlayerDisplayName(TEXT("Test Pilot"));

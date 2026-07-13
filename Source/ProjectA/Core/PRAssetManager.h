@@ -6,6 +6,7 @@
 
 class UPRItemDataAsset;
 class UPRLootTableDataAsset;
+class UPRMissionProgressionDataAsset;
 struct FStreamableHandle;
 
 DECLARE_DELEGATE_OneParam(FPRItemDataLoadComplete, UPRItemDataAsset*);
@@ -20,6 +21,7 @@ public:
 	static UPRAssetManager* Get();
 	static FPrimaryAssetId MakeItemPrimaryAssetId(FName ItemId);
 	static FPrimaryAssetId MakeLootTablePrimaryAssetId(FName AssetName);
+	static FPrimaryAssetId MakeMissionPrimaryAssetId(FName MissionId);
 
 	virtual void StartInitialLoading() override;
 
@@ -27,6 +29,7 @@ public:
 	UPRLootTableDataAsset* GetLoadedLootTable(FName AssetName) const;
 	UPRItemDataAsset* LoadItemDataSync(FName ItemId);
 	UPRLootTableDataAsset* LoadLootTableSync(FName AssetName);
+	UPRMissionProgressionDataAsset* LoadMissionSync(FName MissionId);
 	TSharedPtr<FStreamableHandle> LoadItemDataAsync(FName ItemId, FPRItemDataLoadComplete Completion);
 	TSharedPtr<FStreamableHandle> LoadLootTableAsync(FName AssetName, FPRLootTableLoadComplete Completion);
 

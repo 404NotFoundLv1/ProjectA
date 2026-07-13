@@ -5,7 +5,10 @@
 #include "Abilities/PRHealthConsumableGameplayEffect.h"
 #include "Abilities/PRShieldConsumableGameplayEffect.h"
 #include "Characters/PRCharacter.h"
+#include "Core/PRAssetManager.h"
+#include "Core/PRGameState.h"
 #include "Core/PRShipLobbyGameMode.h"
+#include "Core/PRRiftGameMode.h"
 #include "Core/PRRiftObjectiveActor.h"
 #include "Engine/Engine.h"
 #include "Engine/OverlapResult.h"
@@ -22,6 +25,8 @@
 #include "Items/PRPickupActor.h"
 #include "Player/PRPlayerState.h"
 #include "ProjectA.h"
+#include "Persistence/PRSaveSubsystem.h"
+#include "Progression/PRMissionProgressionDataAsset.h"
 #include "UI/PRDebugUILayout.h"
 #include "UI/PRGASDebugWidget.h"
 #include "UI/PRInventoryWidget.h"
@@ -34,13 +39,6 @@ namespace
 const FName AssaultRoleModuleName(TEXT("Ability.Role.Assault"));
 const FName HealthInjectorItemId(TEXT("HealthInjector"));
 const FName ShieldPackItemId(TEXT("ShieldPack"));
-
-#if UE_BUILD_SHIPPING
-int32 GetLobbyReadyDebugMessageKey(const AController* Controller)
-{
-	return Controller && Controller->IsLocalController() ? 16016 : 16017;
-}
-#endif
 
 bool IsShipLobbyDebugWorld(const UWorld* World)
 {
@@ -96,10 +94,11 @@ FString GetLobbyReadyLine(const APlayerState* PlayerState)
 
 	const int32 PlayerId = PlayerState ? PlayerState->GetPlayerId() : INDEX_NONE;
 	return FString::Printf(
-		TEXT("P%d %s: %s | Role: %s | Resources: %s"),
+		TEXT("P%d %s: %s | Profile: %s | Role: %s | Resources: %s"),
 		PlayerId,
 		*DisplayName,
 		bReady ? TEXT("READY") : TEXT("WAITING"),
+		ProjectRiftPlayerState && ProjectRiftPlayerState->IsMultiplayerProfileBound() ? TEXT("BOUND") : TEXT("UNBOUND"),
 		SelectedRoleModule.IsNone() ? TEXT("None") : *SelectedRoleModule.ToString(),
 		*ResourceSummary);
 }
@@ -149,6 +148,7 @@ void APRPlayerController::BeginPlay()
 		CreateGASDebugHUD();
 		CreateInventoryUI();
 		CreateRiftSettlementUI();
+		SubmitLocalMultiplayerProfile();
 	}
 }
 
@@ -180,6 +180,7 @@ void APRPlayerController::OnRep_PlayerState()
 	Super::OnRep_PlayerState();
 
 	RefreshInventoryDisplay();
+	SubmitLocalMultiplayerProfile();
 }
 
 void APRPlayerController::SelectAssaultRoleModule()
@@ -591,6 +592,10 @@ void APRPlayerController::ServerSetReady_Implementation(const bool bReady)
 	}
 
 	ProjectRiftPlayerState->SetReady(bReady);
+	if (APRShipLobbyGameMode* LobbyGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<APRShipLobbyGameMode>() : nullptr)
+	{
+		LobbyGameMode->RefreshTeamMissionState();
+	}
 }
 
 void APRPlayerController::ServerSetSelectedRoleModule_Implementation(const FName RoleModule)
@@ -653,6 +658,171 @@ void APRPlayerController::ServerDropInventoryItem_Implementation(const FName Ite
 void APRPlayerController::ServerSpawnTestLoot_Implementation()
 {
 	TrySpawnTestLootOnServer();
+}
+
+void APRPlayerController::SubmitLocalMultiplayerProfile()
+{
+	if (!IsLocalPlayerController() || !GetPlayerState<APRPlayerState>() || !IsShipLobbyDebugWorld(GetWorld()))
+	{
+		return;
+	}
+	UGameInstance* GameInstance = GetGameInstance();
+	UPRSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<UPRSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem)
+	{
+		MultiplayerProfileStatus = TEXT("Save subsystem unavailable");
+		return;
+	}
+	if (SaveSubsystem->HasPendingSettlementReceipt())
+	{
+		const FPRProfileOperationResult RetryResult = SaveSubsystem->RetryPendingSettlementReceipt();
+		PersonalSettlementSaveStatus = RetryResult.IsSuccess() ? TEXT("Saved after retry") : TEXT("Retry failed");
+		if (RiftSettlementWidget)
+		{
+			RiftSettlementWidget->SetPersonalSaveStatus(PersonalSettlementSaveStatus);
+		}
+		if (!RetryResult.IsSuccess())
+		{
+			MultiplayerProfileStatus = TEXT("Pending settlement must be saved before readying");
+			ServerReportPendingSettlementSave();
+			return;
+		}
+	}
+	FPRMultiplayerProfileProjection Projection;
+	FPRProfileOperationResult Result = SaveSubsystem->BuildMultiplayerProfileProjection(Projection);
+	if (!Result.IsSuccess())
+	{
+		MultiplayerProfileStatus = Result.Diagnostic.IsEmpty() ? TEXT("No active profile") : Result.Diagnostic;
+		return;
+	}
+	Result = SaveSubsystem->BindActiveProfileToSession();
+	if (!Result.IsSuccess())
+	{
+		MultiplayerProfileStatus = Result.Diagnostic;
+		return;
+	}
+	MultiplayerProfileStatus = TEXT("Binding");
+	ServerBindMultiplayerProfile(Projection);
+}
+
+void APRPlayerController::ServerReportPendingSettlementSave_Implementation()
+{
+	if (APRShipLobbyGameMode* LobbyGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<APRShipLobbyGameMode>() : nullptr)
+	{
+		if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
+		{
+			ProjectRiftPlayerState->ClearMultiplayerProfileBinding();
+		}
+		LobbyGameMode->RefreshTeamMissionState();
+	}
+}
+
+void APRPlayerController::ServerBindMultiplayerProfile_Implementation(const FPRMultiplayerProfileProjection& Projection)
+{
+	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	FString Diagnostic;
+	if (!GetWorld() || !GetWorld()->GetAuthGameMode<APRShipLobbyGameMode>())
+	{
+		ClientMultiplayerProfileBindingResult(false, TEXT("Profile binding is only accepted in the ship lobby."));
+		return;
+	}
+	if (!ProjectRiftPlayerState || !Projection.IsValid(&Diagnostic))
+	{
+		ClientMultiplayerProfileBindingResult(false, Diagnostic.IsEmpty() ? TEXT("PlayerState or profile projection is invalid.") : Diagnostic);
+		if (APRShipLobbyGameMode* LobbyGameMode = GetWorld()->GetAuthGameMode<APRShipLobbyGameMode>())
+		{
+			LobbyGameMode->RefreshTeamMissionState();
+		}
+		return;
+	}
+
+	if (const AGameStateBase* CurrentGameState = GetWorld() ? GetWorld()->GetGameState() : nullptr)
+	{
+		for (const TObjectPtr<APlayerState>& CandidateState : CurrentGameState->PlayerArray)
+		{
+			const APRPlayerState* Candidate = Cast<APRPlayerState>(CandidateState.Get());
+			if (Candidate && Candidate != ProjectRiftPlayerState && Candidate->IsMultiplayerProfileBound()
+				&& Candidate->GetBoundProfileId() == Projection.ProfileId)
+			{
+				Diagnostic = TEXT("This profile GUID is already bound to another player in the session.");
+				ProjectRiftPlayerState->ClearMultiplayerProfileBinding();
+				ClientMultiplayerProfileBindingResult(false, Diagnostic);
+				if (APRShipLobbyGameMode* LobbyGameMode = GetWorld()->GetAuthGameMode<APRShipLobbyGameMode>())
+				{
+					LobbyGameMode->RefreshTeamMissionState();
+				}
+				return;
+			}
+		}
+	}
+
+	if (!ProjectRiftPlayerState->BindMultiplayerProfile(Projection, Diagnostic))
+	{
+		ProjectRiftPlayerState->ClearMultiplayerProfileBinding();
+		ClientMultiplayerProfileBindingResult(false, Diagnostic);
+		if (APRShipLobbyGameMode* LobbyGameMode = GetWorld()->GetAuthGameMode<APRShipLobbyGameMode>())
+		{
+			LobbyGameMode->RefreshTeamMissionState();
+		}
+		return;
+	}
+	ClientMultiplayerProfileBindingResult(true, TEXT("Profile bound"));
+	if (APRShipLobbyGameMode* LobbyGameMode = GetWorld()->GetAuthGameMode<APRShipLobbyGameMode>())
+	{
+		LobbyGameMode->RefreshTeamMissionState();
+	}
+}
+
+void APRPlayerController::ClientMultiplayerProfileBindingResult_Implementation(const bool bAccepted, const FString& Diagnostic)
+{
+	MultiplayerProfileStatus = bAccepted ? TEXT("Bound") : Diagnostic;
+	if (!bAccepted)
+	{
+		if (UGameInstance* GameInstance = GetGameInstance())
+		{
+			if (UPRSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<UPRSaveSubsystem>())
+			{
+				SaveSubsystem->ReleaseSessionProfileBinding();
+			}
+		}
+	}
+}
+
+void APRPlayerController::ClientReceivePersonalSettlement_Implementation(const FPRPlayerSettlementReceipt& Receipt)
+{
+	PersonalSettlementSaveStatus = TEXT("Saving");
+	if (RiftSettlementWidget)
+	{
+		RiftSettlementWidget->SetPersonalSaveStatus(PersonalSettlementSaveStatus);
+	}
+	UGameInstance* GameInstance = GetGameInstance();
+	UPRSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<UPRSaveSubsystem>() : nullptr;
+	const FPRProfileOperationResult Result = SaveSubsystem
+		? SaveSubsystem->ApplyMultiplayerSettlementReceipt(Receipt)
+		: FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::IOError, TEXT("Save subsystem unavailable."), Receipt.ProfileId);
+	if (Result.IsSuccess())
+	{
+		PersonalSettlementSaveStatus = Result.bAlreadyProcessedSettlement ? TEXT("Already saved") : TEXT("Saved");
+	}
+	else
+	{
+		PersonalSettlementSaveStatus = SaveSubsystem && SaveSubsystem->HasPendingSettlementReceipt()
+			? TEXT("Retry in lobby")
+			: TEXT("Save failed");
+	}
+	if (RiftSettlementWidget)
+	{
+		RiftSettlementWidget->SetPersonalSaveStatus(PersonalSettlementSaveStatus);
+	}
+	ServerAcknowledgePersonalSettlement(Receipt.SettlementId, Result.IsSuccess());
+}
+
+void APRPlayerController::ServerAcknowledgePersonalSettlement_Implementation(const FGuid SettlementId, const bool bSaveSucceeded)
+{
+	if (APRRiftGameMode* RiftGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<APRRiftGameMode>() : nullptr)
+	{
+		RiftGameMode->HandlePersonalSettlementAcknowledgement(this, SettlementId, bSaveSucceeded);
+	}
 }
 
 bool APRPlayerController::TryUseInventoryItemOnServer(const FName ItemId)
@@ -838,10 +1008,9 @@ APRPickupActor* APRPlayerController::TrySpawnTestLootOnServer(const float RollOv
 void APRPlayerController::RefreshLobbyReadyDebugDisplay()
 {
 #if UE_BUILD_SHIPPING
-	if (!IsLocalPlayerController() || !GEngine)
-#else
-	if (!IsLocalPlayerController())
+	return;
 #endif
+	if (!IsLocalPlayerController())
 	{
 		return;
 	}
@@ -849,17 +1018,11 @@ void APRPlayerController::RefreshLobbyReadyDebugDisplay()
 	const UWorld* World = GetWorld();
 	if (!IsShipLobbyDebugWorld(World))
 	{
-#if UE_BUILD_SHIPPING
-		GEngine->RemoveOnScreenDebugMessage(GetLobbyReadyDebugMessageKey(this));
-#else
 		DestroyLobbyReadyDebugHUD();
-#endif
 		return;
 	}
 
-#if !UE_BUILD_SHIPPING
 	CreateLobbyReadyDebugHUD();
-#endif
 
 	const AGameStateBase* GameState = World ? World->GetGameState() : nullptr;
 	if (!GameState)
@@ -873,26 +1036,61 @@ void APRPlayerController::RefreshLobbyReadyDebugDisplay()
 		return;
 	}
 
-	FString ReadyList = TEXT("Lobby Ready\n");
-	ReadyList += TEXT("1: Assault | P: Ready | Host O: Start Rift\n");
+	const APRGameState* ProjectRiftGameState = Cast<APRGameState>(GameState);
+	const FName TeamMissionId = ProjectRiftGameState ? ProjectRiftGameState->GetSelectedTeamMissionId() : NAME_None;
+	const UPRMissionProgressionDataAsset* Mission = UPRAssetManager::Get()
+		? UPRAssetManager::Get()->LoadMissionSync(TeamMissionId)
+		: nullptr;
+	const APRPlayerState* LocalPlayerState = GetPlayerState<APRPlayerState>();
+	const bool bLocalEligible = Mission && LocalPlayerState && Mission->IsEligible(LocalPlayerState->GetBoundStoryProgress());
+	bool bAllBound = true;
+	bool bAllReady = true;
+	for (const APlayerState* ListedPlayerState : GameState->PlayerArray)
+	{
+		const APRPlayerState* ProjectRiftPlayerState = Cast<APRPlayerState>(ListedPlayerState);
+		bAllBound &= ProjectRiftPlayerState && ProjectRiftPlayerState->IsMultiplayerProfileBound();
+		bAllReady &= ProjectRiftPlayerState && ProjectRiftPlayerState->IsReady();
+	}
+	FString BlockReason = TEXT("None");
+	if (!Mission || !Mission->IsContractValid())
+	{
+		BlockReason = TEXT("Mission contract unavailable");
+	}
+	else if (!LocalPlayerState || !LocalPlayerState->IsMultiplayerProfileBound())
+	{
+		BlockReason = TEXT("Local profile is not bound");
+	}
+	else if (HasAuthority() && !bLocalEligible)
+	{
+		BlockReason = TEXT("Host is not eligible for mission");
+	}
+	else if (!bAllBound)
+	{
+		BlockReason = TEXT("Waiting for all profile bindings");
+	}
+	else if (!bAllReady)
+	{
+		BlockReason = TEXT("Waiting for all players to ready");
+	}
+
+	FString ReadyList = FString::Printf(
+		TEXT("Lobby Team Status\nMission: %s | Contract: %s | Can start: %s\nProfile: %s | Host eligible: %s\nStart blocked by: %s\n1: Assault | P: Ready | Host O: Start Rift\n"),
+		TeamMissionId.IsNone() ? TEXT("None") : *TeamMissionId.ToString(),
+		Mission && Mission->IsContractValid() ? TEXT("VALID") : TEXT("INVALID"),
+		ProjectRiftGameState && ProjectRiftGameState->IsTeamMissionReady() ? TEXT("YES") : TEXT("NO"),
+		*MultiplayerProfileStatus,
+		HasAuthority() ? (bLocalEligible ? TEXT("YES") : TEXT("NO")) : TEXT("HOST ONLY"),
+		*BlockReason);
 	for (const APlayerState* ListedPlayerState : GameState->PlayerArray)
 	{
 		ReadyList += GetLobbyReadyLine(ListedPlayerState);
 		ReadyList += LINE_TERMINATOR;
 	}
 
-#if UE_BUILD_SHIPPING
-	GEngine->AddOnScreenDebugMessage(
-		GetLobbyReadyDebugMessageKey(this),
-		1.1f,
-		FColor::Green,
-		ReadyList);
-#else
 	if (LobbyReadyDebugWidget)
 	{
 		LobbyReadyDebugWidget->SetReadyText(FText::FromString(ReadyList));
 	}
-#endif
 }
 
 void APRPlayerController::CreateGASDebugHUD()
@@ -1015,6 +1213,7 @@ void APRPlayerController::CreateRiftSettlementUI()
 	RiftSettlementWidget = CreateWidget<UPRRiftSettlementWidget>(this, RiftSettlementWidgetClass);
 	if (RiftSettlementWidget)
 	{
+		RiftSettlementWidget->SetPersonalSaveStatus(PersonalSettlementSaveStatus);
 		RiftSettlementWidget->SetVisibility(ESlateVisibility::Collapsed);
 		RiftSettlementWidget->AddToPlayerScreen(45);
 		RiftSettlementWidget->SetPositionInViewport(FVector2D::ZeroVector, false);

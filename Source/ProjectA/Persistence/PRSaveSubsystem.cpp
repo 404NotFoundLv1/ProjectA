@@ -1,30 +1,72 @@
 #include "Persistence/PRSaveSubsystem.h"
 
 #include "Core/PRRiftGameMode.h"
+#include "Core/PRAssetManager.h"
 #include "Core/PRShipLobbyGameMode.h"
+#include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Misc/Paths.h"
 #include "Persistence/PRProfileRuntimeBridge.h"
 #include "Player/PRPlayerState.h"
+#include "Player/PRPlayerController.h"
 #include "ProjectA.h"
+#include "Progression/PRMissionProgressionDataAsset.h"
 
 void UPRSaveSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
-	SaveStore = MakeUnique<FPRSafeSaveStore>(
-		FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("SaveGames"), TEXT("ProjectRift")));
+	FString SaveRoot = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("SaveGames"), TEXT("ProjectRift"));
+#if !UE_BUILD_SHIPPING
+	FString RequestedTestRoot;
+	if (FParse::Value(FCommandLine::Get(), TEXT("ProjectRiftProfileRoot="), RequestedTestRoot))
+	{
+		const FString CandidateRoot = FPaths::ConvertRelativePathToFull(RequestedTestRoot);
+		const FString AutomationRoot = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation")));
+		if (CandidateRoot == AutomationRoot || FPaths::IsUnderDirectory(CandidateRoot, AutomationRoot))
+		{
+			int32 PIEInstance = INDEX_NONE;
+			UWorld* GameWorld = GetGameInstance() ? GetGameInstance()->GetWorld() : nullptr;
+			if (GEngine && GameWorld)
+			{
+				if (const FWorldContext* WorldContext = GEngine->GetWorldContextFromWorld(GameWorld))
+				{
+					PIEInstance = WorldContext->PIEInstance;
+				}
+			}
+			SaveRoot = PIEInstance == INDEX_NONE
+				? CandidateRoot
+				: FPaths::Combine(CandidateRoot, FString::Printf(TEXT("PIE_%d"), PIEInstance));
+			UE_LOG(LogProjectA, Log, TEXT("Using isolated ProjectRift development profile root: %s"), *SaveRoot);
+		}
+		else
+		{
+			UE_LOG(LogProjectA, Error, TEXT("Ignored ProjectRiftProfileRoot outside ProjectA Saved/Automation: %s"), *CandidateRoot);
+		}
+	}
+#endif
+	SaveStore = MakeUnique<FPRSafeSaveStore>(SaveRoot);
 	LoadOrRebuildCatalog();
 	if (Catalog && Catalog->ActiveProfileId.IsValid())
 	{
 		ActivateAndLoadProfile(Catalog->ActiveProfileId);
 	}
+#if !UE_BUILD_SHIPPING
+	else if (Catalog && FParse::Param(FCommandLine::Get(), TEXT("ProjectRiftCreateTestProfile")))
+	{
+		CreateProfile(TEXT("PIE Test Profile"));
+	}
+#endif
 }
 
 void UPRSaveSubsystem::Deinitialize()
 {
+	RetryPendingSettlementReceipt();
+	ReleaseSessionProfileBinding();
 	ActiveProfile = nullptr;
 	Catalog = nullptr;
 	SaveStore.Reset();
@@ -37,6 +79,8 @@ void UPRSaveSubsystem::InitializeForAutomation(const FString& RootDirectory)
 	ActiveProfile = nullptr;
 	Catalog = nullptr;
 	bHasAppliedActiveProfile = false;
+	SessionBoundProfileId.Invalidate();
+	bHasPendingSettlementReceipt = false;
 	SaveStore = MakeUnique<FPRSafeSaveStore>(RootDirectory);
 	LoadOrRebuildCatalog();
 	if (Catalog && Catalog->ActiveProfileId.IsValid())
@@ -48,6 +92,12 @@ void UPRSaveSubsystem::InitializeForAutomation(const FString& RootDirectory)
 
 FPRProfileOperationResult UPRSaveSubsystem::CreateProfile(const FString& DisplayName)
 {
+	if (IsSessionProfileBound())
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::Busy, TEXT("Cannot create or switch profiles while a multiplayer session profile is bound."), SessionBoundProfileId);
+		SetLastResult(Result);
+		return Result;
+	}
 	if (!SaveStore || !Catalog)
 	{
 		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::IOError, TEXT("Profile storage is not initialized."));
@@ -115,6 +165,12 @@ TArray<FPRProfileSummary> UPRSaveSubsystem::GetProfiles()
 
 FPRProfileOperationResult UPRSaveSubsystem::ActivateAndLoadProfile(const FGuid ProfileId)
 {
+	if (IsSessionProfileBound() && ProfileId != SessionBoundProfileId)
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::Busy, TEXT("Cannot switch profiles while a multiplayer session profile is bound."), ProfileId);
+		SetLastResult(Result);
+		return Result;
+	}
 	if (!SaveStore || !Catalog || !ProfileId.IsValid())
 	{
 		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::ValidationFailed, TEXT("Profile storage or ProfileId is invalid."), ProfileId);
@@ -172,6 +228,12 @@ FPRProfileOperationResult UPRSaveSubsystem::ActivateAndLoadProfile(const FGuid P
 
 FPRProfileOperationResult UPRSaveSubsystem::DeleteProfile(const FGuid ProfileId)
 {
+	if (IsSessionProfileBound() && ProfileId == SessionBoundProfileId)
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::Busy, TEXT("Cannot delete the profile bound to the active multiplayer session."), ProfileId);
+		SetLastResult(Result);
+		return Result;
+	}
 	if (!SaveStore || !Catalog || !Catalog->ProfileIds.Contains(ProfileId))
 	{
 		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::NotFound, TEXT("Profile is not present in the catalog."), ProfileId);
@@ -245,6 +307,12 @@ bool UPRSaveSubsystem::GetActiveProfileSnapshot(FPRProfileSnapshot& OutSnapshot)
 
 FPRProfileOperationResult UPRSaveSubsystem::ReplaceActiveProfileSnapshot(const FPRProfileSnapshot& Snapshot)
 {
+	if (IsSessionProfileBound())
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::Busy, TEXT("Cannot externally replace a profile snapshot while it is bound to a multiplayer session."), SessionBoundProfileId);
+		SetLastResult(Result);
+		return Result;
+	}
 	if (!ActiveProfile)
 	{
 		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::NoActiveProfile, TEXT("No active profile is loaded."));
@@ -288,6 +356,15 @@ FPRProfileOperationResult UPRSaveSubsystem::ApplyActiveProfileToPlayerState(APRP
 
 FPRProfileOperationResult UPRSaveSubsystem::CaptureAndSaveAtSafeCheckpoint(APRPlayerState* PlayerState)
 {
+	if (IsSessionProfileBound())
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(
+			EPRProfileOperationStatus::Busy,
+			TEXT("Runtime checkpoint capture is locked while the active profile is bound to a multiplayer session."),
+			SessionBoundProfileId);
+		SetLastResult(Result);
+		return Result;
+	}
 	if (!ActiveProfile)
 	{
 		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::NoActiveProfile, TEXT("No active profile is loaded."));
@@ -310,6 +387,139 @@ FPRProfileOperationResult UPRSaveSubsystem::CaptureAndSaveAtSafeCheckpoint(APRPl
 	}
 	ActiveProfile->Snapshot = MoveTemp(Candidate);
 	return SaveActiveProfile(EPRSaveReason::SafeCheckpoint);
+}
+
+FPRProfileOperationResult UPRSaveSubsystem::BuildMultiplayerProfileProjection(FPRMultiplayerProfileProjection& OutProjection) const
+{
+	OutProjection = FPRMultiplayerProfileProjection();
+	if (!ActiveProfile)
+	{
+		return FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::NoActiveProfile, TEXT("No active profile is loaded."));
+	}
+
+	OutProjection.ProfileId = ActiveProfile->ProfileId;
+	OutProjection.DisplayName = ActiveProfile->DisplayName;
+	OutProjection.BackpackItems = ActiveProfile->Snapshot.BackpackItems;
+	OutProjection.ResourceWallet = ActiveProfile->Snapshot.ResourceWallet;
+	OutProjection.SelectedRoleId = ActiveProfile->Snapshot.SelectedRoleId;
+	OutProjection.Story = ActiveProfile->Snapshot.Story;
+	FString Diagnostic;
+	if (!OutProjection.IsValid(&Diagnostic))
+	{
+		return FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::ValidationFailed, Diagnostic, ActiveProfile->ProfileId);
+	}
+	return FPRProfileOperationResult::MakeSuccess(ActiveProfile->ProfileId);
+}
+
+FPRProfileOperationResult UPRSaveSubsystem::BindActiveProfileToSession()
+{
+	FPRMultiplayerProfileProjection Projection;
+	FPRProfileOperationResult Result = BuildMultiplayerProfileProjection(Projection);
+	if (!Result.IsSuccess())
+	{
+		SetLastResult(Result);
+		return Result;
+	}
+	if (IsSessionProfileBound() && SessionBoundProfileId != Projection.ProfileId)
+	{
+		Result = FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::Busy, TEXT("A different profile is already bound to this multiplayer session."), SessionBoundProfileId);
+		SetLastResult(Result);
+		return Result;
+	}
+	SessionBoundProfileId = Projection.ProfileId;
+	SetLastResult(Result);
+	return Result;
+}
+
+void UPRSaveSubsystem::ReleaseSessionProfileBinding()
+{
+	SessionBoundProfileId.Invalidate();
+}
+
+FPRProfileOperationResult UPRSaveSubsystem::ApplyMultiplayerSettlementReceipt(const FPRPlayerSettlementReceipt& Receipt)
+{
+	FString Diagnostic;
+	if (!Receipt.IsValid(&Diagnostic))
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::ValidationFailed, Diagnostic, Receipt.ProfileId);
+		SetLastResult(Result);
+		return Result;
+	}
+	if (!SaveStore || !ActiveProfile || Receipt.ProfileId != ActiveProfile->ProfileId
+		|| !IsSessionProfileBound() || Receipt.ProfileId != SessionBoundProfileId)
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::ValidationFailed, TEXT("Settlement receipt does not match the active session-bound profile."), Receipt.ProfileId);
+		SetLastResult(Result);
+		return Result;
+	}
+	if (ActiveProfile->Snapshot.ProcessedSettlementIds.Contains(Receipt.SettlementId))
+	{
+		FPRProfileOperationResult Result = FPRProfileOperationResult::MakeSuccess(Receipt.ProfileId);
+		Result.bAlreadyProcessedSettlement = true;
+		bHasPendingSettlementReceipt = false;
+		SetLastResult(Result);
+		return Result;
+	}
+
+	UPRAssetManager* AssetManager = UPRAssetManager::Get();
+	UPRMissionProgressionDataAsset* Mission = AssetManager ? AssetManager->LoadMissionSync(Receipt.MissionId) : nullptr;
+	if (!Mission || !Mission->IsContractValid(&Diagnostic) || Mission->MissionId != Receipt.MissionId)
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::ValidationFailed, Diagnostic.IsEmpty() ? TEXT("Settlement mission contract is unavailable or invalid.") : Diagnostic, Receipt.ProfileId);
+		SetLastResult(Result);
+		return Result;
+	}
+
+	UPRProfileSave* Candidate = DuplicateObject<UPRProfileSave>(ActiveProfile, this);
+	Candidate->Snapshot.BackpackItems = Receipt.SettledBackpackItems;
+	Candidate->Snapshot.ResourceWallet = Receipt.SettledResourceWallet;
+	Candidate->Snapshot.SelectedRoleId = Receipt.SettledRoleId;
+	if (!Receipt.SettledRoleId.IsNone())
+	{
+		Candidate->Snapshot.UnlockedRoleIds.AddUnique(Receipt.SettledRoleId);
+	}
+	if (Receipt.bGrantStoryProgress)
+	{
+		if (!Mission->IsEligible(Candidate->Snapshot.Story))
+		{
+			const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::ValidationFailed, TEXT("Local profile does not satisfy the mission prerequisites in the settlement receipt."), Receipt.ProfileId);
+			SetLastResult(Result);
+			return Result;
+		}
+		Mission->ApplyCompletion(Candidate->Snapshot.Story);
+	}
+	Candidate->Snapshot.ProcessedSettlementIds.Add(Receipt.SettlementId);
+	Candidate->Snapshot.Normalize();
+	if (!Candidate->Snapshot.IsValid(&Diagnostic))
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::ValidationFailed, Diagnostic, Receipt.ProfileId);
+		SetLastResult(Result);
+		return Result;
+	}
+	Candidate->SaveVersion = UPRProfileSave::LatestSaveVersion;
+	Candidate->LastSavedUtc = FDateTime::UtcNow();
+	FPRProfileOperationResult Result = SaveStore->SaveProfile(Candidate);
+	if (!Result.IsSuccess())
+	{
+		PendingSettlementReceipt = Receipt;
+		bHasPendingSettlementReceipt = true;
+		SetLastResult(Result);
+		return Result;
+	}
+	ActiveProfile = Candidate;
+	bHasPendingSettlementReceipt = false;
+	SetLastResult(Result);
+	return Result;
+}
+
+FPRProfileOperationResult UPRSaveSubsystem::RetryPendingSettlementReceipt()
+{
+	if (!bHasPendingSettlementReceipt)
+	{
+		return FPRProfileOperationResult::MakeSuccess(GetActiveProfileId());
+	}
+	const FPRPlayerSettlementReceipt Receipt = PendingSettlementReceipt;
+	return ApplyMultiplayerSettlementReceipt(Receipt);
 }
 
 FPRProfileOperationResult UPRSaveSubsystem::CreateLegacyV1ProfileForDevelopment()
@@ -399,6 +609,11 @@ FPRProfileOperationResult UPRSaveSubsystem::CorruptActivePrimaryForDevelopment()
 
 void UPRSaveSubsystem::HandleLocalLobbyPlayerReady(APlayerController* PlayerController)
 {
+	if (APRPlayerController* ProjectRiftController = Cast<APRPlayerController>(PlayerController))
+	{
+		ProjectRiftController->SubmitLocalMultiplayerProfile();
+		return;
+	}
 	if (!bHasAppliedActiveProfile && ActiveProfile && PlayerController && PlayerController->IsLocalController() && PlayerController->HasAuthority())
 	{
 		ApplyActiveProfileToPlayerState(PlayerController->GetPlayerState<APRPlayerState>());
@@ -407,12 +622,17 @@ void UPRSaveSubsystem::HandleLocalLobbyPlayerReady(APlayerController* PlayerCont
 
 FPRProfileOperationResult UPRSaveSubsystem::SaveForApplicationExit()
 {
+	if (bHasPendingSettlementReceipt)
+	{
+		const FPRProfileOperationResult PendingResult = RetryPendingSettlementReceipt();
+		return PendingResult;
+	}
 	if (!ActiveProfile)
 	{
 		return FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::NoActiveProfile, TEXT("No active profile is loaded."));
 	}
 	UWorld* World = GetGameInstance() ? GetGameInstance()->GetWorld() : nullptr;
-	if (World && Cast<APRShipLobbyGameMode>(World->GetAuthGameMode()))
+	if (!IsSessionProfileBound() && World && Cast<APRShipLobbyGameMode>(World->GetAuthGameMode()))
 	{
 		if (APlayerController* Controller = World->GetFirstPlayerController())
 		{

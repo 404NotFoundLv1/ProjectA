@@ -141,7 +141,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FPRProfileContractTest::RunTest(const FString& Parameters)
 {
-	TestEqual(TEXT("Current player profile schema is version 2"), UPRProfileSave::LatestSaveVersion, 2);
+	TestEqual(TEXT("Current player profile schema is version 3"), UPRProfileSave::LatestSaveVersion, 3);
 	TestFalse(
 		TEXT("Profile snapshot recursively contains no UObject references"),
 		StructContainsObjectReference(FPRProfileSnapshot::StaticStruct()));
@@ -156,7 +156,8 @@ bool FPRProfileContractTest::RunTest(const FString& Parameters)
 	FPRProfileOperationResult MigrationResult = LegacyProfile->MigrateToLatest();
 	TestTrue(TEXT("v1 profile migrates successfully"), MigrationResult.IsSuccess());
 	TestTrue(TEXT("Migration result is marked"), MigrationResult.bMigrated);
-	TestEqual(TEXT("Migrated profile reaches v2"), LegacyProfile->SaveVersion, 2);
+	TestEqual(TEXT("Migrated profile reaches v3"), LegacyProfile->SaveVersion, 3);
+	TestTrue(TEXT("v1 to v3 migration preserves existing story progress"), LegacyProfile->Snapshot.Story.CompletedStoryNodeIds.Contains(TEXT("Story.Prologue.Intro")));
 	TestTrue(
 		TEXT("Selected role is added to unlocked roles"),
 		LegacyProfile->Snapshot.UnlockedRoleIds.Contains(TEXT("Ability.Role.Assault")));
@@ -171,7 +172,37 @@ bool FPRProfileContractTest::RunTest(const FString& Parameters)
 		TEXT("Future profile is rejected explicitly"),
 		FutureResult.Status,
 		EPRProfileOperationStatus::UnsupportedFutureVersion);
-	TestEqual(TEXT("Future profile remains untouched"), FutureProfile->SaveVersion, 3);
+	TestEqual(TEXT("Future profile remains untouched"), FutureProfile->SaveVersion, 4);
+
+	UPRProfileSave* VersionTwoProfile = MakeProfile(TEXT("Version Two"));
+	VersionTwoProfile->SaveVersion = 2;
+	VersionTwoProfile->Snapshot.ProcessedSettlementIds.Reset();
+	const FPRProfileOperationResult V2MigrationResult = VersionTwoProfile->MigrateToLatest();
+	TestTrue(TEXT("v2 profile migrates successfully"), V2MigrationResult.IsSuccess());
+	TestTrue(TEXT("v2 migration result is marked"), V2MigrationResult.bMigrated);
+	TestEqual(TEXT("v2 profile reaches v3"), VersionTwoProfile->SaveVersion, 3);
+	TestTrue(TEXT("v2 profile starts with an empty settlement ledger"), VersionTwoProfile->Snapshot.ProcessedSettlementIds.IsEmpty());
+
+	FGuid OldestSettlementId;
+	for (int32 Index = 0; Index < 132; ++Index)
+	{
+		const FGuid SettlementId = FGuid::NewGuid();
+		if (Index == 0)
+		{
+			OldestSettlementId = SettlementId;
+		}
+		VersionTwoProfile->Snapshot.ProcessedSettlementIds.Add(SettlementId);
+	}
+	const FGuid InvalidSettlementId;
+	VersionTwoProfile->Snapshot.ProcessedSettlementIds.Insert(InvalidSettlementId, 0);
+	const FGuid DuplicateSettlementId = VersionTwoProfile->Snapshot.ProcessedSettlementIds.Last();
+	VersionTwoProfile->Snapshot.ProcessedSettlementIds.Add(DuplicateSettlementId);
+	VersionTwoProfile->Snapshot.Normalize();
+	TestEqual(TEXT("Settlement ledger is capped at 128 entries"), VersionTwoProfile->Snapshot.ProcessedSettlementIds.Num(), 128);
+	TestFalse(TEXT("Settlement ledger trims the oldest processed id first"), VersionTwoProfile->Snapshot.ProcessedSettlementIds.Contains(OldestSettlementId));
+	TestFalse(TEXT("Settlement ledger removes invalid ids"), VersionTwoProfile->Snapshot.ProcessedSettlementIds.Contains(InvalidSettlementId));
+	TSet<FGuid> UniqueSettlementIds(VersionTwoProfile->Snapshot.ProcessedSettlementIds);
+	TestEqual(TEXT("Settlement ledger removes duplicate ids"), UniqueSettlementIds.Num(), VersionTwoProfile->Snapshot.ProcessedSettlementIds.Num());
 
 	return true;
 }
@@ -271,10 +302,10 @@ bool FPRSafeProfileStorageTest::RunTest(const FString& Parameters)
 	const FPRProfileOperationResult DiskMigrationResult = LoadedLegacy->MigrateToLatest();
 	TestTrue(TEXT("Loaded v1 sample migrates"), DiskMigrationResult.IsSuccess());
 	TestTrue(TEXT("Loaded v1 sample reports migration"), DiskMigrationResult.bMigrated);
-	TestTrue(TEXT("Migrated v2 sample is safely written"), Store.SaveProfile(LoadedLegacy).IsSuccess());
+	TestTrue(TEXT("Migrated v3 sample is safely written"), Store.SaveProfile(LoadedLegacy).IsSuccess());
 	UPRProfileSave* ReloadedMigratedProfile = nullptr;
 	TestTrue(TEXT("Migrated sample reloads"), Store.LoadProfile(LegacyOnDisk->ProfileId, ReloadedMigratedProfile).IsSuccess());
-	TestEqual(TEXT("Migrated sample persists as v2"), ReloadedMigratedProfile ? ReloadedMigratedProfile->SaveVersion : 0, 2);
+	TestEqual(TEXT("Migrated sample persists as v3"), ReloadedMigratedProfile ? ReloadedMigratedProfile->SaveVersion : 0, 3);
 	TestTrue(TEXT("Migrated sample retains its v1 backup"), IFileManager::Get().FileExists(*Store.GetProfileBackupPath(LegacyOnDisk->ProfileId)));
 
 	UPRProfileSave* DoubleCorruptProfile = MakeProfile(TEXT("Double Corrupt"));
@@ -591,6 +622,140 @@ bool FPRProfileSubsystemIntegrationTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Subsystem leaves future catalog backup byte-identical"), FutureBackupAfterSubsystem == FutureBackupBeforeSubsystem);
 	FutureSubsystem->Deinitialize();
 	IFileManager::Get().DeleteDirectory(*FutureRoot, false, true);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FPRMultiplayerSettlementPersistenceTest,
+	"ProjectRift.MultiplayerProfile.Persistence",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPRMultiplayerSettlementPersistenceTest::RunTest(const FString& Parameters)
+{
+	const FString TestRoot = MakeTestRoot(TEXT("MultiplayerSettlement"));
+	IFileManager::Get().DeleteDirectory(*TestRoot, false, true);
+	UGameInstance* GameInstance = NewObject<UGameInstance>(GetTransientPackage());
+	UPRSaveSubsystem* SaveSubsystem = NewObject<UPRSaveSubsystem>(GameInstance);
+	SaveSubsystem->InitializeForAutomation(TestRoot);
+	const FPRProfileOperationResult CreateResult = SaveSubsystem->CreateProfile(TEXT("Settlement Client"));
+	TestTrue(TEXT("Settlement test profile is created"), CreateResult.IsSuccess());
+
+	FPRProfileSnapshot InitialSnapshot;
+	InitialSnapshot.ResourceWallet = { FPRProfileResourceBalance{ TEXT("EnergyCrystal"), 5 } };
+	InitialSnapshot.BackpackItems = { MakeProfileTestItem(TEXT("HealthInjector"), 2) };
+	InitialSnapshot.UnlockedRoleIds = { TEXT("Ability.Role.Assault") };
+	InitialSnapshot.SelectedRoleId = TEXT("Ability.Role.Assault");
+	TestTrue(TEXT("Initial multiplayer snapshot is installed"), SaveSubsystem->ReplaceActiveProfileSnapshot(InitialSnapshot).IsSuccess());
+	TestTrue(TEXT("Initial multiplayer snapshot is saved"), SaveSubsystem->SaveActiveProfile().IsSuccess());
+
+	FPRMultiplayerProfileProjection Projection;
+	TestTrue(TEXT("Active profile builds a multiplayer projection"), SaveSubsystem->BuildMultiplayerProfileProjection(Projection).IsSuccess());
+	TestEqual(TEXT("Projection binds the active profile id"), Projection.ProfileId, CreateResult.ProfileId);
+	TestTrue(TEXT("Active profile can be locked to the session"), SaveSubsystem->BindActiveProfileToSession().IsSuccess());
+	TestTrue(TEXT("Session binding is visible"), SaveSubsystem->IsSessionProfileBound());
+	TestFalse(TEXT("Bound profile cannot be deleted"), SaveSubsystem->DeleteProfile(CreateResult.ProfileId).IsSuccess());
+	TestFalse(TEXT("Bound profile cannot be externally replaced"), SaveSubsystem->ReplaceActiveProfileSnapshot(FPRProfileSnapshot()).IsSuccess());
+	TestEqual(
+		TEXT("Bound profile cannot be mutated through a lobby checkpoint"),
+		SaveSubsystem->CaptureAndSaveAtSafeCheckpoint(nullptr).Status,
+		EPRProfileOperationStatus::Busy);
+
+	FPRPlayerSettlementReceipt Receipt;
+	Receipt.ProfileId = CreateResult.ProfileId;
+	Receipt.MissionId = TEXT("Mission.Rift.Test.Hold");
+	Receipt.RunId = FGuid::NewGuid();
+	Receipt.SettlementId = FGuid::NewGuid();
+	Receipt.Result = EPRRiftMissionResult::Success;
+	Receipt.bExtracted = true;
+	Receipt.bGrantStoryProgress = true;
+	Receipt.SettledBackpackItems = { MakeProfileTestItem(TEXT("ShieldPack"), 1) };
+	Receipt.SettledResourceWallet = { FPRProfileResourceBalance{ TEXT("EnergyCrystal"), 12 } };
+	Receipt.SettledRoleId = TEXT("Ability.Role.Assault");
+	const FPRProfileOperationResult ApplyResult = SaveSubsystem->ApplyMultiplayerSettlementReceipt(Receipt);
+	TestTrue(TEXT("Valid personal settlement is saved transactionally"), ApplyResult.IsSuccess());
+	TestFalse(TEXT("First settlement apply is not marked duplicate"), ApplyResult.bAlreadyProcessedSettlement);
+
+	FPRProfileSnapshot AppliedSnapshot;
+	TestTrue(TEXT("Applied multiplayer snapshot is available"), SaveSubsystem->GetActiveProfileSnapshot(AppliedSnapshot));
+	TestEqual(TEXT("Settled resource wallet replaces runtime wallet"), AppliedSnapshot.GetResourceCount(TEXT("EnergyCrystal")), 12);
+	TestEqual(TEXT("Settled backpack replaces runtime backpack"), AppliedSnapshot.BackpackItems.Num(), 1);
+	TestTrue(TEXT("Settlement id is recorded durably"), AppliedSnapshot.ProcessedSettlementIds.Contains(Receipt.SettlementId));
+	TestTrue(TEXT("Eligible extracted player receives story completion"), AppliedSnapshot.Story.CompletedStoryNodeIds.Contains(TEXT("Story.Prologue.RiftTestHold")));
+
+	const FPRProfileOperationResult DuplicateResult = SaveSubsystem->ApplyMultiplayerSettlementReceipt(Receipt);
+	TestTrue(TEXT("Duplicate settlement is an idempotent success"), DuplicateResult.IsSuccess());
+	TestTrue(TEXT("Duplicate settlement is reported"), DuplicateResult.bAlreadyProcessedSettlement);
+
+	FPRPlayerSettlementReceipt WrongProfileReceipt = Receipt;
+	WrongProfileReceipt.SettlementId = FGuid::NewGuid();
+	WrongProfileReceipt.ProfileId = FGuid::NewGuid();
+	TestFalse(TEXT("Wrong profile receipt is rejected"), SaveSubsystem->ApplyMultiplayerSettlementReceipt(WrongProfileReceipt).IsSuccess());
+	FPRProfileSnapshot AfterWrongProfile;
+	SaveSubsystem->GetActiveProfileSnapshot(AfterWrongProfile);
+	TestEqual(TEXT("Rejected receipt leaves wallet unchanged"), AfterWrongProfile.GetResourceCount(TEXT("EnergyCrystal")), 12);
+
+	SaveSubsystem->ReleaseSessionProfileBinding();
+	TestFalse(TEXT("Session binding can be released"), SaveSubsystem->IsSessionProfileBound());
+	SaveSubsystem->Deinitialize();
+
+	UGameInstance* ReloadGameInstance = NewObject<UGameInstance>(GetTransientPackage());
+	UPRSaveSubsystem* ReloadSubsystem = NewObject<UPRSaveSubsystem>(ReloadGameInstance);
+	ReloadSubsystem->InitializeForAutomation(TestRoot);
+	TestTrue(TEXT("Reloaded settlement profile activates"), ReloadSubsystem->ActivateAndLoadProfile(CreateResult.ProfileId).IsSuccess());
+	FPRProfileSnapshot ReloadedSnapshot;
+	ReloadSubsystem->GetActiveProfileSnapshot(ReloadedSnapshot);
+	TestEqual(TEXT("Reload preserves settled wallet"), ReloadedSnapshot.GetResourceCount(TEXT("EnergyCrystal")), 12);
+	TestTrue(TEXT("Reload preserves processed settlement id"), ReloadedSnapshot.ProcessedSettlementIds.Contains(Receipt.SettlementId));
+	ReloadSubsystem->Deinitialize();
+	IFileManager::Get().DeleteDirectory(*TestRoot, false, true);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FPRMultiplayerSettlementWriteFailureTest,
+	"ProjectRift.MultiplayerProfile.WriteFailure",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPRMultiplayerSettlementWriteFailureTest::RunTest(const FString& Parameters)
+{
+	const FString TestRoot = MakeTestRoot(TEXT("MultiplayerSettlementWriteFailure"));
+	IFileManager::Get().DeleteDirectory(*TestRoot, false, true);
+	UGameInstance* GameInstance = NewObject<UGameInstance>(GetTransientPackage());
+	UPRSaveSubsystem* SaveSubsystem = NewObject<UPRSaveSubsystem>(GameInstance);
+	SaveSubsystem->InitializeForAutomation(TestRoot);
+	const FPRProfileOperationResult CreateResult = SaveSubsystem->CreateProfile(TEXT("Write Failure Client"));
+	TestTrue(TEXT("Write-failure profile is created"), CreateResult.IsSuccess());
+
+	FPRProfileSnapshot InitialSnapshot;
+	InitialSnapshot.ResourceWallet = { FPRProfileResourceBalance{ TEXT("EnergyCrystal"), 5 } };
+	TestTrue(TEXT("Write-failure initial snapshot is installed"), SaveSubsystem->ReplaceActiveProfileSnapshot(InitialSnapshot).IsSuccess());
+	TestTrue(TEXT("Write-failure initial snapshot is saved"), SaveSubsystem->SaveActiveProfile().IsSuccess());
+	TestTrue(TEXT("Write-failure profile is session bound"), SaveSubsystem->BindActiveProfileToSession().IsSuccess());
+
+	UPRProfileSave* FuturePrimary = MakeProfile(TEXT("Future Write Barrier"));
+	FuturePrimary->ProfileId = CreateResult.ProfileId;
+	FuturePrimary->SaveVersion = UPRProfileSave::LatestSaveVersion + 1;
+	FPRSafeSaveStore Store(TestRoot);
+	TestTrue(TEXT("Can install a future-version primary as a deterministic write barrier"), WriteRawEnvelopedSave(FuturePrimary, Store.GetProfilePrimaryPath(CreateResult.ProfileId)));
+
+	FPRPlayerSettlementReceipt Receipt;
+	Receipt.ProfileId = CreateResult.ProfileId;
+	Receipt.MissionId = TEXT("Mission.Rift.Test.Hold");
+	Receipt.RunId = FGuid::NewGuid();
+	Receipt.SettlementId = FGuid::NewGuid();
+	Receipt.Result = EPRRiftMissionResult::Success;
+	Receipt.bExtracted = true;
+	Receipt.SettledResourceWallet = { FPRProfileResourceBalance{ TEXT("EnergyCrystal"), 50 } };
+	const FPRProfileOperationResult ApplyResult = SaveSubsystem->ApplyMultiplayerSettlementReceipt(Receipt);
+	TestEqual(TEXT("Future primary rejects settlement write"), ApplyResult.Status, EPRProfileOperationStatus::UnsupportedFutureVersion);
+	TestTrue(TEXT("Rejected settlement remains pending for lobby retry"), SaveSubsystem->HasPendingSettlementReceipt());
+	FPRProfileSnapshot AfterFailure;
+	SaveSubsystem->GetActiveProfileSnapshot(AfterFailure);
+	TestEqual(TEXT("Rejected write preserves the in-memory active snapshot"), AfterFailure.GetResourceCount(TEXT("EnergyCrystal")), 5);
+	TestFalse(TEXT("Rejected write does not record the settlement id in memory"), AfterFailure.ProcessedSettlementIds.Contains(Receipt.SettlementId));
+
+	SaveSubsystem->Deinitialize();
+	IFileManager::Get().DeleteDirectory(*TestRoot, false, true);
 	return true;
 }
 

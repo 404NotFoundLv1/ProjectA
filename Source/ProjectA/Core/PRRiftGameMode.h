@@ -4,6 +4,7 @@
 #include "Core/PRGameModeBase.h"
 #include "Core/PRRiftGameState.h"
 #include "Items/PRItemTypes.h"
+#include "Multiplayer/PRMultiplayerProfileTypes.h"
 #include "UObject/ObjectKey.h"
 #include "PRRiftGameMode.generated.h"
 
@@ -14,6 +15,8 @@ class APREnemyCharacter;
 class APlayerState;
 class APawn;
 class UPRInventoryComponent;
+class APRPlayerController;
+class UPRMissionProgressionDataAsset;
 
 /**
  * Server-authoritative rule set for rift missions.
@@ -31,6 +34,7 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
+	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Mission")
 	bool StartRiftMission();
@@ -113,6 +117,15 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Settlement")
 	void FinalizeRiftSettlement(EPRRiftMissionResult Result);
 
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Settlement")
+	void HandlePersonalSettlementAcknowledgement(APRPlayerController* PlayerController, FGuid SettlementId, bool bSaveSucceeded);
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Settlement")
+	float GetSettlementAcknowledgementTimeout() const;
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Settlement")
+	int32 GetPendingSettlementAcknowledgementCount() const { return PendingSettlementAcknowledgements.Num(); }
+
 	UFUNCTION(BlueprintPure, Category = "Rift|Resources")
 	int32 CalculateRetainedResourceCount(int32 Count, EPRRiftMissionResult Result) const;
 
@@ -145,6 +158,10 @@ private:
 	static bool IsFallbackMaterialResourceId(FName ItemId);
 	void RequestReturnToLobbyTravel(EPRRiftMissionResult Result);
 	void PerformReturnToLobbyTravel();
+	void TryCompleteSettlementReturn();
+	void FinalizePersonalSettlements(EPRRiftMissionResult Result);
+	FPRPlayerSettlementReceipt BuildPersonalSettlementReceipt(APRPlayerState* PlayerState, EPRRiftMissionResult Result, const UPRMissionProgressionDataAsset* Mission) const;
+	UPRMissionProgressionDataAsset* ResolveMissionContract() const;
 	void LogFlowPhase(const TCHAR* Phase, const APlayerState* PlayerState = nullptr) const;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Rift|Diagnostics")
@@ -165,5 +182,9 @@ private:
 	FGuid FinalizedRunId;
 	TSet<TObjectKey<APlayerState>> ExtractedPlayerStates;
 	TSet<TObjectKey<APREnemyCharacter>> CountedKilledEnemies;
+	TSet<TObjectKey<APRPlayerController>> PendingSettlementAcknowledgements;
+	int32 FailedSettlementAcknowledgementCount = 0;
+	float SettlementReturnEarliestTime = 0.0f;
+	float SettlementAcknowledgementDeadline = 0.0f;
 	FTimerHandle ReturnToLobbyTravelTimerHandle;
 };

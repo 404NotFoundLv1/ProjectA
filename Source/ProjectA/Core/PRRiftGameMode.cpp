@@ -3,6 +3,7 @@
 #include "Characters/PRCharacter.h"
 #include "Core/PRSpawnManager.h"
 #include "Core/PRRiftObjectiveActor.h"
+#include "Core/PRAssetManager.h"
 #include "Enemies/PREnemyCharacter.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
@@ -13,8 +14,11 @@
 #include "Items/PRInventoryComponent.h"
 #include "Items/PRItemDataAsset.h"
 #include "Items/PRItemTypes.h"
+#include "Kismet/GameplayStatics.h"
 #include "Player/PRPlayerState.h"
+#include "Player/PRPlayerController.h"
 #include "ProjectA.h"
+#include "Progression/PRMissionProgressionDataAsset.h"
 #include "Settings/PRProjectSettings.h"
 
 APRRiftGameMode::APRRiftGameMode()
@@ -26,7 +30,11 @@ APRRiftGameMode::APRRiftGameMode()
 void APRRiftGameMode::BeginPlay()
 {
 	Super::BeginPlay();
-
+	if (!ResolveMissionContract())
+	{
+		UE_LOG(LogProjectA, Error, TEXT("Rift mission will not start because its authoritative mission contract is unavailable. MissionId=%s"), *MissionId.ToString());
+		return;
+	}
 	StartRiftMission();
 }
 
@@ -39,11 +47,33 @@ void APRRiftGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	ActiveObjective = nullptr;
 	ExtractedPlayerStates.Reset();
 	CountedKilledEnemies.Reset();
+	PendingSettlementAcknowledgements.Reset();
 	bRiftMissionStarted = false;
 	bReturnToLobbyTravelPending = false;
 	bSettlementFinalizationInProgress = false;
 
 	Super::EndPlay(EndPlayReason);
+}
+
+void APRRiftGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
+{
+	Super::InitGame(MapName, Options, ErrorMessage);
+	const FString RequestedMissionId = UGameplayStatics::ParseOption(Options, TEXT("MissionId"));
+	if (RequestedMissionId.IsEmpty())
+	{
+		return;
+	}
+	const FName RequestedMissionName(*RequestedMissionId);
+	UPRAssetManager* AssetManager = UPRAssetManager::Get();
+	UPRMissionProgressionDataAsset* Mission = AssetManager ? AssetManager->LoadMissionSync(RequestedMissionName) : nullptr;
+	if (!Mission || Mission->MissionId != RequestedMissionName || !Mission->IsContractValid())
+	{
+		MissionId = NAME_None;
+		ErrorMessage = TEXT("The requested ProjectRift mission contract is invalid or unregistered.");
+		UE_LOG(LogProjectA, Error, TEXT("Rift mission option rejected. MissionId=%s"), *RequestedMissionId);
+		return;
+	}
+	MissionId = RequestedMissionName;
 }
 
 void APRRiftGameMode::Tick(const float DeltaSeconds)
@@ -77,15 +107,25 @@ void APRRiftGameMode::PostLogin(APlayerController* NewPlayer)
 
 void APRRiftGameMode::Logout(AController* Exiting)
 {
+	if (APRPlayerController* ProjectRiftController = Cast<APRPlayerController>(Exiting))
+	{
+		PendingSettlementAcknowledgements.Remove(TObjectKey<APRPlayerController>(ProjectRiftController));
+	}
 	Super::Logout(Exiting);
 
 	UpdateAlivePlayerCount();
+	TryCompleteSettlementReturn();
 }
 
 bool APRRiftGameMode::StartRiftMission()
 {
 	if (!HasAuthority())
 	{
+		return false;
+	}
+	if (!ResolveMissionContract())
+	{
+		UE_LOG(LogProjectA, Error, TEXT("Rift mission start rejected because the mission contract is invalid. MissionId=%s"), *MissionId.ToString());
 		return false;
 	}
 
@@ -100,6 +140,8 @@ bool APRRiftGameMode::StartRiftMission()
 	CurrentSettlementId = FGuid::NewGuid();
 	FinalizedRunId.Invalidate();
 	bSettlementFinalizationInProgress = false;
+	PendingSettlementAcknowledgements.Reset();
+	FailedSettlementAcknowledgementCount = 0;
 	CountedKilledEnemies.Reset();
 	bRiftMissionStarted = true;
 	ActiveObjective = nullptr;
@@ -300,6 +342,12 @@ float APRRiftGameMode::GetReturnToLobbyDelayAfterSettlement() const
 		: 4.0f;
 }
 
+float APRRiftGameMode::GetSettlementAcknowledgementTimeout() const
+{
+	const UPRProjectSettings* ProjectSettings = GetDefault<UPRProjectSettings>();
+	return ProjectSettings ? FMath::Max(0.0f, ProjectSettings->SettlementAcknowledgementTimeout) : 8.0f;
+}
+
 FPRRiftSettlementData APRRiftGameMode::GenerateSettlementData(const EPRRiftMissionResult Result) const
 {
 	FPRRiftSettlementData Settlement;
@@ -341,6 +389,7 @@ void APRRiftGameMode::FinalizeRiftSettlement(const EPRRiftMissionResult Result)
 		bSettlementFinalizationInProgress = true;
 		FPRRiftSettlementData Settlement = GenerateSettlementData(Result);
 		ApplyExtractedResourceRules(Result, Settlement);
+		FinalizePersonalSettlements(Result);
 
 		RiftGameState->SetSettlementData(Settlement);
 		RiftGameState->SetSettlementReady(true);
@@ -360,6 +409,134 @@ void APRRiftGameMode::FinalizeRiftSettlement(const EPRRiftMissionResult Result)
 			FinalSettlement.ExtractedResourceCount,
 			FinalSettlement.ExtractedUniqueResourceTypes,
 			FinalSettlement.LostResourceCount);
+	}
+}
+
+void APRRiftGameMode::FinalizePersonalSettlements(const EPRRiftMissionResult Result)
+{
+	PendingSettlementAcknowledgements.Reset();
+	FailedSettlementAcknowledgementCount = 0;
+	const UPRMissionProgressionDataAsset* Mission = ResolveMissionContract();
+	const AGameStateBase* CurrentGameState = GameState;
+	if (!Mission || !CurrentGameState)
+	{
+		UE_LOG(LogProjectA, Error, TEXT("Personal settlement skipped because the mission contract or GameState is unavailable."));
+		return;
+	}
+
+	for (const TObjectPtr<APlayerState>& RawPlayerState : CurrentGameState->PlayerArray)
+	{
+		APRPlayerState* PlayerState = Cast<APRPlayerState>(RawPlayerState.Get());
+		APRPlayerController* PlayerController = PlayerState ? Cast<APRPlayerController>(PlayerState->GetOwner()) : nullptr;
+		if (!PlayerState || !PlayerController || PlayerState->IsOnlyASpectator() || !PlayerState->IsMultiplayerProfileBound())
+		{
+			continue;
+		}
+
+		const FPRPlayerSettlementReceipt Receipt = BuildPersonalSettlementReceipt(PlayerState, Result, Mission);
+		FString Diagnostic;
+		if (!Receipt.IsValid(&Diagnostic))
+		{
+			UE_LOG(LogProjectA, Error, TEXT("Personal settlement receipt rejected before dispatch. Player=%s Diagnostic=%s"), *GetNameSafe(PlayerState), *Diagnostic);
+			continue;
+		}
+
+		UPRInventoryComponent* Inventory = PlayerState->GetInventoryComponent();
+		if (!Inventory || !Inventory->ReplaceInventoryItems(Receipt.SettledBackpackItems))
+		{
+			UE_LOG(LogProjectA, Error, TEXT("Settled inventory could not be applied to PlayerState. Player=%s"), *GetNameSafe(PlayerState));
+			continue;
+		}
+		TArray<FPRShipResourceStack> SettledResources;
+		SettledResources.Reserve(Receipt.SettledResourceWallet.Num());
+		for (const FPRProfileResourceBalance& Resource : Receipt.SettledResourceWallet)
+		{
+			FPRShipResourceStack& SettledResource = SettledResources.AddDefaulted_GetRef();
+			SettledResource.ResourceId = Resource.ResourceId;
+			SettledResource.Count = Resource.Count;
+		}
+		if (!PlayerState->ReplaceShipResources(SettledResources))
+		{
+			UE_LOG(LogProjectA, Error, TEXT("Settled resource wallet could not be applied to PlayerState. Player=%s"), *GetNameSafe(PlayerState));
+			continue;
+		}
+		PlayerState->SetSelectedRoleModule(Receipt.SettledRoleId);
+		if (Receipt.bGrantStoryProgress)
+		{
+			PlayerState->ApplyMissionCompletion(Mission);
+		}
+
+		PendingSettlementAcknowledgements.Add(TObjectKey<APRPlayerController>(PlayerController));
+		PlayerController->ClientReceivePersonalSettlement(Receipt);
+	}
+}
+
+FPRPlayerSettlementReceipt APRRiftGameMode::BuildPersonalSettlementReceipt(
+	APRPlayerState* PlayerState,
+	const EPRRiftMissionResult Result,
+	const UPRMissionProgressionDataAsset* Mission) const
+{
+	FPRPlayerSettlementReceipt Receipt;
+	if (!PlayerState || !Mission)
+	{
+		return Receipt;
+	}
+	Receipt.ProfileId = PlayerState->GetBoundProfileId();
+	Receipt.MissionId = MissionId;
+	Receipt.RunId = CurrentRunId;
+	Receipt.SettlementId = CurrentSettlementId;
+	Receipt.Result = Result;
+	Receipt.bExtracted = ExtractedPlayerStates.Contains(TObjectKey<APlayerState>(PlayerState));
+	Receipt.bGrantStoryProgress = Result == EPRRiftMissionResult::Success
+		&& Receipt.bExtracted
+		&& Mission->IsEligible(PlayerState->GetBoundStoryProgress());
+	const UPRInventoryComponent* Inventory = PlayerState->GetInventoryComponent();
+	const TArray<FPRItemInstance> RuntimeItems = Inventory ? Inventory->GetInventoryItems() : TArray<FPRItemInstance>();
+	Receipt.SettledBackpackItems = Result == EPRRiftMissionResult::Success && Receipt.bExtracted
+		? RuntimeItems
+		: FPRMultiplayerSettlementPolicy::BuildNonExtractedInventory(PlayerState->GetMissionStartBackpackItems(), RuntimeItems);
+	for (const FPRShipResourceStack& Resource : PlayerState->GetShipResources())
+	{
+		if (Resource.IsValid())
+		{
+			Receipt.SettledResourceWallet.Emplace(Resource.ResourceId, Resource.Count);
+		}
+	}
+	if (Result == EPRRiftMissionResult::Success && !Receipt.bExtracted)
+	{
+		Receipt.SettledResourceWallet = FPRMultiplayerSettlementPolicy::BuildNonExtractedResourceWallet(
+			PlayerState->GetMissionStartResourceWallet(),
+			Receipt.SettledResourceWallet);
+	}
+	Receipt.SettledRoleId = PlayerState->GetSelectedRoleModule();
+	return Receipt;
+}
+
+UPRMissionProgressionDataAsset* APRRiftGameMode::ResolveMissionContract() const
+{
+	UPRAssetManager* AssetManager = UPRAssetManager::Get();
+	UPRMissionProgressionDataAsset* Mission = AssetManager ? AssetManager->LoadMissionSync(MissionId) : nullptr;
+	return Mission && Mission->MissionId == MissionId && Mission->IsContractValid() ? Mission : nullptr;
+}
+
+void APRRiftGameMode::HandlePersonalSettlementAcknowledgement(
+	APRPlayerController* PlayerController,
+	const FGuid SettlementId,
+	const bool bSaveSucceeded)
+{
+	if (!HasAuthority() || !PlayerController || SettlementId != CurrentSettlementId)
+	{
+		return;
+	}
+	const int32 RemovedCount = PendingSettlementAcknowledgements.Remove(TObjectKey<APRPlayerController>(PlayerController));
+	if (RemovedCount > 0 && !bSaveSucceeded)
+	{
+		++FailedSettlementAcknowledgementCount;
+	}
+	if (RemovedCount > 0)
+	{
+		LogFlowPhase(bSaveSucceeded ? TEXT("PersonalSettlementSaved") : TEXT("PersonalSettlementSaveFailed"), PlayerController->PlayerState);
+		TryCompleteSettlementReturn();
 	}
 }
 
@@ -916,22 +1093,45 @@ void APRRiftGameMode::RequestReturnToLobbyTravel(const EPRRiftMissionResult Resu
 		return;
 	}
 
+	const float Now = World->GetTimeSeconds();
 	const float ReturnDelay = GetReturnToLobbyDelayAfterSettlement();
-	if (ReturnDelay > 0.0f)
+	SettlementReturnEarliestTime = Now + ReturnDelay;
+	SettlementAcknowledgementDeadline = Now + FMath::Max(ReturnDelay, GetSettlementAcknowledgementTimeout());
+	UE_LOG(LogProjectA, Log, TEXT("Rift settlement return barrier armed. DisplayDelay=%.1f AckTimeout=%.1f Pending=%d Travel=%s"),
+		ReturnDelay,
+		GetSettlementAcknowledgementTimeout(),
+		PendingSettlementAcknowledgements.Num(),
+		*TravelURL);
+	TryCompleteSettlementReturn();
+}
+
+void APRRiftGameMode::TryCompleteSettlementReturn()
+{
+	if (!HasAuthority() || !bReturnToLobbyTravelPending || !bReturnToLobbyServerTravelEnabled)
 	{
-		UE_LOG(LogProjectA, Log, TEXT("Rift extraction completed. Showing settlement for %.1f seconds before return travel: %s"),
-			ReturnDelay,
-			*TravelURL);
-		World->GetTimerManager().SetTimer(
-			ReturnToLobbyTravelTimerHandle,
-			this,
-			&APRRiftGameMode::PerformReturnToLobbyTravel,
-			ReturnDelay,
-			false);
 		return;
 	}
-
-	PerformReturnToLobbyTravel();
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	const float Now = World->GetTimeSeconds();
+	if (Now < SettlementReturnEarliestTime)
+	{
+		World->GetTimerManager().SetTimer(ReturnToLobbyTravelTimerHandle, this, &APRRiftGameMode::TryCompleteSettlementReturn, SettlementReturnEarliestTime - Now, false);
+		return;
+	}
+	if (PendingSettlementAcknowledgements.IsEmpty() || Now >= SettlementAcknowledgementDeadline)
+	{
+		if (!PendingSettlementAcknowledgements.IsEmpty())
+		{
+			UE_LOG(LogProjectA, Warning, TEXT("Personal settlement acknowledgement timeout. Pending=%d Failed=%d"), PendingSettlementAcknowledgements.Num(), FailedSettlementAcknowledgementCount);
+		}
+		PerformReturnToLobbyTravel();
+		return;
+	}
+	World->GetTimerManager().SetTimer(ReturnToLobbyTravelTimerHandle, this, &APRRiftGameMode::TryCompleteSettlementReturn, SettlementAcknowledgementDeadline - Now, false);
 }
 
 void APRRiftGameMode::PerformReturnToLobbyTravel()

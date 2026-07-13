@@ -3,7 +3,9 @@
 #include "Misc/AutomationTest.h"
 
 #include "Core/PRRiftSettlementTypes.h"
+#include "Core/PRRiftGameMode.h"
 #include "Player/PRPlayerController.h"
+#include "Settings/PRProjectSettings.h"
 #include "UI/PRRiftSettlementWidget.h"
 #include "UObject/UnrealType.h"
 
@@ -42,7 +44,11 @@ bool FPRRiftSettlementTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Settlement widget exposes SetPreviewSettlementData"), SettlementWidgetClass->FindFunctionByName(TEXT("SetPreviewSettlementData")));
 	TestNotNull(TEXT("Settlement widget exposes GetDisplayedSettlementData"), SettlementWidgetClass->FindFunctionByName(TEXT("GetDisplayedSettlementData")));
 	TestNotNull(TEXT("Settlement widget exposes GetDisplayedSettlementText"), SettlementWidgetClass->FindFunctionByName(TEXT("GetDisplayedSettlementText")));
+	TestNotNull(TEXT("Settlement widget exposes personal save status"), SettlementWidgetClass->FindFunctionByName(TEXT("SetPersonalSaveStatus")));
 	TestNotNull(TEXT("PlayerController exposes GetRiftSettlementWidget"), PlayerControllerClass->FindFunctionByName(TEXT("GetRiftSettlementWidget")));
+	TestNotNull(TEXT("Rift GameMode exposes settlement acknowledgement handler"), APRRiftGameMode::StaticClass()->FindFunctionByName(TEXT("HandlePersonalSettlementAcknowledgement")));
+	TestNotNull(TEXT("Rift GameMode exposes acknowledgement timeout"), APRRiftGameMode::StaticClass()->FindFunctionByName(TEXT("GetSettlementAcknowledgementTimeout")));
+	TestEqual(TEXT("Settlement acknowledgement timeout defaults to eight seconds"), GetDefault<UPRProjectSettings>()->SettlementAcknowledgementTimeout, 8.0f);
 	TestNotNull(TEXT("PlayerController has configurable RiftSettlementWidgetClass"), FindFProperty<FClassProperty>(PlayerControllerClass, TEXT("RiftSettlementWidgetClass")));
 	TestNotNull(TEXT("Rift settlement data records killed enemy count"), FindFProperty<FIntProperty>(FPRRiftSettlementData::StaticStruct(), TEXT("KilledEnemyCount")));
 
@@ -65,6 +71,7 @@ bool FPRRiftSettlementTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Can seed settlement killed enemy count"), SetSettlementIntField(SettlementData, TEXT("KilledEnemyCount"), 4));
 
 	Widget->SetPreviewSettlementData(SettlementData);
+	Widget->SetPersonalSaveStatus(TEXT("Saved"));
 
 	const FPRRiftSettlementData DisplayedData = Widget->GetDisplayedSettlementData();
 	TestEqual(TEXT("Settlement widget stores server settlement result"), DisplayedData.Result, EPRRiftMissionResult::Success);
@@ -78,6 +85,7 @@ bool FPRRiftSettlementTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Settlement widget renders killed enemy label"), SettlementText.Contains(TEXT("\u51FB\u6740\u6570")));
 	TestTrue(TEXT("Settlement widget renders killed enemy count"), SettlementText.Contains(TEXT("4")));
 	TestTrue(TEXT("Settlement widget renders carried item count"), SettlementText.Contains(TEXT("5")));
+	TestTrue(TEXT("Settlement widget renders personal save status"), SettlementText.Contains(TEXT("Saved")));
 
 	Widget->ClearPreviewSettlementData();
 	TestFalse(TEXT("Clearing preview removes displayed settlement data"), Widget->GetDisplayedSettlementData().IsValid());

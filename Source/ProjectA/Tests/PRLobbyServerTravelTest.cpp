@@ -4,6 +4,7 @@
 #include "Core/PRShipLobbyGameMode.h"
 #include "Player/PRPlayerController.h"
 #include "Player/PRPlayerState.h"
+#include "Multiplayer/PRMultiplayerProfileTypes.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPRLobbyServerTravelTest, "ProjectRift.Lobby.ServerTravel", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
@@ -15,9 +16,9 @@ bool FPRLobbyServerTravelTest::RunTest(const FString& Parameters)
 		GameModeDefaults->GetRiftTestMapPath(),
 		FString(TEXT("/Game/ProjectRift/Maps/L_Rift_Test")));
 	TestEqual(
-		TEXT("Lobby travel URL keeps listen server open"),
+		TEXT("Lobby travel URL keeps listen server open and carries the authoritative mission"),
 		GameModeDefaults->BuildRiftTravelURL(),
-		FString(TEXT("/Game/ProjectRift/Maps/L_Rift_Test?listen")));
+		FString(TEXT("/Game/ProjectRift/Maps/L_Rift_Test?listen?MissionId=Mission.Rift.Test.Hold")));
 
 	APRShipLobbyGameMode* LobbyGameMode = NewObject<APRShipLobbyGameMode>();
 	TArray<APlayerState*> PlayerStates;
@@ -26,7 +27,15 @@ bool FPRLobbyServerTravelTest::RunTest(const FString& Parameters)
 	APRPlayerState* ReadyPlayer = NewObject<APRPlayerState>();
 	ReadyPlayer->SetReady(true);
 	PlayerStates.Add(ReadyPlayer);
-	TestTrue(TEXT("A lobby with every player ready can start rift travel"), LobbyGameMode->ArePlayerStatesReadyForTravel(PlayerStates));
+	TestFalse(TEXT("A ready player without a bound profile cannot start rift travel"), LobbyGameMode->ArePlayerStatesReadyForTravel(PlayerStates));
+
+	FPRMultiplayerProfileProjection Projection;
+	Projection.ProfileId = FGuid::NewGuid();
+	Projection.DisplayName = TEXT("Ready Profile");
+	FString BindDiagnostic;
+	TestTrue(TEXT("A valid multiplayer projection binds to PlayerState"), ReadyPlayer->BindMultiplayerProfile(Projection, BindDiagnostic));
+	ReadyPlayer->SetReady(true);
+	TestTrue(TEXT("A lobby with every bound player ready can start rift travel"), LobbyGameMode->ArePlayerStatesReadyForTravel(PlayerStates));
 
 	APRPlayerState* WaitingPlayer = NewObject<APRPlayerState>();
 	WaitingPlayer->SetReady(false);

@@ -25,7 +25,8 @@ enum class EPRSaveReason : uint8
 	Manual,
 	SafeCheckpoint,
 	ApplicationExit,
-	Migration
+	Migration,
+	MultiplayerSettlement
 };
 
 USTRUCT(BlueprintType)
@@ -47,6 +48,9 @@ struct PROJECTA_API FPRProfileOperationResult
 
 	UPROPERTY(BlueprintReadOnly, Category = "Profile")
 	bool bMigrated = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Profile")
+	bool bAlreadyProcessedSettlement = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Profile")
 	FString Diagnostic;
@@ -184,6 +188,9 @@ struct PROJECTA_API FPRProfileSnapshot
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Profile|Story")
 	FPRProfileStoryProgress Story;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Profile|Settlement")
+	TArray<FGuid> ProcessedSettlementIds;
 
 	int32 GetResourceCount(FName ResourceId) const;
 	void Normalize();

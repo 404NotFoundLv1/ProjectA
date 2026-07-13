@@ -157,6 +157,10 @@ bool UPRGameInstance::DestroySession()
 {
 	LastSessionError.Reset();
 	CachedSessionSearchResults.Reset();
+	if (UPRSaveSubsystem* SaveSubsystem = GetSubsystem<UPRSaveSubsystem>())
+	{
+		SaveSubsystem->ReleaseSessionProfileBinding();
+	}
 
 	SetSessionInterfaceState(EPRSessionInterfaceState::Destroying);
 	UE_LOG(LogProjectA, Log, TEXT("DestroySession requested."));

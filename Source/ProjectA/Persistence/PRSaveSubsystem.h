@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Persistence/PRProfileSave.h"
 #include "Persistence/PRSaveStorage.h"
+#include "Multiplayer/PRMultiplayerProfileTypes.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "PRSaveSubsystem.generated.h"
 
@@ -45,6 +46,32 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Profile")
 	FPRProfileOperationResult CaptureAndSaveAtSafeCheckpoint(APRPlayerState* PlayerState);
 
+	UFUNCTION(BlueprintCallable, Category = "Profile|Multiplayer")
+	FPRProfileOperationResult BuildMultiplayerProfileProjection(UPARAM(ref) FPRMultiplayerProfileProjection& OutProjection) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Profile|Multiplayer")
+	FPRProfileOperationResult BindActiveProfileToSession();
+
+	UFUNCTION(BlueprintCallable, Category = "Profile|Multiplayer")
+	void ReleaseSessionProfileBinding();
+
+	UFUNCTION(BlueprintPure, Category = "Profile|Multiplayer")
+	bool IsSessionProfileBound() const { return SessionBoundProfileId.IsValid(); }
+
+	UFUNCTION(BlueprintPure, Category = "Profile|Multiplayer")
+	FGuid GetSessionBoundProfileId() const { return SessionBoundProfileId; }
+
+	UFUNCTION(BlueprintCallable, Category = "Profile|Multiplayer")
+	FPRProfileOperationResult ApplyMultiplayerSettlementReceipt(const FPRPlayerSettlementReceipt& Receipt);
+
+	UFUNCTION(BlueprintPure, Category = "Profile|Multiplayer")
+	bool HasPendingSettlementReceipt() const { return bHasPendingSettlementReceipt; }
+
+	UFUNCTION(BlueprintPure, Category = "Profile|Multiplayer")
+	FPRPlayerSettlementReceipt GetPendingSettlementReceipt() const { return PendingSettlementReceipt; }
+
+	FPRProfileOperationResult RetryPendingSettlementReceipt();
+
 	UFUNCTION(BlueprintCallable, Category = "Profile|Development")
 	FPRProfileOperationResult CreateLegacyV1ProfileForDevelopment();
 
@@ -79,4 +106,7 @@ private:
 	TUniquePtr<FPRSafeSaveStore> SaveStore;
 	FPRProfileOperationResult LastOperationResult;
 	bool bHasAppliedActiveProfile = false;
+	FGuid SessionBoundProfileId;
+	FPRPlayerSettlementReceipt PendingSettlementReceipt;
+	bool bHasPendingSettlementReceipt = false;
 };

@@ -2,6 +2,8 @@
 
 namespace
 {
+constexpr int32 MaxProcessedSettlementIds = 128;
+
 void NormalizeNames(TArray<FName>& Names)
 {
 	TSet<FName> Seen;
@@ -124,6 +126,21 @@ void FPRProfileSnapshot::Normalize()
 	{
 		Story.UnlockedChapterIds.Add(Story.CurrentChapterId);
 	}
+
+	TSet<FGuid> SeenSettlementIds;
+	ProcessedSettlementIds.RemoveAll([&SeenSettlementIds](const FGuid& SettlementId)
+	{
+		if (!SettlementId.IsValid() || SeenSettlementIds.Contains(SettlementId))
+		{
+			return true;
+		}
+		SeenSettlementIds.Add(SettlementId);
+		return false;
+	});
+	if (ProcessedSettlementIds.Num() > MaxProcessedSettlementIds)
+	{
+		ProcessedSettlementIds.RemoveAt(0, ProcessedSettlementIds.Num() - MaxProcessedSettlementIds);
+	}
 }
 
 bool FPRProfileSnapshot::IsValid(FString* OutDiagnostic) const
@@ -162,6 +179,21 @@ bool FPRProfileSnapshot::IsValid(FString* OutDiagnostic) const
 	{
 		if (OutDiagnostic) { *OutDiagnostic = TEXT("Player settings are outside their supported ranges."); }
 		return false;
+	}
+	if (ProcessedSettlementIds.Num() > MaxProcessedSettlementIds)
+	{
+		if (OutDiagnostic) { *OutDiagnostic = TEXT("Processed settlement ledger exceeds its supported limit."); }
+		return false;
+	}
+	TSet<FGuid> SettlementIds;
+	for (const FGuid& SettlementId : ProcessedSettlementIds)
+	{
+		if (!SettlementId.IsValid() || SettlementIds.Contains(SettlementId))
+		{
+			if (OutDiagnostic) { *OutDiagnostic = TEXT("Processed settlement ledger contains an invalid or duplicate id."); }
+			return false;
+		}
+		SettlementIds.Add(SettlementId);
 	}
 	return true;
 }

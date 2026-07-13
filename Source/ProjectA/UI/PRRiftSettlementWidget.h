@@ -30,6 +30,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Rift|Settlement")
 	FText GetDisplayedSettlementText() const;
 
+	UFUNCTION(BlueprintCallable, Category = "Rift|Settlement")
+	void SetPersonalSaveStatus(const FString& InStatus);
+
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual void ReleaseSlateResources(bool bReleaseChildren) override;
@@ -42,6 +45,7 @@ private:
 	static FSlateFontInfo GetSettlementFont(float Size);
 
 	FPRRiftSettlementData DisplayedSettlementData;
+	FString PersonalSaveStatus = TEXT("Waiting");
 	bool bUsePreviewData = false;
 
 	TSharedPtr<SWidget> SettlementRootWidget;

@@ -11,6 +11,7 @@
 #include "GameFramework/WorldSettings.h"
 #include "Items/PRInventoryComponent.h"
 #include "Items/PRItemTypes.h"
+#include "Multiplayer/PRMultiplayerProfileTypes.h"
 #include "Player/PRPlayerState.h"
 #include "Tests/AutomationCommon.h"
 
@@ -83,7 +84,7 @@ bool FPRLobbyRiftLoopTest::RunTest(const FString& Parameters)
 	TestEqual(
 		TEXT("Lobby still travels to the rift test map as a listen server"),
 		LobbyDefaults ? LobbyDefaults->BuildRiftTravelURL() : FString(),
-		FString(TEXT("/Game/ProjectRift/Maps/L_Rift_Test?listen")));
+		FString(TEXT("/Game/ProjectRift/Maps/L_Rift_Test?listen?MissionId=Mission.Rift.Test.Hold")));
 	TestEqual(
 		TEXT("Rift still returns to the ship lobby as a listen server"),
 		RiftDefaults ? RiftDefaults->BuildReturnToLobbyTravelURL() : FString(),
@@ -100,6 +101,15 @@ bool FPRLobbyRiftLoopTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
+	FPRMultiplayerProfileProjection LobbyProjectionOne;
+	LobbyProjectionOne.ProfileId = FGuid::NewGuid();
+	LobbyProjectionOne.DisplayName = TEXT("Lobby Player One");
+	FPRMultiplayerProfileProjection LobbyProjectionTwo;
+	LobbyProjectionTwo.ProfileId = FGuid::NewGuid();
+	LobbyProjectionTwo.DisplayName = TEXT("Lobby Player Two");
+	FString BindingDiagnostic;
+	TestTrue(TEXT("Lobby player one profile binds"), LobbyPlayerOne->BindMultiplayerProfile(LobbyProjectionOne, BindingDiagnostic));
+	TestTrue(TEXT("Lobby player two profile binds"), LobbyPlayerTwo->BindMultiplayerProfile(LobbyProjectionTwo, BindingDiagnostic));
 	LobbyPlayerOne->SetReady(true);
 	LobbyPlayerTwo->SetReady(true);
 	LobbyPlayerOne->SetSelectedRoleModule(TEXT("Assault"));

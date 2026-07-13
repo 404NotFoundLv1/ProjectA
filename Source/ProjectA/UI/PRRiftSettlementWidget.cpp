@@ -27,6 +27,12 @@ FText UPRRiftSettlementWidget::GetDisplayedSettlementText() const
 	return BuildSettlementText(DisplayedSettlementData);
 }
 
+void UPRRiftSettlementWidget::SetPersonalSaveStatus(const FString& InStatus)
+{
+	PersonalSaveStatus = InStatus.IsEmpty() ? TEXT("Waiting") : InStatus;
+	RefreshSettlementSlate();
+}
+
 TSharedRef<SWidget> UPRRiftSettlementWidget::RebuildWidget()
 {
 	TSharedRef<SWidget> Widget = SAssignNew(SettlementRootWidget, SBorder)
@@ -129,6 +135,7 @@ FText UPRRiftSettlementWidget::BuildSettlementText(const FPRRiftSettlementData& 
 		TEXT("\u5E26\u51FA\u8D44\u6E90\uFF1A%d \u4EF6 / %d \u7C7B\n")
 		TEXT("\u635F\u5931\u8D44\u6E90\uFF1A%d \u4EF6\n")
 		TEXT("\u5E26\u51FA\u7269\u54C1\uFF1A%d \u4EF6 / %d \u7C7B\n\n")
+		TEXT("\u4E2A\u4EBA\u6863\u6848\uFF1A%s\n")
 		TEXT("\u5373\u5C06\u8FD4\u56DE\u4E3B\u623F\u95F4..."),
 		ResultText,
 		InSettlementData.MissionTime,
@@ -141,7 +148,8 @@ FText UPRRiftSettlementWidget::BuildSettlementText(const FPRRiftSettlementData& 
 		InSettlementData.ExtractedUniqueResourceTypes,
 		InSettlementData.LostResourceCount,
 		InSettlementData.ExtractedItemCount,
-		InSettlementData.ExtractedUniqueItemTypes));
+		InSettlementData.ExtractedUniqueItemTypes,
+		*PersonalSaveStatus));
 }
 
 FSlateFontInfo UPRRiftSettlementWidget::GetSettlementFont(const float Size)

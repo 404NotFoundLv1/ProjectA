@@ -25,6 +25,9 @@ public:
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Mission", meta=(ClampMin="0.0", UIMin="0.0"))
 	float ReturnToLobbyDelayAfterSettlement = 4.0f;
 
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Mission", meta=(ClampMin="0.0", UIMin="0.0"))
+	float SettlementAcknowledgementTimeout = 8.0f;
+
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Objective", meta=(ClampMin="0.1", UIMin="0.1"))
 	float ObjectiveHoldDuration = 30.0f;
 

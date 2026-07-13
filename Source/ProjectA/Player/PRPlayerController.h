@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Items/PRItemTypes.h"
+#include "Multiplayer/PRMultiplayerProfileTypes.h"
 #include "ProjectAPlayerController.h"
 #include "TimerManager.h"
 #include "PRPlayerController.generated.h"
@@ -114,6 +115,30 @@ public:
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Loot|Debug")
 	void ServerSpawnTestLoot();
 
+	UFUNCTION(BlueprintCallable, Category = "Lobby|Profile")
+	void SubmitLocalMultiplayerProfile();
+
+	UFUNCTION(Server, Reliable, Category = "Lobby|Profile")
+	void ServerBindMultiplayerProfile(const FPRMultiplayerProfileProjection& Projection);
+
+	UFUNCTION(Server, Reliable, Category = "Lobby|Profile")
+	void ServerReportPendingSettlementSave();
+
+	UFUNCTION(Client, Reliable, Category = "Lobby|Profile")
+	void ClientMultiplayerProfileBindingResult(bool bAccepted, const FString& Diagnostic);
+
+	UFUNCTION(Client, Reliable, Category = "Rift|Settlement")
+	void ClientReceivePersonalSettlement(const FPRPlayerSettlementReceipt& Receipt);
+
+	UFUNCTION(Server, Reliable, Category = "Rift|Settlement")
+	void ServerAcknowledgePersonalSettlement(FGuid SettlementId, bool bSaveSucceeded);
+
+	UFUNCTION(BlueprintPure, Category = "Lobby|Profile")
+	FString GetMultiplayerProfileStatus() const { return MultiplayerProfileStatus; }
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Settlement")
+	FString GetPersonalSettlementSaveStatus() const { return PersonalSettlementSaveStatus; }
+
 	UFUNCTION(BlueprintCallable, Category = "Lobby|Debug")
 	void RefreshLobbyReadyDebugDisplay();
 
@@ -202,4 +227,6 @@ private:
 	TObjectPtr<UPRLootTableDataAsset> TestLootTable;
 
 	FTimerHandle LobbyReadyDebugTimerHandle;
+	FString MultiplayerProfileStatus = TEXT("Not bound");
+	FString PersonalSettlementSaveStatus = TEXT("Waiting");
 };

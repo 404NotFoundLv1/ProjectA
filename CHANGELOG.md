@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.5.3] - 2026-07-13
+
+### Added
+
+- Added `ProjectRiftMission` Primary DataAssets and the starter `Mission.Rift.Test.Hold` progression contract for `L_Rift_Test`.
+- Added validated per-client multiplayer profile projections, unique GUID binding, host-led mission eligibility, and replicated team mission readiness.
+- Added authoritative personal settlement receipts, client-owned transactional persistence, acknowledgement/timeout handling, and lobby retry status.
+- Added the v3 processed-settlement ledger with 128-entry trimming and real v2-to-v3 migration.
+- Added isolated multi-client PIE profile roots under ProjectA `Saved/Automation` for development verification.
+
+### Changed
+
+- Rift travel now carries and validates the authoritative MissionId, while seamless PlayerState replacement preserves profile binding, story projection, baselines, inventory, resources, and role.
+- Successful extracted players retain authoritative results and can advance eligible story nodes; non-extracted and failed players lose new non-resource loot while preserving real consumption, with failure resources continuing to use the configured retention policy.
+- Settlement return now waits at least four seconds and then for all connected client acknowledgements, with an eight-second maximum barrier.
+- Multiplayer-bound profiles reject profile switching, deletion of the bound profile, external snapshot replacement, and checkpoint capture outside the settlement transaction.
+- Updated the displayed project version and development profile panel title to `0.5.3`.
+
+### Verified
+
+- ProjectAEditor and ProjectA Win64 Development targets build successfully with Unreal Engine 5.8.
+- All 47 ProjectRift automation leaf tests pass.
+- ProjectA-only 8001 MCP validates the mission asset, isolated two-player PIE profile binding, replicated team mission state, and non-overlapping development HUD layout.
+
 ## [0.5.1] - 2026-07-11
 
 ### Added

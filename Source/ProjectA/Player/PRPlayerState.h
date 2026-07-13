@@ -3,12 +3,14 @@
 #include "CoreMinimal.h"
 #include "AbilitySystemInterface.h"
 #include "GameFramework/PlayerState.h"
+#include "Multiplayer/PRMultiplayerProfileTypes.h"
 #include "PRPlayerState.generated.h"
 
 class UPRAbilitySystemComponent;
 class UPRAttributeSet;
 class UAbilitySystemComponent;
 class UPRInventoryComponent;
+class UPRMissionProgressionDataAsset;
 
 USTRUCT(BlueprintType)
 struct PROJECTA_API FPRShipResourceStack
@@ -55,6 +57,25 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Lobby")
 	bool IsReady() const { return bIsReady; }
+
+	UFUNCTION(BlueprintPure, Category = "Lobby|Profile")
+	bool IsMultiplayerProfileBound() const { return bMultiplayerProfileBound; }
+
+	UFUNCTION(BlueprintPure, Category = "Lobby|Profile")
+	FGuid GetBoundProfileId() const { return BoundProfileId; }
+
+	const FPRProfileStoryProgress& GetBoundStoryProgress() const { return BoundStoryProgress; }
+	const TArray<FPRItemInstance>& GetMissionStartBackpackItems() const { return MissionStartBackpackItems; }
+	const TArray<FPRProfileResourceBalance>& GetMissionStartResourceWallet() const { return MissionStartResourceWallet; }
+	FName GetMissionStartRoleId() const { return MissionStartRoleId; }
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Lobby|Profile")
+	bool BindMultiplayerProfile(const FPRMultiplayerProfileProjection& Projection, FString& OutDiagnostic);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Lobby|Profile")
+	void ClearMultiplayerProfileBinding();
+
+	bool ApplyMissionCompletion(const UPRMissionProgressionDataAsset* Mission);
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Lobby")
 	void SetReady(bool bReady);
@@ -113,6 +134,24 @@ private:
 
 	UPROPERTY(ReplicatedUsing = OnRep_IsReady, VisibleInstanceOnly, BlueprintReadOnly, Category = "Lobby", meta = (AllowPrivateAccess = "true"))
 	bool bIsReady;
+
+	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Lobby|Profile", meta = (AllowPrivateAccess = "true"))
+	bool bMultiplayerProfileBound = false;
+
+	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Lobby|Profile", meta = (AllowPrivateAccess = "true"))
+	FGuid BoundProfileId;
+
+	UPROPERTY()
+	FPRProfileStoryProgress BoundStoryProgress;
+
+	UPROPERTY()
+	TArray<FPRItemInstance> MissionStartBackpackItems;
+
+	UPROPERTY()
+	TArray<FPRProfileResourceBalance> MissionStartResourceWallet;
+
+	UPROPERTY()
+	FName MissionStartRoleId = NAME_None;
 
 	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Lobby", meta = (AllowPrivateAccess = "true"))
 	FName SelectedRoleModule;

@@ -18,5 +18,5 @@ struct FPRDebugUILayout final
 	static FAnchors LobbyReadyAnchors() { return FAnchors(0.0f, 1.0f); }
 	static FVector2D LobbyReadyAlignment() { return FVector2D(0.0f, 1.0f); }
 	static FVector2D LobbyReadyPosition() { return FVector2D(24.0f, -24.0f); }
-	static FVector2D LobbyReadySize() { return FVector2D(420.0f, 160.0f); }
+	static FVector2D LobbyReadySize() { return FVector2D(420.0f, 216.0f); }
 };

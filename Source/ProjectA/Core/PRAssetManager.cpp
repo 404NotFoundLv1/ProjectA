@@ -2,6 +2,7 @@
 
 #include "Items/PRItemDataAsset.h"
 #include "Items/PRLootTableDataAsset.h"
+#include "Progression/PRMissionProgressionDataAsset.h"
 #include "Engine/StreamableManager.h"
 #include "ProjectA.h"
 
@@ -40,12 +41,20 @@ FPrimaryAssetId UPRAssetManager::MakeLootTablePrimaryAssetId(const FName AssetNa
 		: FPrimaryAssetId(UPRLootTableDataAsset::LootTablePrimaryAssetType, AssetName);
 }
 
+FPrimaryAssetId UPRAssetManager::MakeMissionPrimaryAssetId(const FName MissionId)
+{
+	return MissionId.IsNone()
+		? FPrimaryAssetId()
+		: FPrimaryAssetId(UPRMissionProgressionDataAsset::MissionPrimaryAssetType, MissionId);
+}
+
 void UPRAssetManager::StartInitialLoading()
 {
 	Super::StartInitialLoading();
 
 	ValidatePrimaryAssetType(UPRItemDataAsset::ItemPrimaryAssetType);
 	ValidatePrimaryAssetType(UPRLootTableDataAsset::LootTablePrimaryAssetType);
+	ValidatePrimaryAssetType(UPRMissionProgressionDataAsset::MissionPrimaryAssetType);
 }
 
 UPRItemDataAsset* UPRAssetManager::GetLoadedItemData(const FName ItemId) const
@@ -70,6 +79,13 @@ UPRLootTableDataAsset* UPRAssetManager::LoadLootTableSync(const FName AssetName)
 	return Cast<UPRLootTableDataAsset>(LoadPrimaryAssetSync(
 		MakeLootTablePrimaryAssetId(AssetName),
 		UPRLootTableDataAsset::StaticClass()));
+}
+
+UPRMissionProgressionDataAsset* UPRAssetManager::LoadMissionSync(const FName MissionId)
+{
+	return Cast<UPRMissionProgressionDataAsset>(LoadPrimaryAssetSync(
+		MakeMissionPrimaryAssetId(MissionId),
+		UPRMissionProgressionDataAsset::StaticClass()));
 }
 
 TSharedPtr<FStreamableHandle> UPRAssetManager::LoadItemDataAsync(
