@@ -42,7 +42,8 @@ bool APRShipLobbyGameMode::ArePlayerStatesReadyForTravel(const TArray<APlayerSta
 	for (const APlayerState* PlayerState : PlayerStates)
 	{
 		const APRPlayerState* ProjectRiftPlayerState = Cast<APRPlayerState>(PlayerState);
-		if (!ProjectRiftPlayerState || !ProjectRiftPlayerState->IsMultiplayerProfileBound() || !ProjectRiftPlayerState->IsReady())
+		if (!ProjectRiftPlayerState || !ProjectRiftPlayerState->IsMultiplayerProfileBound()
+			|| ProjectRiftPlayerState->IsRepairPersistencePending() || !ProjectRiftPlayerState->IsReady())
 		{
 			return false;
 		}

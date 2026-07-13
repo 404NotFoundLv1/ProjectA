@@ -6,6 +6,7 @@ constexpr int32 MaxProjectionDisplayNameLength = 64;
 constexpr int32 MaxProjectionBackpackEntries = 256;
 constexpr int32 MaxProjectionResourceEntries = 128;
 constexpr int32 MaxProjectionStoryEntries = 512;
+constexpr int32 MaxProjectionShipModuleEntries = 128;
 
 bool AreItemsValid(const TArray<FPRItemInstance>& Items)
 {
@@ -48,6 +49,20 @@ bool IsStoryValid(const FPRProfileStoryProgress& Story)
 		&& AreUniqueValidNames(Story.CompletedStoryNodeIds)
 		&& (Story.CurrentChapterId.IsNone() || Story.UnlockedChapterIds.Contains(Story.CurrentChapterId));
 }
+
+bool AreShipModulesValid(const TArray<FPRProfileShipModuleState>& ShipModules)
+{
+	TSet<FName> Seen;
+	for (const FPRProfileShipModuleState& Module : ShipModules)
+	{
+		if (Module.ModuleId.IsNone() || Module.Level < 0 || Seen.Contains(Module.ModuleId))
+		{
+			return false;
+		}
+		Seen.Add(Module.ModuleId);
+	}
+	return true;
+}
 }
 
 bool FPRMultiplayerProfileProjection::IsValid(FString* OutDiagnostic) const
@@ -60,8 +75,10 @@ bool FPRMultiplayerProfileProjection::IsValid(FString* OutDiagnostic) const
 	}
 	if (BackpackItems.Num() > MaxProjectionBackpackEntries
 		|| ResourceWallet.Num() > MaxProjectionResourceEntries
+		|| ShipModules.Num() > MaxProjectionShipModuleEntries
 		|| !AreItemsValid(BackpackItems)
 		|| !AreResourcesValid(ResourceWallet)
+		|| !AreShipModulesValid(ShipModules)
 		|| !IsStoryValid(Story))
 	{
 		if (OutDiagnostic) { *OutDiagnostic = TEXT("Profile projection contains invalid runtime data."); }

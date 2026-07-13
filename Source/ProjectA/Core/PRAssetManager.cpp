@@ -3,6 +3,7 @@
 #include "Items/PRItemDataAsset.h"
 #include "Items/PRLootTableDataAsset.h"
 #include "Progression/PRMissionProgressionDataAsset.h"
+#include "Ship/PRShipRepairDataAsset.h"
 #include "Engine/StreamableManager.h"
 #include "ProjectA.h"
 
@@ -48,6 +49,13 @@ FPrimaryAssetId UPRAssetManager::MakeMissionPrimaryAssetId(const FName MissionId
 		: FPrimaryAssetId(UPRMissionProgressionDataAsset::MissionPrimaryAssetType, MissionId);
 }
 
+FPrimaryAssetId UPRAssetManager::MakeShipRepairPrimaryAssetId(const FName RepairProjectId)
+{
+	return RepairProjectId.IsNone()
+		? FPrimaryAssetId()
+		: FPrimaryAssetId(UPRShipRepairDataAsset::ShipRepairPrimaryAssetType, RepairProjectId);
+}
+
 void UPRAssetManager::StartInitialLoading()
 {
 	Super::StartInitialLoading();
@@ -55,6 +63,7 @@ void UPRAssetManager::StartInitialLoading()
 	ValidatePrimaryAssetType(UPRItemDataAsset::ItemPrimaryAssetType);
 	ValidatePrimaryAssetType(UPRLootTableDataAsset::LootTablePrimaryAssetType);
 	ValidatePrimaryAssetType(UPRMissionProgressionDataAsset::MissionPrimaryAssetType);
+	ValidatePrimaryAssetType(UPRShipRepairDataAsset::ShipRepairPrimaryAssetType);
 }
 
 UPRItemDataAsset* UPRAssetManager::GetLoadedItemData(const FName ItemId) const
@@ -86,6 +95,44 @@ UPRMissionProgressionDataAsset* UPRAssetManager::LoadMissionSync(const FName Mis
 	return Cast<UPRMissionProgressionDataAsset>(LoadPrimaryAssetSync(
 		MakeMissionPrimaryAssetId(MissionId),
 		UPRMissionProgressionDataAsset::StaticClass()));
+}
+
+UPRShipRepairDataAsset* UPRAssetManager::LoadShipRepairSync(const FName RepairProjectId)
+{
+	return Cast<UPRShipRepairDataAsset>(LoadPrimaryAssetSync(
+		MakeShipRepairPrimaryAssetId(RepairProjectId),
+		UPRShipRepairDataAsset::StaticClass()));
+}
+
+bool UPRAssetManager::LoadShipRepairCatalog(TArray<UPRShipRepairDataAsset*>& OutCatalog)
+{
+	OutCatalog.Reset();
+	TArray<FPrimaryAssetId> AssetIds;
+	GetPrimaryAssetIdList(UPRShipRepairDataAsset::ShipRepairPrimaryAssetType, AssetIds);
+	AssetIds.Sort([](const FPrimaryAssetId& A, const FPrimaryAssetId& B)
+	{
+		return A.PrimaryAssetName.LexicalLess(B.PrimaryAssetName);
+	});
+	for (const FPrimaryAssetId& AssetId : AssetIds)
+	{
+		UPRShipRepairDataAsset* Contract = Cast<UPRShipRepairDataAsset>(LoadPrimaryAssetSync(
+			AssetId,
+			UPRShipRepairDataAsset::StaticClass()));
+		if (!Contract)
+		{
+			OutCatalog.Reset();
+			return false;
+		}
+		OutCatalog.Add(Contract);
+	}
+	FString Diagnostic;
+	if (!UPRShipRepairDataAsset::ValidateCatalog(OutCatalog, &Diagnostic))
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("ProjectRift ship repair catalog is invalid: %s"), *Diagnostic);
+		OutCatalog.Reset();
+		return false;
+	}
+	return true;
 }
 
 TSharedPtr<FStreamableHandle> UPRAssetManager::LoadItemDataAsync(

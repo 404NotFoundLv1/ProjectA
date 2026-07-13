@@ -16,6 +16,69 @@
 #include "Player/PRPlayerController.h"
 #include "ProjectA.h"
 #include "Progression/PRMissionProgressionDataAsset.h"
+#include "Ship/PRShipRepairDataAsset.h"
+
+namespace ProjectRiftSaveSubsystemPrivate
+{
+bool AreResourceWalletsEqual(
+	const TArray<FPRProfileResourceBalance>& A,
+	const TArray<FPRProfileResourceBalance>& B)
+{
+	if (A.Num() != B.Num())
+	{
+		return false;
+	}
+	for (int32 Index = 0; Index < A.Num(); ++Index)
+	{
+		if (A[Index].ResourceId != B[Index].ResourceId || A[Index].Count != B[Index].Count)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+bool AreShipModulesEqual(
+	const TArray<FPRProfileShipModuleState>& A,
+	const TArray<FPRProfileShipModuleState>& B)
+{
+	if (A.Num() != B.Num())
+	{
+		return false;
+	}
+	for (int32 Index = 0; Index < A.Num(); ++Index)
+	{
+		if (A[Index].ModuleId != B[Index].ModuleId
+			|| A[Index].Level != B[Index].Level
+			|| A[Index].bUnlocked != B[Index].bUnlocked)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+bool AreStoriesEqual(const FPRProfileStoryProgress& A, const FPRProfileStoryProgress& B)
+{
+	return A.CurrentChapterId == B.CurrentChapterId
+		&& A.UnlockedChapterIds == B.UnlockedChapterIds
+		&& A.CompletedStoryNodeIds == B.CompletedStoryNodeIds;
+}
+
+bool DoesReceiptMatchExpectedState(
+	const FPRShipRepairReceipt& Receipt,
+	const FPRProfileSnapshot& Expected)
+{
+	FPRProfileSnapshot ReceiptState;
+	ReceiptState.ResourceWallet = Receipt.SettledResourceWallet;
+	ReceiptState.ShipModules = Receipt.SettledShipModules;
+	ReceiptState.Story = Receipt.SettledStory;
+	ReceiptState.Normalize();
+	return AreResourceWalletsEqual(ReceiptState.ResourceWallet, Expected.ResourceWallet)
+		&& AreShipModulesEqual(ReceiptState.ShipModules, Expected.ShipModules)
+		&& AreStoriesEqual(ReceiptState.Story, Expected.Story);
+}
+}
 
 void UPRSaveSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -65,6 +128,7 @@ void UPRSaveSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void UPRSaveSubsystem::Deinitialize()
 {
+	RetryPendingShipRepairReceipt();
 	RetryPendingSettlementReceipt();
 	ReleaseSessionProfileBinding();
 	ActiveProfile = nullptr;
@@ -81,6 +145,7 @@ void UPRSaveSubsystem::InitializeForAutomation(const FString& RootDirectory)
 	bHasAppliedActiveProfile = false;
 	SessionBoundProfileId.Invalidate();
 	bHasPendingSettlementReceipt = false;
+	bHasPendingShipRepairReceipt = false;
 	SaveStore = MakeUnique<FPRSafeSaveStore>(RootDirectory);
 	LoadOrRebuildCatalog();
 	if (Catalog && Catalog->ActiveProfileId.IsValid())
@@ -403,6 +468,7 @@ FPRProfileOperationResult UPRSaveSubsystem::BuildMultiplayerProfileProjection(FP
 	OutProjection.ResourceWallet = ActiveProfile->Snapshot.ResourceWallet;
 	OutProjection.SelectedRoleId = ActiveProfile->Snapshot.SelectedRoleId;
 	OutProjection.Story = ActiveProfile->Snapshot.Story;
+	OutProjection.ShipModules = ActiveProfile->Snapshot.ShipModules;
 	FString Diagnostic;
 	if (!OutProjection.IsValid(&Diagnostic))
 	{
@@ -522,6 +588,219 @@ FPRProfileOperationResult UPRSaveSubsystem::RetryPendingSettlementReceipt()
 	return ApplyMultiplayerSettlementReceipt(Receipt);
 }
 
+FPRShipRepairEvaluation UPRSaveSubsystem::EvaluateShipRepair(const FName RepairProjectId) const
+{
+	FPRShipRepairEvaluation Evaluation;
+	if (!ActiveProfile || RepairProjectId.IsNone())
+	{
+		Evaluation.Diagnostic = !ActiveProfile
+			? TEXT("No active profile is loaded.")
+			: TEXT("RepairProjectId is invalid.");
+		return Evaluation;
+	}
+	UPRAssetManager* AssetManager = UPRAssetManager::Get();
+	UPRShipRepairDataAsset* Contract = AssetManager ? AssetManager->LoadShipRepairSync(RepairProjectId) : nullptr;
+	TArray<UPRShipRepairDataAsset*> RepairCatalog;
+	if (!Contract || !AssetManager->LoadShipRepairCatalog(RepairCatalog))
+	{
+		Evaluation.Diagnostic = TEXT("Ship repair contract or catalog is unavailable.");
+		return Evaluation;
+	}
+	Evaluation = Contract->EvaluateRepair(ActiveProfile->Snapshot, RepairCatalog);
+	return Evaluation;
+}
+
+FPRProfileOperationResult UPRSaveSubsystem::ApplyShipRepairReceipt(const FPRShipRepairReceipt& Receipt)
+{
+	FString Diagnostic;
+	if (!Receipt.IsValid(&Diagnostic))
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(
+			EPRProfileOperationStatus::ValidationFailed,
+			Diagnostic,
+			Receipt.ProfileId);
+		SetLastResult(Result);
+		return Result;
+	}
+	if (!SaveStore || !ActiveProfile || Receipt.ProfileId != ActiveProfile->ProfileId
+		|| !IsSessionProfileBound() || Receipt.ProfileId != SessionBoundProfileId)
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(
+			EPRProfileOperationStatus::ValidationFailed,
+			TEXT("Ship repair receipt does not match the active session-bound profile."),
+			Receipt.ProfileId);
+		SetLastResult(Result);
+		return Result;
+	}
+	if (bHasPendingShipRepairReceipt
+		&& PendingShipRepairReceipt.TransactionId != Receipt.TransactionId)
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(
+			EPRProfileOperationStatus::Busy,
+			TEXT("A different ship repair receipt is still waiting to be saved."),
+			Receipt.ProfileId);
+		SetLastResult(Result);
+		return Result;
+	}
+	if (ActiveProfile->Snapshot.ProcessedRepairTransactionIds.Contains(Receipt.TransactionId))
+	{
+		FPRProfileOperationResult Result = FPRProfileOperationResult::MakeSuccess(Receipt.ProfileId);
+		Result.bAlreadyProcessedRepairTransaction = true;
+		bHasPendingShipRepairReceipt = false;
+		SetLastResult(Result);
+		return Result;
+	}
+
+	UPRAssetManager* AssetManager = UPRAssetManager::Get();
+	UPRShipRepairDataAsset* Contract = AssetManager ? AssetManager->LoadShipRepairSync(Receipt.RepairProjectId) : nullptr;
+	TArray<UPRShipRepairDataAsset*> RepairCatalog;
+	if (!Contract || Contract->RepairProjectId != Receipt.RepairProjectId
+		|| !AssetManager->LoadShipRepairCatalog(RepairCatalog))
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(
+			EPRProfileOperationStatus::ValidationFailed,
+			TEXT("Ship repair receipt references an unavailable or invalid contract."),
+			Receipt.ProfileId);
+		SetLastResult(Result);
+		return Result;
+	}
+
+	FPRProfileSnapshot Expected = ActiveProfile->Snapshot;
+	if (!Contract->ApplyRepairToSnapshot(Expected, RepairCatalog, &Diagnostic)
+		|| !ProjectRiftSaveSubsystemPrivate::DoesReceiptMatchExpectedState(Receipt, Expected))
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(
+			EPRProfileOperationStatus::ValidationFailed,
+			Diagnostic.IsEmpty()
+				? TEXT("Ship repair receipt absolute state does not match the locally calculated contract result.")
+				: Diagnostic,
+			Receipt.ProfileId);
+		SetLastResult(Result);
+		return Result;
+	}
+
+	UPRProfileSave* Candidate = DuplicateObject<UPRProfileSave>(ActiveProfile, this);
+	Candidate->Snapshot.ResourceWallet = Expected.ResourceWallet;
+	Candidate->Snapshot.ShipModules = Expected.ShipModules;
+	Candidate->Snapshot.Story = Expected.Story;
+	Candidate->Snapshot.ProcessedRepairTransactionIds.Add(Receipt.TransactionId);
+	Candidate->Snapshot.Normalize();
+	if (!Candidate->Snapshot.IsValid(&Diagnostic))
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(
+			EPRProfileOperationStatus::ValidationFailed,
+			Diagnostic,
+			Receipt.ProfileId);
+		SetLastResult(Result);
+		return Result;
+	}
+	Candidate->SaveVersion = UPRProfileSave::LatestSaveVersion;
+	Candidate->LastSavedUtc = FDateTime::UtcNow();
+	FPRProfileOperationResult Result = SaveStore->SaveProfile(Candidate);
+	if (!Result.IsSuccess())
+	{
+		PendingShipRepairReceipt = Receipt;
+		bHasPendingShipRepairReceipt = true;
+		SetLastResult(Result);
+		return Result;
+	}
+	ActiveProfile = Candidate;
+	bHasPendingShipRepairReceipt = false;
+	SetLastResult(Result);
+	return Result;
+}
+
+FPRProfileOperationResult UPRSaveSubsystem::RetryPendingShipRepairReceipt()
+{
+	return bHasPendingShipRepairReceipt
+		? ApplyShipRepairReceipt(PendingShipRepairReceipt)
+		: FPRProfileOperationResult::MakeSuccess(GetActiveProfileId());
+}
+
+FPRProfileOperationResult UPRSaveSubsystem::PrepareShipRepairAcceptanceForDevelopment()
+{
+#if UE_BUILD_SHIPPING
+	const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(
+		EPRProfileOperationStatus::ValidationFailed,
+		TEXT("Ship repair acceptance preparation is disabled in Shipping."),
+		GetActiveProfileId());
+	SetLastResult(Result);
+	return Result;
+#else
+	if (!SaveStore || !ActiveProfile)
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(
+			EPRProfileOperationStatus::NoActiveProfile,
+			TEXT("No active profile is loaded."));
+		SetLastResult(Result);
+		return Result;
+	}
+	if (bHasPendingShipRepairReceipt)
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(
+			EPRProfileOperationStatus::Busy,
+			TEXT("A ship repair receipt is still waiting to be saved."),
+			ActiveProfile->ProfileId);
+		SetLastResult(Result);
+		return Result;
+	}
+	UPRAssetManager* AssetManager = UPRAssetManager::Get();
+	UPRShipRepairDataAsset* Contract = AssetManager
+		? AssetManager->LoadShipRepairSync(TEXT("Repair.Ship.Engine.Stage1"))
+		: nullptr;
+	FString Diagnostic;
+	if (!Contract || !Contract->ValidateContract(&Diagnostic))
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(
+			EPRProfileOperationStatus::ValidationFailed,
+			Diagnostic.IsEmpty() ? TEXT("Acceptance repair contract is unavailable.") : Diagnostic,
+			ActiveProfile->ProfileId);
+		SetLastResult(Result);
+		return Result;
+	}
+
+	UPRProfileSave* Candidate = DuplicateObject<UPRProfileSave>(ActiveProfile, this);
+	for (const FName StoryNodeId : Contract->RequiredCompletedStoryNodeIds)
+	{
+		Candidate->Snapshot.Story.CompletedStoryNodeIds.AddUnique(StoryNodeId);
+	}
+	for (const FPRShipRepairResourceCost& Cost : Contract->ResourceCosts)
+	{
+		FPRProfileResourceBalance* Balance = Candidate->Snapshot.ResourceWallet.FindByPredicate([&Cost](const FPRProfileResourceBalance& Entry)
+		{
+			return Entry.ResourceId == Cost.ResourceId;
+		});
+		if (Balance)
+		{
+			Balance->Count = FMath::Max(Balance->Count, Cost.Count);
+		}
+		else
+		{
+			Candidate->Snapshot.ResourceWallet.Emplace(Cost.ResourceId, Cost.Count);
+		}
+	}
+	Candidate->Snapshot.Normalize();
+	if (!Candidate->Snapshot.IsValid(&Diagnostic))
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(
+			EPRProfileOperationStatus::ValidationFailed,
+			Diagnostic,
+			ActiveProfile->ProfileId);
+		SetLastResult(Result);
+		return Result;
+	}
+	Candidate->SaveVersion = UPRProfileSave::LatestSaveVersion;
+	Candidate->LastSavedUtc = FDateTime::UtcNow();
+	FPRProfileOperationResult Result = SaveStore->SaveProfile(Candidate);
+	if (Result.IsSuccess())
+	{
+		ActiveProfile = Candidate;
+	}
+	SetLastResult(Result);
+	return Result;
+#endif
+}
+
 FPRProfileOperationResult UPRSaveSubsystem::CreateLegacyV1ProfileForDevelopment()
 {
 #if UE_BUILD_SHIPPING
@@ -622,6 +901,10 @@ void UPRSaveSubsystem::HandleLocalLobbyPlayerReady(APlayerController* PlayerCont
 
 FPRProfileOperationResult UPRSaveSubsystem::SaveForApplicationExit()
 {
+	if (bHasPendingShipRepairReceipt)
+	{
+		return RetryPendingShipRepairReceipt();
+	}
 	if (bHasPendingSettlementReceipt)
 	{
 		const FPRProfileOperationResult PendingResult = RetryPendingSettlementReceipt();

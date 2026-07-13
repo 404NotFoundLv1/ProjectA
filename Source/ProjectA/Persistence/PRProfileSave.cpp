@@ -33,6 +33,11 @@ FPRProfileOperationResult UPRProfileSave::MigrateToLatest()
 			Snapshot.Normalize();
 			SaveVersion = 3;
 			break;
+		case 3:
+			Snapshot.ProcessedRepairTransactionIds.Reset();
+			Snapshot.Normalize();
+			SaveVersion = 4;
+			break;
 		default:
 			return FPRProfileOperationResult::MakeFailure(
 				EPRProfileOperationStatus::MigrationFailed,

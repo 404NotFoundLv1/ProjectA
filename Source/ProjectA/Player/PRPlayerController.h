@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Items/PRItemTypes.h"
 #include "Multiplayer/PRMultiplayerProfileTypes.h"
+#include "Ship/PRShipRepairTypes.h"
 #include "ProjectAPlayerController.h"
 #include "TimerManager.h"
 #include "PRPlayerController.generated.h"
@@ -12,6 +13,7 @@ class UPRInventoryComponent;
 class UPRInventoryWidget;
 class UPRLobbyReadyDebugWidget;
 class UPRRiftSettlementWidget;
+class UPRShipRepairWidget;
 class UPRLootTableDataAsset;
 class UGameplayEffect;
 class APRPickupActor;
@@ -73,6 +75,21 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
 	UPRInventoryWidget* GetInventoryWidget() const { return InventoryWidget.Get(); }
 
+	UFUNCTION(BlueprintCallable, Category = "Ship Repair|UI")
+	void ToggleShipRepairPanel();
+
+	UFUNCTION(BlueprintCallable, Category = "Ship Repair|UI")
+	void ShowShipRepairPanel();
+
+	UFUNCTION(BlueprintCallable, Category = "Ship Repair|UI")
+	void HideShipRepairPanel();
+
+	UFUNCTION(BlueprintPure, Category = "Ship Repair|UI")
+	bool IsShipRepairPanelVisible() const;
+
+	UFUNCTION(BlueprintPure, Category = "Ship Repair|UI")
+	UPRShipRepairWidget* GetShipRepairWidget() const { return ShipRepairWidget.Get(); }
+
 	UFUNCTION(BlueprintPure, Category = "Rift|Settlement")
 	UPRRiftSettlementWidget* GetRiftSettlementWidget() const { return RiftSettlementWidget.Get(); }
 
@@ -133,11 +150,35 @@ public:
 	UFUNCTION(Server, Reliable, Category = "Rift|Settlement")
 	void ServerAcknowledgePersonalSettlement(FGuid SettlementId, bool bSaveSucceeded);
 
+	UFUNCTION(BlueprintCallable, Category = "Lobby|Ship Repair")
+	void RequestShipRepair(FName RepairProjectId);
+
+	UFUNCTION(BlueprintCallable, Category = "Lobby|Ship Repair")
+	void RetryPendingShipRepairSave();
+
+	UFUNCTION(Server, Reliable, Category = "Lobby|Ship Repair")
+	void ServerRequestShipRepair(FName RepairProjectId);
+
+	UFUNCTION(Client, Reliable, Category = "Lobby|Ship Repair")
+	void ClientReceiveShipRepairReceipt(const FPRShipRepairReceipt& Receipt);
+
+	UFUNCTION(Server, Reliable, Category = "Lobby|Ship Repair")
+	void ServerAcknowledgeShipRepair(FGuid TransactionId, bool bSaveSucceeded);
+
+	UFUNCTION(Server, Reliable, Category = "Lobby|Ship Repair")
+	void ServerReportPendingShipRepairSave(FGuid TransactionId);
+
+	UFUNCTION(Client, Reliable, Category = "Lobby|Ship Repair")
+	void ClientShipRepairFailed(FName RepairProjectId, const FString& Diagnostic);
+
 	UFUNCTION(BlueprintPure, Category = "Lobby|Profile")
 	FString GetMultiplayerProfileStatus() const { return MultiplayerProfileStatus; }
 
 	UFUNCTION(BlueprintPure, Category = "Rift|Settlement")
 	FString GetPersonalSettlementSaveStatus() const { return PersonalSettlementSaveStatus; }
+
+	UFUNCTION(BlueprintPure, Category = "Lobby|Ship Repair")
+	FString GetShipRepairSaveStatus() const { return ShipRepairSaveStatus; }
 
 	UFUNCTION(BlueprintCallable, Category = "Lobby|Debug")
 	void RefreshLobbyReadyDebugDisplay();
@@ -161,8 +202,12 @@ private:
 	void DestroyInventoryUI();
 	void CreateRiftSettlementUI();
 	void DestroyRiftSettlementUI();
+	void CreateShipRepairUI();
+	void DestroyShipRepairUI();
 	void ApplyInventoryInputMode();
 	void RestoreInventoryInputMode();
+	void ApplyShipRepairInputMode();
+	void RestoreShipRepairInputMode();
 	UPRInventoryComponent* GetLocalInventoryComponent() const;
 	TSubclassOf<UGameplayEffect> ResolveConsumableEffectClass(FName ItemId) const;
 	bool CanUseInventoryItemOnServer(FName ItemId, FString* OutFailureReason = nullptr) const;
@@ -205,8 +250,16 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UPRRiftSettlementWidget> RiftSettlementWidget;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Ship Repair|UI")
+	TSubclassOf<UPRShipRepairWidget> ShipRepairWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPRShipRepairWidget> ShipRepairWidget;
+
 	bool bInventoryInputModeActive = false;
 	bool bSavedMouseCursorVisibilityForInventory = false;
+	bool bShipRepairInputModeActive = false;
+	bool bSavedMouseCursorVisibilityForShipRepair = false;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory|Use")
 	TSubclassOf<UGameplayEffect> HealthInjectorEffectClass;
@@ -227,6 +280,8 @@ private:
 	TObjectPtr<UPRLootTableDataAsset> TestLootTable;
 
 	FTimerHandle LobbyReadyDebugTimerHandle;
+	FTimerHandle ShipRepairRetryTimerHandle;
 	FString MultiplayerProfileStatus = TEXT("Not bound");
 	FString PersonalSettlementSaveStatus = TEXT("Waiting");
+	FString ShipRepairSaveStatus = TEXT("Idle");
 };

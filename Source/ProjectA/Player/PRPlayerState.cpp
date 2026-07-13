@@ -69,6 +69,10 @@ void APRPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(APRPlayerState, bIsReady);
 	DOREPLIFETIME(APRPlayerState, bMultiplayerProfileBound);
 	DOREPLIFETIME_CONDITION(APRPlayerState, BoundProfileId, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(APRPlayerState, BoundStoryProgress, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(APRPlayerState, BoundShipModules, COND_OwnerOnly);
+	DOREPLIFETIME(APRPlayerState, bRepairPersistencePending);
+	DOREPLIFETIME_CONDITION(APRPlayerState, PendingRepairTransactionId, COND_OwnerOnly);
 	DOREPLIFETIME(APRPlayerState, SelectedRoleModule);
 	DOREPLIFETIME(APRPlayerState, PlayerDisplayName);
 	DOREPLIFETIME(APRPlayerState, ShipResources);
@@ -76,9 +80,9 @@ void APRPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 
 void APRPlayerState::SetReady(const bool bReady)
 {
-	if (bReady && !bMultiplayerProfileBound)
+	if (bReady && (!bMultiplayerProfileBound || bRepairPersistencePending))
 	{
-		UE_LOG(LogProjectA, Warning, TEXT("Ready state rejected because no multiplayer profile is bound. Player=%s"), *GetPlayerDisplayName());
+		UE_LOG(LogProjectA, Warning, TEXT("Ready state rejected because profile binding or repair persistence is incomplete. Player=%s"), *GetPlayerDisplayName());
 		return;
 	}
 	if (bIsReady == bReady)
@@ -122,6 +126,9 @@ bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjectio
 	BoundProfileId = Projection.ProfileId;
 	bMultiplayerProfileBound = true;
 	BoundStoryProgress = Projection.Story;
+	BoundShipModules = Projection.ShipModules;
+	bRepairPersistencePending = false;
+	PendingRepairTransactionId.Invalidate();
 	MissionStartBackpackItems = Projection.BackpackItems;
 	MissionStartResourceWallet = Projection.ResourceWallet;
 	MissionStartRoleId = Projection.SelectedRoleId;
@@ -137,6 +144,9 @@ void APRPlayerState::ClearMultiplayerProfileBinding()
 	bMultiplayerProfileBound = false;
 	BoundProfileId.Invalidate();
 	BoundStoryProgress = FPRProfileStoryProgress();
+	BoundShipModules.Reset();
+	bRepairPersistencePending = false;
+	PendingRepairTransactionId.Invalidate();
 	MissionStartBackpackItems.Reset();
 	MissionStartResourceWallet.Reset();
 	MissionStartRoleId = NAME_None;
@@ -146,6 +156,86 @@ void APRPlayerState::ClearMultiplayerProfileBinding()
 bool APRPlayerState::ApplyMissionCompletion(const UPRMissionProgressionDataAsset* Mission)
 {
 	return Mission && Mission->ApplyCompletion(BoundStoryProgress);
+}
+
+bool APRPlayerState::BuildBoundShipRepairSnapshot(FPRProfileSnapshot& OutSnapshot, FString& OutDiagnostic) const
+{
+	OutSnapshot = FPRProfileSnapshot();
+	if (!bMultiplayerProfileBound || !BoundProfileId.IsValid())
+	{
+		OutDiagnostic = TEXT("A valid multiplayer profile must be bound before evaluating ship repairs.");
+		return false;
+	}
+	OutSnapshot.ResourceWallet.Reserve(ShipResources.Num());
+	for (const FPRShipResourceStack& Resource : ShipResources)
+	{
+		if (!Resource.IsValid())
+		{
+			OutDiagnostic = TEXT("Bound runtime resources contain invalid data.");
+			return false;
+		}
+		OutSnapshot.ResourceWallet.Emplace(Resource.ResourceId, Resource.Count);
+	}
+	OutSnapshot.ShipModules = BoundShipModules;
+	OutSnapshot.Story = BoundStoryProgress;
+	OutSnapshot.SelectedRoleId = SelectedRoleModule;
+	if (!SelectedRoleModule.IsNone())
+	{
+		OutSnapshot.UnlockedRoleIds.Add(SelectedRoleModule);
+	}
+	OutSnapshot.Normalize();
+	return OutSnapshot.IsValid(&OutDiagnostic);
+}
+
+bool APRPlayerState::ApplyShipRepairState(const FPRShipRepairReceipt& Receipt, FString& OutDiagnostic)
+{
+	if (!bMultiplayerProfileBound || Receipt.ProfileId != BoundProfileId || !Receipt.IsValid(&OutDiagnostic))
+	{
+		if (OutDiagnostic.IsEmpty())
+		{
+			OutDiagnostic = TEXT("Ship repair receipt does not match the bound profile.");
+		}
+		return false;
+	}
+	TArray<FPRShipResourceStack> RuntimeResources;
+	RuntimeResources.Reserve(Receipt.SettledResourceWallet.Num());
+	for (const FPRProfileResourceBalance& Balance : Receipt.SettledResourceWallet)
+	{
+		FPRShipResourceStack& RuntimeResource = RuntimeResources.AddDefaulted_GetRef();
+		RuntimeResource.ResourceId = Balance.ResourceId;
+		RuntimeResource.Count = Balance.Count;
+	}
+	if (!ReplaceShipResources(RuntimeResources))
+	{
+		OutDiagnostic = TEXT("PlayerState rejected the repaired resource wallet.");
+		return false;
+	}
+	BoundShipModules = Receipt.SettledShipModules;
+	BoundStoryProgress = Receipt.SettledStory;
+	MissionStartResourceWallet = Receipt.SettledResourceWallet;
+	bIsReady = false;
+	ForceNetUpdate();
+	return true;
+}
+
+void APRPlayerState::SetRepairPersistencePending(const FGuid TransactionId, const bool bPending)
+{
+	if (bPending)
+	{
+		if (!bMultiplayerProfileBound || !TransactionId.IsValid())
+		{
+			return;
+		}
+		bRepairPersistencePending = true;
+		PendingRepairTransactionId = TransactionId;
+		bIsReady = false;
+	}
+	else if (!TransactionId.IsValid() || PendingRepairTransactionId == TransactionId)
+	{
+		bRepairPersistencePending = false;
+		PendingRepairTransactionId.Invalidate();
+	}
+	ForceNetUpdate();
 }
 
 void APRPlayerState::SetSelectedRoleModule(const FName InSelectedRoleModule)
@@ -319,6 +409,9 @@ void APRPlayerState::CopyProjectRiftStateFrom(const APRPlayerState* SourcePlayer
 	bMultiplayerProfileBound = SourcePlayerState->bMultiplayerProfileBound;
 	BoundProfileId = SourcePlayerState->BoundProfileId;
 	BoundStoryProgress = SourcePlayerState->BoundStoryProgress;
+	BoundShipModules = SourcePlayerState->BoundShipModules;
+	bRepairPersistencePending = SourcePlayerState->bRepairPersistencePending;
+	PendingRepairTransactionId = SourcePlayerState->PendingRepairTransactionId;
 	MissionStartBackpackItems = SourcePlayerState->MissionStartBackpackItems;
 	MissionStartResourceWallet = SourcePlayerState->MissionStartResourceWallet;
 	MissionStartRoleId = SourcePlayerState->MissionStartRoleId;

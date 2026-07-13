@@ -4,6 +4,7 @@
 #include "Persistence/PRProfileSave.h"
 #include "Persistence/PRSaveStorage.h"
 #include "Multiplayer/PRMultiplayerProfileTypes.h"
+#include "Ship/PRShipRepairTypes.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "PRSaveSubsystem.generated.h"
 
@@ -72,6 +73,24 @@ public:
 
 	FPRProfileOperationResult RetryPendingSettlementReceipt();
 
+	UFUNCTION(BlueprintPure, Category = "Profile|Ship Repair")
+	FPRShipRepairEvaluation EvaluateShipRepair(FName RepairProjectId) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Profile|Ship Repair")
+	FPRProfileOperationResult ApplyShipRepairReceipt(const FPRShipRepairReceipt& Receipt);
+
+	UFUNCTION(BlueprintPure, Category = "Profile|Ship Repair")
+	bool HasPendingShipRepairReceipt() const { return bHasPendingShipRepairReceipt; }
+
+	UFUNCTION(BlueprintPure, Category = "Profile|Ship Repair")
+	FPRShipRepairReceipt GetPendingShipRepairReceipt() const { return PendingShipRepairReceipt; }
+
+	UFUNCTION(BlueprintCallable, Category = "Profile|Ship Repair")
+	FPRProfileOperationResult RetryPendingShipRepairReceipt();
+
+	UFUNCTION(BlueprintCallable, Category = "Profile|Development")
+	FPRProfileOperationResult PrepareShipRepairAcceptanceForDevelopment();
+
 	UFUNCTION(BlueprintCallable, Category = "Profile|Development")
 	FPRProfileOperationResult CreateLegacyV1ProfileForDevelopment();
 
@@ -109,4 +128,6 @@ private:
 	FGuid SessionBoundProfileId;
 	FPRPlayerSettlementReceipt PendingSettlementReceipt;
 	bool bHasPendingSettlementReceipt = false;
+	FPRShipRepairReceipt PendingShipRepairReceipt;
+	bool bHasPendingShipRepairReceipt = false;
 };

@@ -141,7 +141,16 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FPRProfileContractTest::RunTest(const FString& Parameters)
 {
-	TestEqual(TEXT("Current player profile schema is version 3"), UPRProfileSave::LatestSaveVersion, 3);
+	TestEqual(TEXT("Current player profile schema is version 4"), UPRProfileSave::LatestSaveVersion, 4);
+	TestNotNull(
+		TEXT("Profile snapshot exposes a durable repair transaction ledger"),
+		FindFProperty<FArrayProperty>(FPRProfileSnapshot::StaticStruct(), TEXT("ProcessedRepairTransactionIds")));
+	TestNotNull(
+		TEXT("Ship repair contracts have a reflected Primary DataAsset class"),
+		FindObject<UClass>(nullptr, TEXT("/Script/ProjectA.PRShipRepairDataAsset")));
+	TestNotNull(
+		TEXT("Ship repair receipts have a reflected pure-data struct"),
+		FindObject<UScriptStruct>(nullptr, TEXT("/Script/ProjectA.PRShipRepairReceipt")));
 	TestFalse(
 		TEXT("Profile snapshot recursively contains no UObject references"),
 		StructContainsObjectReference(FPRProfileSnapshot::StaticStruct()));
@@ -156,8 +165,8 @@ bool FPRProfileContractTest::RunTest(const FString& Parameters)
 	FPRProfileOperationResult MigrationResult = LegacyProfile->MigrateToLatest();
 	TestTrue(TEXT("v1 profile migrates successfully"), MigrationResult.IsSuccess());
 	TestTrue(TEXT("Migration result is marked"), MigrationResult.bMigrated);
-	TestEqual(TEXT("Migrated profile reaches v3"), LegacyProfile->SaveVersion, 3);
-	TestTrue(TEXT("v1 to v3 migration preserves existing story progress"), LegacyProfile->Snapshot.Story.CompletedStoryNodeIds.Contains(TEXT("Story.Prologue.Intro")));
+	TestEqual(TEXT("Migrated profile reaches v4"), LegacyProfile->SaveVersion, 4);
+	TestTrue(TEXT("v1 to v4 migration preserves existing story progress"), LegacyProfile->Snapshot.Story.CompletedStoryNodeIds.Contains(TEXT("Story.Prologue.Intro")));
 	TestTrue(
 		TEXT("Selected role is added to unlocked roles"),
 		LegacyProfile->Snapshot.UnlockedRoleIds.Contains(TEXT("Ability.Role.Assault")));
@@ -172,7 +181,7 @@ bool FPRProfileContractTest::RunTest(const FString& Parameters)
 		TEXT("Future profile is rejected explicitly"),
 		FutureResult.Status,
 		EPRProfileOperationStatus::UnsupportedFutureVersion);
-	TestEqual(TEXT("Future profile remains untouched"), FutureProfile->SaveVersion, 4);
+	TestEqual(TEXT("Future profile remains untouched"), FutureProfile->SaveVersion, 5);
 
 	UPRProfileSave* VersionTwoProfile = MakeProfile(TEXT("Version Two"));
 	VersionTwoProfile->SaveVersion = 2;
@@ -180,8 +189,18 @@ bool FPRProfileContractTest::RunTest(const FString& Parameters)
 	const FPRProfileOperationResult V2MigrationResult = VersionTwoProfile->MigrateToLatest();
 	TestTrue(TEXT("v2 profile migrates successfully"), V2MigrationResult.IsSuccess());
 	TestTrue(TEXT("v2 migration result is marked"), V2MigrationResult.bMigrated);
-	TestEqual(TEXT("v2 profile reaches v3"), VersionTwoProfile->SaveVersion, 3);
+	TestEqual(TEXT("v2 profile reaches v4"), VersionTwoProfile->SaveVersion, 4);
 	TestTrue(TEXT("v2 profile starts with an empty settlement ledger"), VersionTwoProfile->Snapshot.ProcessedSettlementIds.IsEmpty());
+
+	UPRProfileSave* VersionThreeProfile = MakeProfile(TEXT("Version Three"));
+	VersionThreeProfile->SaveVersion = 3;
+	VersionThreeProfile->Snapshot.ProcessedRepairTransactionIds.Add(FGuid::NewGuid());
+	const FPRProfileOperationResult V3MigrationResult = VersionThreeProfile->MigrateToLatest();
+	TestTrue(TEXT("v3 profile migrates successfully"), V3MigrationResult.IsSuccess());
+	TestTrue(TEXT("v3 migration result is marked"), V3MigrationResult.bMigrated);
+	TestEqual(TEXT("v3 profile reaches v4"), VersionThreeProfile->SaveVersion, 4);
+	TestTrue(TEXT("v3 profile starts with an empty repair transaction ledger"), VersionThreeProfile->Snapshot.ProcessedRepairTransactionIds.IsEmpty());
+	TestTrue(TEXT("v3 to v4 migration preserves story progress"), VersionThreeProfile->Snapshot.Story.CompletedStoryNodeIds.Contains(TEXT("Story.Prologue.Intro")));
 
 	FGuid OldestSettlementId;
 	for (int32 Index = 0; Index < 132; ++Index)
@@ -203,6 +222,27 @@ bool FPRProfileContractTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Settlement ledger removes invalid ids"), VersionTwoProfile->Snapshot.ProcessedSettlementIds.Contains(InvalidSettlementId));
 	TSet<FGuid> UniqueSettlementIds(VersionTwoProfile->Snapshot.ProcessedSettlementIds);
 	TestEqual(TEXT("Settlement ledger removes duplicate ids"), UniqueSettlementIds.Num(), VersionTwoProfile->Snapshot.ProcessedSettlementIds.Num());
+
+	FGuid OldestRepairTransactionId;
+	for (int32 Index = 0; Index < 132; ++Index)
+	{
+		const FGuid TransactionId = FGuid::NewGuid();
+		if (Index == 0)
+		{
+			OldestRepairTransactionId = TransactionId;
+		}
+		VersionTwoProfile->Snapshot.ProcessedRepairTransactionIds.Add(TransactionId);
+	}
+	const FGuid InvalidRepairTransactionId;
+	VersionTwoProfile->Snapshot.ProcessedRepairTransactionIds.Insert(InvalidRepairTransactionId, 0);
+	const FGuid DuplicateRepairTransactionId = VersionTwoProfile->Snapshot.ProcessedRepairTransactionIds.Last();
+	VersionTwoProfile->Snapshot.ProcessedRepairTransactionIds.Add(DuplicateRepairTransactionId);
+	VersionTwoProfile->Snapshot.Normalize();
+	TestEqual(TEXT("Repair transaction ledger is capped at 128 entries"), VersionTwoProfile->Snapshot.ProcessedRepairTransactionIds.Num(), 128);
+	TestFalse(TEXT("Repair transaction ledger trims the oldest processed id first"), VersionTwoProfile->Snapshot.ProcessedRepairTransactionIds.Contains(OldestRepairTransactionId));
+	TestFalse(TEXT("Repair transaction ledger removes invalid ids"), VersionTwoProfile->Snapshot.ProcessedRepairTransactionIds.Contains(InvalidRepairTransactionId));
+	TSet<FGuid> UniqueRepairTransactionIds(VersionTwoProfile->Snapshot.ProcessedRepairTransactionIds);
+	TestEqual(TEXT("Repair transaction ledger removes duplicate ids"), UniqueRepairTransactionIds.Num(), VersionTwoProfile->Snapshot.ProcessedRepairTransactionIds.Num());
 
 	return true;
 }
@@ -305,7 +345,7 @@ bool FPRSafeProfileStorageTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Migrated v3 sample is safely written"), Store.SaveProfile(LoadedLegacy).IsSuccess());
 	UPRProfileSave* ReloadedMigratedProfile = nullptr;
 	TestTrue(TEXT("Migrated sample reloads"), Store.LoadProfile(LegacyOnDisk->ProfileId, ReloadedMigratedProfile).IsSuccess());
-	TestEqual(TEXT("Migrated sample persists as v3"), ReloadedMigratedProfile ? ReloadedMigratedProfile->SaveVersion : 0, 3);
+	TestEqual(TEXT("Migrated sample persists at the latest version"), ReloadedMigratedProfile ? ReloadedMigratedProfile->SaveVersion : 0, UPRProfileSave::LatestSaveVersion);
 	TestTrue(TEXT("Migrated sample retains its v1 backup"), IFileManager::Get().FileExists(*Store.GetProfileBackupPath(LegacyOnDisk->ProfileId)));
 
 	UPRProfileSave* DoubleCorruptProfile = MakeProfile(TEXT("Double Corrupt"));

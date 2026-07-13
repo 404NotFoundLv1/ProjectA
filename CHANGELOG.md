@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.5.4] - 2026-07-13
+
+### Added
+
+- Added the `ProjectRiftShipRepair` Primary DataAsset contract and the staged `Repair.Ship.Engine.Stage1` engine repair for `EnergyCrystal ×10` after `Story.Prologue.RiftTestHold`.
+- Added authoritative lobby repair requests, owner-only repair receipts, client-owned transactional persistence, acknowledgement state, and five-second retry handling.
+- Added the v4 processed-repair transaction ledger with 128-entry trimming and real v3-to-v4 migration while preserving the v1-to-v4 chain.
+- Added a formal native ship repair panel available in Development and Shipping, with centered R/Esc lifecycle, inventory mutual exclusion, and a non-Shipping acceptance helper.
+
+### Changed
+
+- Multiplayer profile projections and seamless PlayerState travel now preserve personal ship module state.
+- Repair completion deducts the exact absolute wallet cost, upgrades modules monotonically, and unlocks chapters only when both story and repair-resource gates are satisfied.
+- Pending repair persistence prevents readying or another repair until the owning client saves successfully; the server never reads or writes a remote profile file.
+- Profile migration diagnostics now display the actual latest save version, and the displayed project version is `0.5.4`.
+
+### Verified
+
+- ProjectAEditor and ProjectA Win64 Development targets build successfully with Unreal Engine 5.8.
+- `ProjectRift.ShipRepair`, save/profile migration, multiplayer projection, progression, and existing ProjectRift regression coverage pass.
+- ProjectA-only 8001 MCP created and read back the engine repair asset; ProjectA editor validation uses no other MCP endpoint.
+
 ## [0.5.3] - 2026-07-13
 
 ### Added

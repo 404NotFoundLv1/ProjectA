@@ -27,11 +27,13 @@
 #include "ProjectA.h"
 #include "Persistence/PRSaveSubsystem.h"
 #include "Progression/PRMissionProgressionDataAsset.h"
+#include "Ship/PRShipRepairDataAsset.h"
 #include "UI/PRDebugUILayout.h"
 #include "UI/PRGASDebugWidget.h"
 #include "UI/PRInventoryWidget.h"
 #include "UI/PRLobbyReadyDebugWidget.h"
 #include "UI/PRRiftSettlementWidget.h"
+#include "UI/PRShipRepairWidget.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -94,11 +96,12 @@ FString GetLobbyReadyLine(const APlayerState* PlayerState)
 
 	const int32 PlayerId = PlayerState ? PlayerState->GetPlayerId() : INDEX_NONE;
 	return FString::Printf(
-		TEXT("P%d %s: %s | Profile: %s | Role: %s | Resources: %s"),
+		TEXT("P%d %s: %s | Profile: %s | Repair save: %s | Role: %s | Resources: %s"),
 		PlayerId,
 		*DisplayName,
 		bReady ? TEXT("READY") : TEXT("WAITING"),
 		ProjectRiftPlayerState && ProjectRiftPlayerState->IsMultiplayerProfileBound() ? TEXT("BOUND") : TEXT("UNBOUND"),
+		ProjectRiftPlayerState && ProjectRiftPlayerState->IsRepairPersistencePending() ? TEXT("PENDING") : TEXT("CLEAR"),
 		SelectedRoleModule.IsNone() ? TEXT("None") : *SelectedRoleModule.ToString(),
 		*ResourceSummary);
 }
@@ -126,6 +129,7 @@ APRPlayerController::APRPlayerController()
 
 	InventoryWidgetClass = UPRInventoryWidget::StaticClass();
 	RiftSettlementWidgetClass = UPRRiftSettlementWidget::StaticClass();
+	ShipRepairWidgetClass = UPRShipRepairWidget::StaticClass();
 	HealthInjectorEffectClass = UPRHealthConsumableGameplayEffect::StaticClass();
 	ShieldPackEffectClass = UPRShieldConsumableGameplayEffect::StaticClass();
 	PickupActorClass = APRPickupActor::StaticClass();
@@ -144,10 +148,18 @@ void APRPlayerController::BeginPlay()
 			1.0f,
 			true,
 			0.25f);
+		GetWorldTimerManager().SetTimer(
+			ShipRepairRetryTimerHandle,
+			this,
+			&APRPlayerController::RetryPendingShipRepairSave,
+			5.0f,
+			true,
+			5.0f);
 
 		CreateGASDebugHUD();
 		CreateInventoryUI();
 		CreateRiftSettlementUI();
+		CreateShipRepairUI();
 		SubmitLocalMultiplayerProfile();
 	}
 }
@@ -155,10 +167,12 @@ void APRPlayerController::BeginPlay()
 void APRPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	DestroyRiftSettlementUI();
+	DestroyShipRepairUI();
 	DestroyInventoryUI();
 	DestroyLobbyReadyDebugHUD();
 	DestroyGASDebugHUD();
 	GetWorldTimerManager().ClearTimer(LobbyReadyDebugTimerHandle);
+	GetWorldTimerManager().ClearTimer(ShipRepairRetryTimerHandle);
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -172,6 +186,8 @@ void APRPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APRPlayerController::SelectAssaultRoleModule);
 		InputComponent->BindKey(EKeys::P, IE_Pressed, this, &APRPlayerController::ToggleReady);
 		InputComponent->BindKey(EKeys::O, IE_Pressed, this, &APRPlayerController::StartRiftMission);
+		InputComponent->BindKey(EKeys::R, IE_Pressed, this, &APRPlayerController::ToggleShipRepairPanel);
+		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &APRPlayerController::HideShipRepairPanel);
 	}
 }
 
@@ -280,6 +296,7 @@ void APRPlayerController::ShowInventory()
 	{
 		return;
 	}
+	HideShipRepairPanel();
 
 	const bool bWasInventoryVisible = IsInventoryVisible();
 	CreateInventoryUI();
@@ -328,6 +345,49 @@ void APRPlayerController::RefreshInventoryDisplay()
 bool APRPlayerController::IsInventoryVisible() const
 {
 	return InventoryWidget && InventoryWidget->GetVisibility() == ESlateVisibility::Visible;
+}
+
+void APRPlayerController::ToggleShipRepairPanel()
+{
+	if (IsShipRepairPanelVisible())
+	{
+		HideShipRepairPanel();
+	}
+	else
+	{
+		ShowShipRepairPanel();
+	}
+}
+
+void APRPlayerController::ShowShipRepairPanel()
+{
+	if (!IsLocalPlayerController() || !IsShipLobbyDebugWorld(GetWorld()))
+	{
+		return;
+	}
+	HideInventory();
+	CreateShipRepairUI();
+	if (ShipRepairWidget)
+	{
+		bSavedMouseCursorVisibilityForShipRepair = bShowMouseCursor;
+		ShipRepairWidget->RefreshRepairDisplay();
+		ShipRepairWidget->SetVisibility(ESlateVisibility::Visible);
+		ApplyShipRepairInputMode();
+	}
+}
+
+void APRPlayerController::HideShipRepairPanel()
+{
+	if (ShipRepairWidget)
+	{
+		ShipRepairWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	RestoreShipRepairInputMode();
+}
+
+bool APRPlayerController::IsShipRepairPanelVisible() const
+{
+	return ShipRepairWidget && ShipRepairWidget->GetVisibility() == ESlateVisibility::Visible;
 }
 
 void APRPlayerController::UseInventoryItem(const FName ItemId)
@@ -673,6 +733,19 @@ void APRPlayerController::SubmitLocalMultiplayerProfile()
 		MultiplayerProfileStatus = TEXT("Save subsystem unavailable");
 		return;
 	}
+	if (SaveSubsystem->HasPendingShipRepairReceipt())
+	{
+		const FPRShipRepairReceipt PendingReceipt = SaveSubsystem->GetPendingShipRepairReceipt();
+		const FPRProfileOperationResult RetryResult = SaveSubsystem->RetryPendingShipRepairReceipt();
+		ShipRepairSaveStatus = RetryResult.IsSuccess() ? TEXT("Saved after retry") : TEXT("Retry failed");
+		if (!RetryResult.IsSuccess())
+		{
+			MultiplayerProfileStatus = TEXT("Pending repair must be saved before readying");
+			ServerReportPendingShipRepairSave(PendingReceipt.TransactionId);
+			return;
+		}
+		ServerAcknowledgeShipRepair(PendingReceipt.TransactionId, true);
+	}
 	if (SaveSubsystem->HasPendingSettlementReceipt())
 	{
 		const FPRProfileOperationResult RetryResult = SaveSubsystem->RetryPendingSettlementReceipt();
@@ -733,6 +806,11 @@ void APRPlayerController::ServerBindMultiplayerProfile_Implementation(const FPRM
 		{
 			LobbyGameMode->RefreshTeamMissionState();
 		}
+		return;
+	}
+	if (ProjectRiftPlayerState->IsRepairPersistencePending())
+	{
+		ClientMultiplayerProfileBindingResult(false, TEXT("Pending ship repair must be saved before rebinding the profile."));
 		return;
 	}
 
@@ -822,6 +900,179 @@ void APRPlayerController::ServerAcknowledgePersonalSettlement_Implementation(con
 	if (APRRiftGameMode* RiftGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<APRRiftGameMode>() : nullptr)
 	{
 		RiftGameMode->HandlePersonalSettlementAcknowledgement(this, SettlementId, bSaveSucceeded);
+	}
+}
+
+void APRPlayerController::RequestShipRepair(const FName RepairProjectId)
+{
+	ServerRequestShipRepair(RepairProjectId);
+}
+
+void APRPlayerController::RetryPendingShipRepairSave()
+{
+	if (!IsLocalPlayerController() || !IsShipLobbyDebugWorld(GetWorld()))
+	{
+		return;
+	}
+	UPRSaveSubsystem* SaveSubsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<UPRSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem || !SaveSubsystem->HasPendingShipRepairReceipt())
+	{
+		return;
+	}
+	const FPRShipRepairReceipt Receipt = SaveSubsystem->GetPendingShipRepairReceipt();
+	const FPRProfileOperationResult Result = SaveSubsystem->RetryPendingShipRepairReceipt();
+	if (Result.IsSuccess())
+	{
+		ShipRepairSaveStatus = Result.bAlreadyProcessedRepairTransaction ? TEXT("Already saved") : TEXT("Saved after retry");
+		ServerAcknowledgeShipRepair(Receipt.TransactionId, true);
+	}
+	else
+	{
+		ShipRepairSaveStatus = TEXT("Waiting to retry save");
+		ServerReportPendingShipRepairSave(Receipt.TransactionId);
+	}
+	if (ShipRepairWidget)
+	{
+		ShipRepairWidget->RefreshRepairDisplay();
+	}
+}
+
+void APRPlayerController::ServerRequestShipRepair_Implementation(const FName RepairProjectId)
+{
+	UWorld* World = GetWorld();
+	APRShipLobbyGameMode* LobbyGameMode = World ? World->GetAuthGameMode<APRShipLobbyGameMode>() : nullptr;
+	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	if (!LobbyGameMode || !ProjectRiftPlayerState)
+	{
+		ClientShipRepairFailed(RepairProjectId, TEXT("Ship repairs are only accepted in the ship lobby."));
+		return;
+	}
+	if (!ProjectRiftPlayerState->IsMultiplayerProfileBound())
+	{
+		ClientShipRepairFailed(RepairProjectId, TEXT("A valid unique profile must be bound before repairing."));
+		return;
+	}
+	if (ProjectRiftPlayerState->IsReady())
+	{
+		ClientShipRepairFailed(RepairProjectId, TEXT("Leave the ready state before repairing."));
+		return;
+	}
+	if (ProjectRiftPlayerState->IsRepairPersistencePending())
+	{
+		ClientShipRepairFailed(RepairProjectId, TEXT("The previous repair is still waiting to be saved."));
+		return;
+	}
+
+	UPRAssetManager* AssetManager = UPRAssetManager::Get();
+	UPRShipRepairDataAsset* Contract = AssetManager ? AssetManager->LoadShipRepairSync(RepairProjectId) : nullptr;
+	TArray<UPRShipRepairDataAsset*> RepairCatalog;
+	FString Diagnostic;
+	if (!Contract || Contract->RepairProjectId != RepairProjectId
+		|| !AssetManager->LoadShipRepairCatalog(RepairCatalog))
+	{
+		ClientShipRepairFailed(RepairProjectId, TEXT("The requested repair contract is unavailable or invalid."));
+		return;
+	}
+	FPRProfileSnapshot ServerSnapshot;
+	if (!ProjectRiftPlayerState->BuildBoundShipRepairSnapshot(ServerSnapshot, Diagnostic))
+	{
+		ClientShipRepairFailed(RepairProjectId, Diagnostic);
+		return;
+	}
+	const FPRShipRepairEvaluation Evaluation = Contract->EvaluateRepair(ServerSnapshot, RepairCatalog);
+	if (!Evaluation.IsAvailable())
+	{
+		ClientShipRepairFailed(RepairProjectId, Evaluation.Diagnostic);
+		return;
+	}
+	if (!Contract->ApplyRepairToSnapshot(ServerSnapshot, RepairCatalog, &Diagnostic))
+	{
+		ClientShipRepairFailed(RepairProjectId, Diagnostic);
+		return;
+	}
+
+	FPRShipRepairReceipt Receipt;
+	Receipt.ProfileId = ProjectRiftPlayerState->GetBoundProfileId();
+	Receipt.RepairProjectId = RepairProjectId;
+	Receipt.TransactionId = FGuid::NewGuid();
+	Receipt.SettledResourceWallet = ServerSnapshot.ResourceWallet;
+	Receipt.SettledShipModules = ServerSnapshot.ShipModules;
+	Receipt.SettledStory = ServerSnapshot.Story;
+	if (!ProjectRiftPlayerState->ApplyShipRepairState(Receipt, Diagnostic))
+	{
+		ClientShipRepairFailed(RepairProjectId, Diagnostic);
+		return;
+	}
+	ProjectRiftPlayerState->SetRepairPersistencePending(Receipt.TransactionId, true);
+	LobbyGameMode->RefreshTeamMissionState();
+	ClientReceiveShipRepairReceipt(Receipt);
+}
+
+void APRPlayerController::ClientReceiveShipRepairReceipt_Implementation(const FPRShipRepairReceipt& Receipt)
+{
+	ShipRepairSaveStatus = TEXT("Saving repair");
+	UPRSaveSubsystem* SaveSubsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<UPRSaveSubsystem>() : nullptr;
+	const FPRProfileOperationResult Result = SaveSubsystem
+		? SaveSubsystem->ApplyShipRepairReceipt(Receipt)
+		: FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::IOError, TEXT("Save subsystem unavailable."), Receipt.ProfileId);
+	if (Result.IsSuccess())
+	{
+		ShipRepairSaveStatus = Result.bAlreadyProcessedRepairTransaction ? TEXT("Already saved") : TEXT("Saved");
+	}
+	else
+	{
+		ShipRepairSaveStatus = SaveSubsystem && SaveSubsystem->HasPendingShipRepairReceipt()
+			? TEXT("Waiting to retry save")
+			: Result.Diagnostic;
+	}
+	ServerAcknowledgeShipRepair(Receipt.TransactionId, Result.IsSuccess());
+	if (ShipRepairWidget)
+	{
+		ShipRepairWidget->RefreshRepairDisplay();
+	}
+}
+
+void APRPlayerController::ServerAcknowledgeShipRepair_Implementation(const FGuid TransactionId, const bool bSaveSucceeded)
+{
+	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	if (!ProjectRiftPlayerState || !TransactionId.IsValid()
+		|| ProjectRiftPlayerState->GetPendingRepairTransactionId() != TransactionId)
+	{
+		return;
+	}
+	if (bSaveSucceeded)
+	{
+		ProjectRiftPlayerState->SetRepairPersistencePending(TransactionId, false);
+	}
+	if (APRShipLobbyGameMode* LobbyGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<APRShipLobbyGameMode>() : nullptr)
+	{
+		LobbyGameMode->RefreshTeamMissionState();
+	}
+}
+
+void APRPlayerController::ServerReportPendingShipRepairSave_Implementation(const FGuid TransactionId)
+{
+	if (!TransactionId.IsValid() || !GetWorld() || !GetWorld()->GetAuthGameMode<APRShipLobbyGameMode>())
+	{
+		return;
+	}
+	if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
+	{
+		ProjectRiftPlayerState->SetRepairPersistencePending(TransactionId, true);
+		if (APRShipLobbyGameMode* LobbyGameMode = GetWorld()->GetAuthGameMode<APRShipLobbyGameMode>())
+		{
+			LobbyGameMode->RefreshTeamMissionState();
+		}
+	}
+}
+
+void APRPlayerController::ClientShipRepairFailed_Implementation(const FName RepairProjectId, const FString& Diagnostic)
+{
+	(void)RepairProjectId;
+	ShipRepairSaveStatus = Diagnostic;
+	if (ShipRepairWidget)
+	{
+		ShipRepairWidget->RefreshRepairDisplay();
 	}
 }
 
@@ -1007,6 +1258,10 @@ APRPickupActor* APRPlayerController::TrySpawnTestLootOnServer(const float RollOv
 
 void APRPlayerController::RefreshLobbyReadyDebugDisplay()
 {
+	if (IsShipRepairPanelVisible() && ShipRepairWidget)
+	{
+		ShipRepairWidget->RefreshRepairDisplay();
+	}
 #if UE_BUILD_SHIPPING
 	return;
 #endif
@@ -1045,11 +1300,13 @@ void APRPlayerController::RefreshLobbyReadyDebugDisplay()
 	const bool bLocalEligible = Mission && LocalPlayerState && Mission->IsEligible(LocalPlayerState->GetBoundStoryProgress());
 	bool bAllBound = true;
 	bool bAllReady = true;
+	bool bAnyRepairPending = false;
 	for (const APlayerState* ListedPlayerState : GameState->PlayerArray)
 	{
 		const APRPlayerState* ProjectRiftPlayerState = Cast<APRPlayerState>(ListedPlayerState);
 		bAllBound &= ProjectRiftPlayerState && ProjectRiftPlayerState->IsMultiplayerProfileBound();
 		bAllReady &= ProjectRiftPlayerState && ProjectRiftPlayerState->IsReady();
+		bAnyRepairPending |= ProjectRiftPlayerState && ProjectRiftPlayerState->IsRepairPersistencePending();
 	}
 	FString BlockReason = TEXT("None");
 	if (!Mission || !Mission->IsContractValid())
@@ -1068,13 +1325,17 @@ void APRPlayerController::RefreshLobbyReadyDebugDisplay()
 	{
 		BlockReason = TEXT("Waiting for all profile bindings");
 	}
+	else if (bAnyRepairPending)
+	{
+		BlockReason = TEXT("Waiting for ship repair save acknowledgement");
+	}
 	else if (!bAllReady)
 	{
 		BlockReason = TEXT("Waiting for all players to ready");
 	}
 
 	FString ReadyList = FString::Printf(
-		TEXT("Lobby Team Status\nMission: %s | Contract: %s | Can start: %s\nProfile: %s | Host eligible: %s\nStart blocked by: %s\n1: Assault | P: Ready | Host O: Start Rift\n"),
+		TEXT("Lobby Team Status\nMission: %s | Contract: %s | Can start: %s\nProfile: %s | Host eligible: %s\nStart blocked by: %s\n1: Assault | P: Ready | R: Ship Repair | Host O: Start Rift\n"),
 		TeamMissionId.IsNone() ? TEXT("None") : *TeamMissionId.ToString(),
 		Mission && Mission->IsContractValid() ? TEXT("VALID") : TEXT("INVALID"),
 		ProjectRiftGameState && ProjectRiftGameState->IsTeamMissionReady() ? TEXT("YES") : TEXT("NO"),
@@ -1232,6 +1493,38 @@ void APRPlayerController::DestroyRiftSettlementUI()
 	}
 }
 
+void APRPlayerController::CreateShipRepairUI()
+{
+	if (!IsLocalPlayerController() || ShipRepairWidget)
+	{
+		return;
+	}
+	if (!ShipRepairWidgetClass)
+	{
+		ShipRepairWidgetClass = UPRShipRepairWidget::StaticClass();
+	}
+	ShipRepairWidget = CreateWidget<UPRShipRepairWidget>(this, ShipRepairWidgetClass);
+	if (ShipRepairWidget)
+	{
+		ShipRepairWidget->SetVisibility(ESlateVisibility::Collapsed);
+		ShipRepairWidget->AddToPlayerScreen(40);
+		ShipRepairWidget->SetPositionInViewport(FVector2D::ZeroVector, false);
+		ShipRepairWidget->SetDesiredSizeInViewport(FVector2D(720.0, 520.0));
+		ShipRepairWidget->SetAnchorsInViewport(FAnchors(0.5f, 0.5f));
+		ShipRepairWidget->SetAlignmentInViewport(FVector2D(0.5f, 0.5f));
+	}
+}
+
+void APRPlayerController::DestroyShipRepairUI()
+{
+	RestoreShipRepairInputMode();
+	if (ShipRepairWidget)
+	{
+		ShipRepairWidget->RemoveFromParent();
+		ShipRepairWidget = nullptr;
+	}
+}
+
 void APRPlayerController::ApplyInventoryInputMode()
 {
 	if (!IsLocalPlayerController() || !InventoryWidget)
@@ -1262,6 +1555,33 @@ void APRPlayerController::RestoreInventoryInputMode()
 
 	bShowMouseCursor = bSavedMouseCursorVisibilityForInventory;
 	bInventoryInputModeActive = false;
+}
+
+void APRPlayerController::ApplyShipRepairInputMode()
+{
+	if (!IsLocalPlayerController() || !ShipRepairWidget)
+	{
+		return;
+	}
+	bShowMouseCursor = true;
+	FInputModeGameAndUI InputMode;
+	InputMode.SetWidgetToFocus(ShipRepairWidget->TakeWidget());
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
+	SetInputMode(InputMode);
+	bShipRepairInputModeActive = true;
+}
+
+void APRPlayerController::RestoreShipRepairInputMode()
+{
+	if (!IsLocalPlayerController() || !bShipRepairInputModeActive)
+	{
+		return;
+	}
+	FInputModeGameOnly InputMode;
+	SetInputMode(InputMode);
+	bShowMouseCursor = bSavedMouseCursorVisibilityForShipRepair;
+	bShipRepairInputModeActive = false;
 }
 
 UPRInventoryComponent* APRPlayerController::GetLocalInventoryComponent() const

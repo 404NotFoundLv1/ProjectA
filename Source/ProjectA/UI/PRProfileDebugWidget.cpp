@@ -41,7 +41,7 @@ void UPRProfileDebugWidget::RefreshProfiles()
 	RootBox->AddSlot().AutoHeight().Padding(0, 0, 0, 8)
 	[
 		SNew(STextBlock)
-		.Text(LOCTEXT("Title", "ProjectRift v0.5.3 Profile Verification"))
+		.Text(LOCTEXT("Title", "ProjectRift v0.5.4 Profile Verification"))
 		.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 18))
 		.ColorAndOpacity(FSlateColor(FLinearColor::White))
 	];
@@ -170,7 +170,7 @@ void UPRProfileDebugWidget::SetStatus(const FPRProfileOperationResult& Result)
 		return;
 	}
 	FString Message = Result.IsSuccess() ? TEXT("Success") : FString::Printf(TEXT("Failed (%d)"), static_cast<int32>(Result.Status));
-	if (Result.bMigrated) { Message += TEXT("; migrated to v2"); }
+	if (Result.bMigrated) { Message += FString::Printf(TEXT("; migrated to v%d"), UPRProfileSave::LatestSaveVersion); }
 	if (Result.bRecoveredFromBackup) { Message += TEXT("; primary corrupt, restored validated backup"); }
 	if (!Result.Diagnostic.IsEmpty()) { Message += TEXT(": ") + Result.Diagnostic; }
 	StatusText->SetText(FText::FromString(Message));

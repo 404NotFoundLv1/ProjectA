@@ -28,6 +28,9 @@ struct PROJECTA_API FPRMultiplayerProfileProjection
 	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Profile")
 	FPRProfileStoryProgress Story;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Profile")
+	TArray<FPRProfileShipModuleState> ShipModules;
+
 	bool IsValid(FString* OutDiagnostic = nullptr) const;
 };
 

@@ -3,6 +3,7 @@
 namespace
 {
 constexpr int32 MaxProcessedSettlementIds = 128;
+constexpr int32 MaxProcessedRepairTransactionIds = 128;
 
 void NormalizeNames(TArray<FName>& Names)
 {
@@ -18,9 +19,23 @@ void NormalizeNames(TArray<FName>& Names)
 	});
 }
 
-bool AreItemsValid(const TArray<FPRItemInstance>& Items)
+bool AreProfileItemsValid(const TArray<FPRItemInstance>& Items)
 {
 	return !Items.ContainsByPredicate([](const FPRItemInstance& Item) { return !Item.IsValid(); });
+}
+
+bool AreProfileNamesValid(const TArray<FName>& Names)
+{
+	TSet<FName> Seen;
+	for (const FName Name : Names)
+	{
+		if (Name.IsNone() || Seen.Contains(Name))
+		{
+			return false;
+		}
+		Seen.Add(Name);
+	}
+	return true;
 }
 }
 
@@ -141,6 +156,21 @@ void FPRProfileSnapshot::Normalize()
 	{
 		ProcessedSettlementIds.RemoveAt(0, ProcessedSettlementIds.Num() - MaxProcessedSettlementIds);
 	}
+
+	TSet<FGuid> SeenRepairTransactionIds;
+	ProcessedRepairTransactionIds.RemoveAll([&SeenRepairTransactionIds](const FGuid& TransactionId)
+	{
+		if (!TransactionId.IsValid() || SeenRepairTransactionIds.Contains(TransactionId))
+		{
+			return true;
+		}
+		SeenRepairTransactionIds.Add(TransactionId);
+		return false;
+	});
+	if (ProcessedRepairTransactionIds.Num() > MaxProcessedRepairTransactionIds)
+	{
+		ProcessedRepairTransactionIds.RemoveAt(0, ProcessedRepairTransactionIds.Num() - MaxProcessedRepairTransactionIds);
+	}
 }
 
 bool FPRProfileSnapshot::IsValid(FString* OutDiagnostic) const
@@ -155,7 +185,7 @@ bool FPRProfileSnapshot::IsValid(FString* OutDiagnostic) const
 		}
 		ResourceIds.Add(Balance.ResourceId);
 	}
-	if (!AreItemsValid(BackpackItems) || !AreItemsValid(WarehouseItems))
+	if (!AreProfileItemsValid(BackpackItems) || !AreProfileItemsValid(WarehouseItems))
 	{
 		if (OutDiagnostic) { *OutDiagnostic = TEXT("Inventory contains an invalid item instance."); }
 		return false;
@@ -173,6 +203,26 @@ bool FPRProfileSnapshot::IsValid(FString* OutDiagnostic) const
 	if (!SelectedRoleId.IsNone() && !UnlockedRoleIds.Contains(SelectedRoleId))
 	{
 		if (OutDiagnostic) { *OutDiagnostic = TEXT("Selected role is not unlocked."); }
+		return false;
+	}
+	TSet<FName> ModuleIds;
+	for (const FPRProfileShipModuleState& Module : ShipModules)
+	{
+		if (Module.ModuleId.IsNone() || Module.Level < 0 || ModuleIds.Contains(Module.ModuleId))
+		{
+			if (OutDiagnostic) { *OutDiagnostic = TEXT("Ship modules contain an invalid or duplicate entry."); }
+			return false;
+		}
+		ModuleIds.Add(Module.ModuleId);
+	}
+	if (!AreProfileNamesValid(Story.UnlockedChapterIds) || !AreProfileNamesValid(Story.CompletedStoryNodeIds))
+	{
+		if (OutDiagnostic) { *OutDiagnostic = TEXT("Story progress contains an invalid or duplicate id."); }
+		return false;
+	}
+	if (!Story.CurrentChapterId.IsNone() && !Story.UnlockedChapterIds.Contains(Story.CurrentChapterId))
+	{
+		if (OutDiagnostic) { *OutDiagnostic = TEXT("Current chapter is not unlocked."); }
 		return false;
 	}
 	if (!Settings.IsValid())
@@ -194,6 +244,21 @@ bool FPRProfileSnapshot::IsValid(FString* OutDiagnostic) const
 			return false;
 		}
 		SettlementIds.Add(SettlementId);
+	}
+	if (ProcessedRepairTransactionIds.Num() > MaxProcessedRepairTransactionIds)
+	{
+		if (OutDiagnostic) { *OutDiagnostic = TEXT("Processed repair transaction ledger exceeds its supported limit."); }
+		return false;
+	}
+	TSet<FGuid> RepairTransactionIds;
+	for (const FGuid& TransactionId : ProcessedRepairTransactionIds)
+	{
+		if (!TransactionId.IsValid() || RepairTransactionIds.Contains(TransactionId))
+		{
+			if (OutDiagnostic) { *OutDiagnostic = TEXT("Processed repair transaction ledger contains an invalid or duplicate id."); }
+			return false;
+		}
+		RepairTransactionIds.Add(TransactionId);
 	}
 	return true;
 }

@@ -4,6 +4,7 @@
 #include "AbilitySystemInterface.h"
 #include "GameFramework/PlayerState.h"
 #include "Multiplayer/PRMultiplayerProfileTypes.h"
+#include "Ship/PRShipRepairTypes.h"
 #include "PRPlayerState.generated.h"
 
 class UPRAbilitySystemComponent;
@@ -65,9 +66,16 @@ public:
 	FGuid GetBoundProfileId() const { return BoundProfileId; }
 
 	const FPRProfileStoryProgress& GetBoundStoryProgress() const { return BoundStoryProgress; }
+	const TArray<FPRProfileShipModuleState>& GetBoundShipModules() const { return BoundShipModules; }
 	const TArray<FPRItemInstance>& GetMissionStartBackpackItems() const { return MissionStartBackpackItems; }
 	const TArray<FPRProfileResourceBalance>& GetMissionStartResourceWallet() const { return MissionStartResourceWallet; }
 	FName GetMissionStartRoleId() const { return MissionStartRoleId; }
+
+	UFUNCTION(BlueprintPure, Category = "Lobby|Ship Repair")
+	bool IsRepairPersistencePending() const { return bRepairPersistencePending; }
+
+	UFUNCTION(BlueprintPure, Category = "Lobby|Ship Repair")
+	FGuid GetPendingRepairTransactionId() const { return PendingRepairTransactionId; }
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Lobby|Profile")
 	bool BindMultiplayerProfile(const FPRMultiplayerProfileProjection& Projection, FString& OutDiagnostic);
@@ -76,6 +84,9 @@ public:
 	void ClearMultiplayerProfileBinding();
 
 	bool ApplyMissionCompletion(const UPRMissionProgressionDataAsset* Mission);
+	bool BuildBoundShipRepairSnapshot(FPRProfileSnapshot& OutSnapshot, FString& OutDiagnostic) const;
+	bool ApplyShipRepairState(const FPRShipRepairReceipt& Receipt, FString& OutDiagnostic);
+	void SetRepairPersistencePending(FGuid TransactionId, bool bPending);
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Lobby")
 	void SetReady(bool bReady);
@@ -141,8 +152,17 @@ private:
 	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Lobby|Profile", meta = (AllowPrivateAccess = "true"))
 	FGuid BoundProfileId;
 
-	UPROPERTY()
+	UPROPERTY(Replicated)
 	FPRProfileStoryProgress BoundStoryProgress;
+
+	UPROPERTY(Replicated)
+	TArray<FPRProfileShipModuleState> BoundShipModules;
+
+	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Lobby|Ship Repair", meta = (AllowPrivateAccess = "true"))
+	bool bRepairPersistencePending = false;
+
+	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Lobby|Ship Repair", meta = (AllowPrivateAccess = "true"))
+	FGuid PendingRepairTransactionId;
 
 	UPROPERTY()
 	TArray<FPRItemInstance> MissionStartBackpackItems;

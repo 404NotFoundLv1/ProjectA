@@ -53,6 +53,9 @@ struct PROJECTA_API FPRProfileOperationResult
 	bool bAlreadyProcessedSettlement = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Profile")
+	bool bAlreadyProcessedRepairTransaction = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Profile")
 	FString Diagnostic;
 
 	bool IsSuccess() const { return Status == EPRProfileOperationStatus::Success; }
@@ -191,6 +194,9 @@ struct PROJECTA_API FPRProfileSnapshot
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Profile|Settlement")
 	TArray<FGuid> ProcessedSettlementIds;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Profile|Ship Repair")
+	TArray<FGuid> ProcessedRepairTransactionIds;
 
 	int32 GetResourceCount(FName ResourceId) const;
 	void Normalize();
