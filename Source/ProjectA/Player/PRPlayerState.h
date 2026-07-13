@@ -83,6 +83,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Ship|Resources")
 	void ResetShipResources();
 
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Ship|Resources")
+	bool ReplaceShipResources(const TArray<FPRShipResourceStack>& Resources);
+
 	UFUNCTION(BlueprintPure, Category = "Ship|Resources")
 	FString BuildShipResourceSummary() const;
 

@@ -5,6 +5,7 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "Player/PRPlayerState.h"
+#include "Persistence/PRSaveSubsystem.h"
 #include "ProjectA.h"
 
 APRShipLobbyGameMode::APRShipLobbyGameMode()
@@ -97,6 +98,16 @@ void APRShipLobbyGameMode::HandleStartingNewPlayer_Implementation(APlayerControl
 	if (APRPlayerState* ProjectRiftPlayerState = NewPlayer ? NewPlayer->GetPlayerState<APRPlayerState>() : nullptr)
 	{
 		ProjectRiftPlayerState->SetReady(false);
+	}
+	if (NewPlayer && NewPlayer->IsLocalController())
+	{
+		if (UGameInstance* GameInstance = GetGameInstance())
+		{
+			if (UPRSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<UPRSaveSubsystem>())
+			{
+				SaveSubsystem->HandleLocalLobbyPlayerReady(NewPlayer);
+			}
+		}
 	}
 }
 

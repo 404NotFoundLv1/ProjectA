@@ -9,6 +9,7 @@
 class UPRGASDebugWidget;
 class UPRInventoryComponent;
 class UPRInventoryWidget;
+class UPRLobbyReadyDebugWidget;
 class UPRRiftSettlementWidget;
 class UPRLootTableDataAsset;
 class UGameplayEffect;
@@ -129,6 +130,8 @@ protected:
 private:
 	void CreateGASDebugHUD();
 	void DestroyGASDebugHUD();
+	void CreateLobbyReadyDebugHUD();
+	void DestroyLobbyReadyDebugHUD();
 	void CreateInventoryUI();
 	void DestroyInventoryUI();
 	void CreateRiftSettlementUI();
@@ -161,6 +164,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPRGASDebugWidget> GASDebugWidget;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPRLobbyReadyDebugWidget> LobbyReadyDebugWidget;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory|UI")
 	TSubclassOf<UPRInventoryWidget> InventoryWidgetClass;

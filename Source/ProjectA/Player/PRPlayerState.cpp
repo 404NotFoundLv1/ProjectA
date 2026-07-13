@@ -164,6 +164,22 @@ void APRPlayerState::ResetShipResources()
 	ForceNetUpdate();
 }
 
+bool APRPlayerState::ReplaceShipResources(const TArray<FPRShipResourceStack>& Resources)
+{
+	TSet<FName> ResourceIds;
+	for (const FPRShipResourceStack& Resource : Resources)
+	{
+		if (!Resource.IsValid() || ResourceIds.Contains(Resource.ResourceId))
+		{
+			return false;
+		}
+		ResourceIds.Add(Resource.ResourceId);
+	}
+	ShipResources = Resources;
+	ForceNetUpdate();
+	return true;
+}
+
 FString APRPlayerState::BuildShipResourceSummary() const
 {
 	TArray<FPRShipResourceStack> ValidResources;

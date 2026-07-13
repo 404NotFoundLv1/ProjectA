@@ -83,6 +83,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Inventory")
 	bool UseItem(FName ItemId);
 
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Inventory")
+	bool ReplaceInventoryItems(const TArray<FPRItemInstance>& Items);
+
 	const TArray<FPRItemInstance>& GetItems() const { return CachedItems; }
 
 	UFUNCTION(BlueprintPure, Category = "Inventory")

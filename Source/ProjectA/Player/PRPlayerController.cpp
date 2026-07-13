@@ -7,8 +7,8 @@
 #include "Characters/PRCharacter.h"
 #include "Core/PRShipLobbyGameMode.h"
 #include "Core/PRRiftObjectiveActor.h"
-#include "Engine/OverlapResult.h"
 #include "Engine/Engine.h"
+#include "Engine/OverlapResult.h"
 #include "Engine/World.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/Pawn.h"
@@ -22,8 +22,10 @@
 #include "Items/PRPickupActor.h"
 #include "Player/PRPlayerState.h"
 #include "ProjectA.h"
+#include "UI/PRDebugUILayout.h"
 #include "UI/PRGASDebugWidget.h"
 #include "UI/PRInventoryWidget.h"
+#include "UI/PRLobbyReadyDebugWidget.h"
 #include "UI/PRRiftSettlementWidget.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -33,10 +35,12 @@ const FName AssaultRoleModuleName(TEXT("Ability.Role.Assault"));
 const FName HealthInjectorItemId(TEXT("HealthInjector"));
 const FName ShieldPackItemId(TEXT("ShieldPack"));
 
+#if UE_BUILD_SHIPPING
 int32 GetLobbyReadyDebugMessageKey(const AController* Controller)
 {
 	return Controller && Controller->IsLocalController() ? 16016 : 16017;
 }
+#endif
 
 bool IsShipLobbyDebugWorld(const UWorld* World)
 {
@@ -152,6 +156,7 @@ void APRPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	DestroyRiftSettlementUI();
 	DestroyInventoryUI();
+	DestroyLobbyReadyDebugHUD();
 	DestroyGASDebugHUD();
 	GetWorldTimerManager().ClearTimer(LobbyReadyDebugTimerHandle);
 
@@ -832,22 +837,39 @@ APRPickupActor* APRPlayerController::TrySpawnTestLootOnServer(const float RollOv
 
 void APRPlayerController::RefreshLobbyReadyDebugDisplay()
 {
+#if UE_BUILD_SHIPPING
 	if (!IsLocalPlayerController() || !GEngine)
+#else
+	if (!IsLocalPlayerController())
+#endif
 	{
 		return;
 	}
 
 	const UWorld* World = GetWorld();
-	const int32 MessageKey = GetLobbyReadyDebugMessageKey(this);
 	if (!IsShipLobbyDebugWorld(World))
 	{
-		GEngine->RemoveOnScreenDebugMessage(MessageKey);
+#if UE_BUILD_SHIPPING
+		GEngine->RemoveOnScreenDebugMessage(GetLobbyReadyDebugMessageKey(this));
+#else
+		DestroyLobbyReadyDebugHUD();
+#endif
 		return;
 	}
+
+#if !UE_BUILD_SHIPPING
+	CreateLobbyReadyDebugHUD();
+#endif
 
 	const AGameStateBase* GameState = World ? World->GetGameState() : nullptr;
 	if (!GameState)
 	{
+#if !UE_BUILD_SHIPPING
+		if (LobbyReadyDebugWidget)
+		{
+			LobbyReadyDebugWidget->SetReadyText(FText::FromString(TEXT("Lobby Ready\nWaiting for game state...")));
+		}
+#endif
 		return;
 	}
 
@@ -859,7 +881,18 @@ void APRPlayerController::RefreshLobbyReadyDebugDisplay()
 		ReadyList += LINE_TERMINATOR;
 	}
 
-	GEngine->AddOnScreenDebugMessage(MessageKey, 1.1f, FColor::Green, ReadyList);
+#if UE_BUILD_SHIPPING
+	GEngine->AddOnScreenDebugMessage(
+		GetLobbyReadyDebugMessageKey(this),
+		1.1f,
+		FColor::Green,
+		ReadyList);
+#else
+	if (LobbyReadyDebugWidget)
+	{
+		LobbyReadyDebugWidget->SetReadyText(FText::FromString(ReadyList));
+	}
+#endif
 }
 
 void APRPlayerController::CreateGASDebugHUD()
@@ -879,9 +912,10 @@ void APRPlayerController::CreateGASDebugHUD()
 	{
 		GASDebugWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
 		GASDebugWidget->AddToPlayerScreen(20);
-		GASDebugWidget->SetAlignmentInViewport(FVector2D::ZeroVector);
-		GASDebugWidget->SetPositionInViewport(FVector2D(16.0, 16.0), false);
-		GASDebugWidget->SetDesiredSizeInViewport(FVector2D(420.0, 220.0));
+		GASDebugWidget->SetPositionInViewport(FPRDebugUILayout::GASPosition(), false);
+		GASDebugWidget->SetDesiredSizeInViewport(FPRDebugUILayout::GASSize());
+		GASDebugWidget->SetAnchorsInViewport(FPRDebugUILayout::GASAnchors());
+		GASDebugWidget->SetAlignmentInViewport(FPRDebugUILayout::GASAlignment());
 	}
 }
 
@@ -891,6 +925,38 @@ void APRPlayerController::DestroyGASDebugHUD()
 	{
 		GASDebugWidget->RemoveFromParent();
 		GASDebugWidget = nullptr;
+	}
+}
+
+void APRPlayerController::CreateLobbyReadyDebugHUD()
+{
+#if UE_BUILD_SHIPPING
+	return;
+#else
+	if (!IsLocalPlayerController() || LobbyReadyDebugWidget)
+	{
+		return;
+	}
+
+	LobbyReadyDebugWidget = CreateWidget<UPRLobbyReadyDebugWidget>(this, UPRLobbyReadyDebugWidget::StaticClass());
+	if (LobbyReadyDebugWidget)
+	{
+		LobbyReadyDebugWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+		LobbyReadyDebugWidget->AddToPlayerScreen(21);
+		LobbyReadyDebugWidget->SetPositionInViewport(FPRDebugUILayout::LobbyReadyPosition(), false);
+		LobbyReadyDebugWidget->SetDesiredSizeInViewport(FPRDebugUILayout::LobbyReadySize());
+		LobbyReadyDebugWidget->SetAnchorsInViewport(FPRDebugUILayout::LobbyReadyAnchors());
+		LobbyReadyDebugWidget->SetAlignmentInViewport(FPRDebugUILayout::LobbyReadyAlignment());
+	}
+#endif
+}
+
+void APRPlayerController::DestroyLobbyReadyDebugHUD()
+{
+	if (LobbyReadyDebugWidget)
+	{
+		LobbyReadyDebugWidget->RemoveFromParent();
+		LobbyReadyDebugWidget = nullptr;
 	}
 }
 

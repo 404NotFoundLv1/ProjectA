@@ -4,6 +4,8 @@
 #include "Engine/GameInstance.h"
 #include "PRGameInstance.generated.h"
 
+class UPRProfileDebugWidget;
+
 UENUM(BlueprintType)
 enum class EPRSessionInterfaceState : uint8
 {
@@ -51,6 +53,8 @@ public:
 	using UGameInstance::JoinSession;
 
 	virtual void Init() override;
+	virtual void OnStart() override;
+	virtual void Shutdown() override;
 
 	UFUNCTION(BlueprintCallable, Category = "Session")
 	bool CreateSession(int32 PublicConnections = 4, bool bIsLANMatch = true);
@@ -77,6 +81,8 @@ public:
 	TArray<FPRSessionSearchResult> GetCachedSessionSearchResults() const { return CachedSessionSearchResults; }
 
 private:
+	void HandlePostLoadMapWithWorld(UWorld* LoadedWorld);
+
 	void SetSessionInterfaceState(EPRSessionInterfaceState NewState);
 	void SetLastSessionError(const FString& ErrorMessage);
 
@@ -92,4 +98,7 @@ private:
 	int32 LastRequestedPublicConnections;
 
 	bool bLastRequestedLANMatch;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPRProfileDebugWidget> ProfileDebugWidget;
 };

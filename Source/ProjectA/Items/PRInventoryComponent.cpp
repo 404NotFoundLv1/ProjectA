@@ -222,6 +222,27 @@ bool UPRInventoryComponent::UseItem(const FName ItemId)
 	return true;
 }
 
+bool UPRInventoryComponent::ReplaceInventoryItems(const TArray<FPRItemInstance>& Items)
+{
+	if (Items.Num() > MaxSlots || Items.ContainsByPredicate([this](const FPRItemInstance& Item)
+	{
+		return !Item.IsValid() || Item.Count > GetMaxStackCount(Item.ItemId);
+	}))
+	{
+		return false;
+	}
+
+	InventoryList.Entries.Reset(Items.Num());
+	for (const FPRItemInstance& Item : Items)
+	{
+		FPRInventoryEntry& Entry = InventoryList.Entries.AddDefaulted_GetRef();
+		Entry.Item = Item;
+	}
+	InventoryList.MarkArrayDirty();
+	NotifyInventoryChanged();
+	return true;
+}
+
 int32 UPRInventoryComponent::GetItemCount(const FName ItemId) const
 {
 	int32 TotalCount = 0;
