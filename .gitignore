@@ -19,6 +19,10 @@ Saved/
 .mcp.json
 tmp/
 
+# ProjectRift AutomationTool compilation output
+/Scripts/ProjectRift/Gauntlet/bin/
+/Scripts/ProjectRift/Gauntlet/obj/
+
 # OS/editor noise
 Thumbs.db
 Desktop.ini

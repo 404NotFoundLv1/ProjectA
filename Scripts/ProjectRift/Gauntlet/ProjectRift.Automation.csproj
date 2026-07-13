@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>ProjectRift.Automation</AssemblyName>
+    <RootNamespace>ProjectRift</RootNamespace>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="AutomationTool">
+      <HintPath>$(UE_ENGINE_ROOT)\Engine\Binaries\DotNET\AutomationTool\AutomationTool.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Gauntlet.Automation">
+      <HintPath>$(UE_ENGINE_ROOT)\Engine\Binaries\DotNET\AutomationTool\AutomationScripts\Gauntlet\net10.0\Gauntlet.Automation.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnrealBuildTool">
+      <HintPath>$(UE_ENGINE_ROOT)\Engine\Binaries\DotNET\AutomationTool\UnrealBuildTool.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

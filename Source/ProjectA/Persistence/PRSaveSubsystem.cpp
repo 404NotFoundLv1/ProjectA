@@ -81,40 +81,150 @@ bool DoesReceiptMatchExpectedState(
 }
 }
 
+bool UPRSaveSubsystem::ResolveGauntletSmokeProfileRoot(
+	const FString& RunIdText,
+	const FString& CustomUserDirectory,
+	const FString& ProjectAutomationDirectory,
+	FString& OutProfileRoot,
+	FString& OutDiagnostic)
+{
+	OutProfileRoot.Reset();
+	OutDiagnostic.Reset();
+
+	FGuid RunId;
+	if (!FGuid::Parse(RunIdText, RunId) || !RunId.IsValid())
+	{
+		OutDiagnostic = TEXT("ProjectRiftGauntletSmoke must contain a valid GUID.");
+		return false;
+	}
+	if (CustomUserDirectory.TrimStartAndEnd().IsEmpty())
+	{
+		OutDiagnostic = TEXT("Gauntlet smoke requires an explicit -userdir sandbox.");
+		return false;
+	}
+	if (FPaths::IsRelative(CustomUserDirectory))
+	{
+		OutDiagnostic = TEXT("Gauntlet smoke requires an absolute -userdir sandbox.");
+		return false;
+	}
+	if (ProjectAutomationDirectory.TrimStartAndEnd().IsEmpty())
+	{
+		OutDiagnostic = TEXT("ProjectA Automation directory is unavailable.");
+		return false;
+	}
+	if (FPaths::IsRelative(ProjectAutomationDirectory))
+	{
+		OutDiagnostic = TEXT("ProjectA Automation directory must be absolute.");
+		return false;
+	}
+
+	const FString AutomationRoot = FPaths::ConvertRelativePathToFull(ProjectAutomationDirectory);
+	const FString ProjectSavedRoot = FPaths::GetPath(AutomationRoot);
+	if (!FPaths::GetCleanFilename(AutomationRoot).Equals(TEXT("Automation"), ESearchCase::IgnoreCase)
+		|| !FPaths::GetCleanFilename(ProjectSavedRoot).Equals(TEXT("Saved"), ESearchCase::IgnoreCase))
+	{
+		OutDiagnostic = TEXT("ProjectA Automation directory must end in Saved/Automation.");
+		return false;
+	}
+	const FString RunRoot = FPaths::ConvertRelativePathToFull(FPaths::Combine(
+		AutomationRoot,
+		TEXT("Gauntlet"),
+		RunId.ToString(EGuidFormats::DigitsWithHyphens)));
+	const FString CustomUserRoot = FPaths::ConvertRelativePathToFull(CustomUserDirectory);
+	FString NormalizedUserRoot = CustomUserRoot;
+	FPaths::NormalizeDirectoryName(NormalizedUserRoot);
+	if (NormalizedUserRoot.Len() == 2 && NormalizedUserRoot[1] == TEXT(':'))
+	{
+		OutDiagnostic = TEXT("Gauntlet -userdir cannot be a filesystem root.");
+		return false;
+	}
+	if (FPaths::IsUnderDirectory(CustomUserRoot, ProjectSavedRoot)
+		&& !FPaths::IsUnderDirectory(CustomUserRoot, AutomationRoot))
+	{
+		OutDiagnostic = TEXT("Gauntlet -userdir cannot access ProjectA non-automation saved data.");
+		return false;
+	}
+	const FString CandidateRoot = FPaths::ConvertRelativePathToFull(FPaths::Combine(RunRoot, TEXT("Profiles")));
+	if (!FPaths::IsUnderDirectory(CandidateRoot, AutomationRoot))
+	{
+		OutDiagnostic = TEXT("Resolved Gauntlet profile root escaped ProjectA Saved/Automation.");
+		return false;
+	}
+
+	OutProfileRoot = CandidateRoot;
+	OutDiagnostic = TEXT("Gauntlet profile root resolved.");
+	return true;
+}
+
 void UPRSaveSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 	bUsingIsolatedDevelopmentRoot = false;
+	bGauntletSmokeInitializationRejected = false;
 	FString SaveRoot = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("SaveGames"), TEXT("ProjectRift"));
 #if !UE_BUILD_SHIPPING
-	FString RequestedTestRoot;
-	if (FParse::Value(FCommandLine::Get(), TEXT("ProjectRiftProfileRoot="), RequestedTestRoot))
+	FString RequestedGauntletRunId;
+	if (FParse::Value(FCommandLine::Get(), TEXT("ProjectRiftGauntletSmoke="), RequestedGauntletRunId))
 	{
-		const FString CandidateRoot = FPaths::ConvertRelativePathToFull(RequestedTestRoot);
-		const FString AutomationRoot = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation")));
-		if (CandidateRoot == AutomationRoot || FPaths::IsUnderDirectory(CandidateRoot, AutomationRoot))
+		FString CustomUserDirectory;
+		FParse::Value(FCommandLine::Get(), TEXT("userdir="), CustomUserDirectory);
+		FString ProjectAutomationDirectory;
+		FParse::Value(FCommandLine::Get(), TEXT("ProjectRiftGauntletAutomationRoot="), ProjectAutomationDirectory);
+		FString Diagnostic;
+		if (ResolveGauntletSmokeProfileRoot(
+			RequestedGauntletRunId,
+			CustomUserDirectory,
+			ProjectAutomationDirectory,
+			SaveRoot,
+			Diagnostic))
 		{
-			int32 PIEInstance = INDEX_NONE;
-			UWorld* GameWorld = GetGameInstance() ? GetGameInstance()->GetWorld() : nullptr;
-			if (GEngine && GameWorld)
-			{
-				if (const FWorldContext* WorldContext = GEngine->GetWorldContextFromWorld(GameWorld))
-				{
-					PIEInstance = WorldContext->PIEInstance;
-				}
-			}
-			SaveRoot = PIEInstance == INDEX_NONE
-				? CandidateRoot
-				: FPaths::Combine(CandidateRoot, FString::Printf(TEXT("PIE_%d"), PIEInstance));
 			bUsingIsolatedDevelopmentRoot = true;
-			UE_LOG(LogProjectA, Log, TEXT("Using isolated ProjectRift development profile root: %s"), *SaveRoot);
+			UE_LOG(LogProjectRiftSave, Log, TEXT("Using isolated Gauntlet profile root: %s"), *SaveRoot);
 		}
 		else
 		{
-			UE_LOG(LogProjectA, Error, TEXT("Ignored ProjectRiftProfileRoot outside ProjectA Saved/Automation: %s"), *CandidateRoot);
+			bGauntletSmokeInitializationRejected = true;
+			UE_LOG(LogProjectRiftSave, Error, TEXT("Gauntlet profile initialization rejected: %s"), *Diagnostic);
+		}
+	}
+	else
+	{
+		FString RequestedTestRoot;
+		if (FParse::Value(FCommandLine::Get(), TEXT("ProjectRiftProfileRoot="), RequestedTestRoot))
+		{
+			const FString CandidateRoot = FPaths::ConvertRelativePathToFull(RequestedTestRoot);
+			const FString AutomationRoot = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation")));
+			if (CandidateRoot == AutomationRoot || FPaths::IsUnderDirectory(CandidateRoot, AutomationRoot))
+			{
+				int32 PIEInstance = INDEX_NONE;
+				UWorld* GameWorld = GetGameInstance() ? GetGameInstance()->GetWorld() : nullptr;
+				if (GEngine && GameWorld)
+				{
+					if (const FWorldContext* WorldContext = GEngine->GetWorldContextFromWorld(GameWorld))
+					{
+						PIEInstance = WorldContext->PIEInstance;
+					}
+				}
+				SaveRoot = PIEInstance == INDEX_NONE
+					? CandidateRoot
+					: FPaths::Combine(CandidateRoot, FString::Printf(TEXT("PIE_%d"), PIEInstance));
+				bUsingIsolatedDevelopmentRoot = true;
+				UE_LOG(LogProjectA, Log, TEXT("Using isolated ProjectRift development profile root: %s"), *SaveRoot);
+			}
+			else
+			{
+				UE_LOG(LogProjectA, Error, TEXT("Ignored ProjectRiftProfileRoot outside ProjectA Saved/Automation: %s"), *CandidateRoot);
+			}
 		}
 	}
 #endif
+	if (bGauntletSmokeInitializationRejected)
+	{
+		SaveStore.Reset();
+		Catalog = nullptr;
+		ActiveProfile = nullptr;
+		return;
+	}
 	SaveStore = MakeUnique<FPRSafeSaveStore>(SaveRoot);
 	LoadOrRebuildCatalog();
 	if (Catalog && Catalog->ActiveProfileId.IsValid())
@@ -138,6 +248,7 @@ void UPRSaveSubsystem::Deinitialize()
 	Catalog = nullptr;
 	SaveStore.Reset();
 	bUsingIsolatedDevelopmentRoot = false;
+	bGauntletSmokeInitializationRejected = false;
 	Super::Deinitialize();
 }
 
@@ -150,6 +261,7 @@ void UPRSaveSubsystem::InitializeForAutomation(const FString& RootDirectory)
 	SessionBoundProfileId.Invalidate();
 	bHasPendingSettlementReceipt = false;
 	bHasPendingShipRepairReceipt = false;
+	bGauntletSmokeInitializationRejected = false;
 	const FString CandidateRoot = FPaths::ConvertRelativePathToFull(RootDirectory);
 	const FString AutomationRoot = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation")));
 	bUsingIsolatedDevelopmentRoot = CandidateRoot == AutomationRoot || FPaths::IsUnderDirectory(CandidateRoot, AutomationRoot);

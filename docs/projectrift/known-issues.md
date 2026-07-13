@@ -1,5 +1,13 @@
 # ProjectRift known issues
 
+## v0.5.6 acceptance-relevant items
+
+- The Gauntlet loop is single-client and deterministic. It proves the complete local authoritative loop but does not exercise two separate client processes.
+- Shipping logging and console commands are compiled out by default, so the automated Shipping probe validates a healthy bounded NullRHI lifetime and exact ProjectA process cleanup. Manual acceptance should still launch the graphical Shipping package.
+- RunUnreal owns its device `-userdir` beneath the UE Gauntlet cache. ProjectRift profile files remain fixed beneath the ProjectA `Saved/Automation/Gauntlet/<RunId>/Profiles` root.
+- UAT reports unavailable SDKs for non-Win64 platforms while validating platforms. Win64 remains valid, and both Development and Shipping packages succeed.
+- ProjectA local runs now guard the official shared `UnrealEditor.modules` by hash and keep a ProjectA-local backup. A detected change stops the run but is intentionally not auto-restored into the shared UE installation.
+
 ## v0.5.1 acceptance-relevant items
 
 - The project settings values are now global and unique. Actor and Blueprint instance overrides for the 11 migrated fields no longer exist; acceptance should change values through Project Settings > ProjectRift > Gameplay and restore the approved defaults before committing.
@@ -26,4 +34,4 @@
 
 ## Release gate
 
-Do not accept v0.5.1 until the manual matrix in `v0.5.1-test-record.md` passes. Do not begin the next small version before explicit user authorization.
+Do not accept v0.5.6 until the manual matrix in `v0.5.6-test-record.md` passes. Do not begin the next small version before explicit user authorization.

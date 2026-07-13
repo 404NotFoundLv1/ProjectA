@@ -54,6 +54,20 @@
 		{
 			"Name": "EditorToolset",
 			"Enabled": true
+		},
+		{
+			"Name": "Gauntlet",
+			"Enabled": true,
+			"TargetConfigurationDenyList": [
+				"Shipping"
+			]
+		},
+		{
+			"Name": "ProjectRiftSmokeTests",
+			"Enabled": true,
+			"TargetConfigurationDenyList": [
+				"Shipping"
+			]
 		}
 	]
 }

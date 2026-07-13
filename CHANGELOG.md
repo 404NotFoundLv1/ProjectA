@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.5.6] - 2026-07-14
+
+### Added
+
+- Added the Development-only `ProjectRiftSmokeTests` plugin with a staged `UPRLocalSmokeGauntletController` and the project-level `ProjectRift.LocalSmoke` AutomationTool node.
+- Added `ProjectRift.Smoke.Content`, `ProfileIsolation`, and `GauntletContract` coverage for maps, Primary Assets, isolated profiles, controller transitions, timeout constants, and Shipping exclusions.
+- Added a PowerShell 5.1 local pipeline with Quick, Full, and Build modes, fixed exit codes, exact ProjectA editor ownership checks, structured run summaries, and dependency-free self-tests.
+- Added transactional Development/Shipping package candidates and safe latest-package promotion beneath `Saved/StagedBuilds/Local`.
+- Added a shared UE module-manifest guard that validates `UnrealEditor.modules`, stores a hash-verified backup inside each ProjectA run, and stops if any ProjectA stage changes it.
+
+### Changed
+
+- Gauntlet smoke runs now fail closed unless they receive a valid run GUID and an absolute engine-owned `-userdir`; profile persistence is fixed to `Saved/Automation/Gauntlet/<RunId>/Profiles` and never scans the normal player profile root.
+- Full local verification now performs the real authoritative lobby, ServerTravel, deterministic loot, objective, extraction, settlement, safe-save, acknowledgement, and lobby-return loop without input simulation.
+- The project descriptor excludes both the custom Smoke plugin and engine Gauntlet plugin from Shipping configurations.
+- Updated the displayed project version to `0.5.6`; the player save schema remains v4.
+
+### Verified
+
+- PowerShell 5.1 self-test passes all 31 assertions, and default Quick completes the Editor Development build plus all three Smoke tests.
+- All 62 ProjectRift automation leaf tests complete with 0 failures (46 clean successes and 16 existing warning successes).
+- Win64 Development BuildCookRun and `ProjectRift.LocalSmoke` pass with `PROJECTRIFT_SMOKE_RESULT=PASS`.
+- Win64 Shipping BuildCookRun passes, contains no Gauntlet or `ProjectRiftSmokeTests` entry, and passes a bounded NullRHI launch probe.
+
 ## [0.5.5] - 2026-07-13
 
 ### Added

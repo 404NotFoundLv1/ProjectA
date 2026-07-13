@@ -1,0 +1,29 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.5.6",
+	"FriendlyName": "ProjectRift Smoke Tests",
+	"Description": "Development-only Gauntlet controllers for ProjectRift local smoke testing.",
+	"Category": "Testing",
+	"CanContainContent": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "ProjectRiftSmokeTests",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [
+				"Win64"
+			],
+			"TargetConfigurationDenyList": [
+				"Shipping"
+			]
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "Gauntlet",
+			"Enabled": true
+		}
+	]
+}

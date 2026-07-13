@@ -103,6 +103,16 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Profile|Development")
 	bool IsUsingIsolatedDevelopmentRoot() const { return bUsingIsolatedDevelopmentRoot; }
 
+	UFUNCTION(BlueprintPure, Category = "Profile|Development")
+	bool IsGauntletSmokeInitializationRejected() const { return bGauntletSmokeInitializationRejected; }
+
+	static bool ResolveGauntletSmokeProfileRoot(
+		const FString& RunIdText,
+		const FString& CustomUserDirectory,
+		const FString& ProjectAutomationDirectory,
+		FString& OutProfileRoot,
+		FString& OutDiagnostic);
+
 	UFUNCTION(BlueprintPure, Category = "Profile")
 	FGuid GetActiveProfileId() const { return ActiveProfile ? ActiveProfile->ProfileId : FGuid(); }
 
@@ -140,4 +150,5 @@ private:
 	FPRShipRepairReceipt PendingShipRepairReceipt;
 	bool bHasPendingShipRepairReceipt = false;
 	bool bUsingIsolatedDevelopmentRoot = false;
+	bool bGauntletSmokeInitializationRejected = false;
 };
