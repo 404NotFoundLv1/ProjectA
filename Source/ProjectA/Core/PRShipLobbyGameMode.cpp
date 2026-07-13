@@ -1,5 +1,7 @@
 #include "Core/PRShipLobbyGameMode.h"
 
+#include "Diagnostics/PRDiagnosticsLog.h"
+
 #include "Engine/World.h"
 #include "Core/PRAssetManager.h"
 #include "Core/PRGameState.h"
@@ -86,6 +88,7 @@ bool APRShipLobbyGameMode::StartRiftMission(APlayerController* RequestingControl
 
 	if (!IsHostPlayerController(RequestingController))
 	{
+		PRRecordDiagnosticEvent(this, EPRDiagnosticSeverity::Warning, TEXT("Flow"), TEXT("Lobby.StartRejected.NotHost"), TEXT("A non-host player attempted to start the rift mission."));
 		if (RequestingController)
 		{
 			RequestingController->ClientMessage(TEXT("Only the listen-server host can start the rift mission."));
@@ -95,6 +98,7 @@ bool APRShipLobbyGameMode::StartRiftMission(APlayerController* RequestingControl
 
 	if (!CanStartRiftMission())
 	{
+		PRRecordDiagnosticEvent(this, EPRDiagnosticSeverity::Warning, TEXT("Flow"), TEXT("Lobby.StartRejected.NotReady"), TEXT("Mission start rejected because team readiness or host eligibility was incomplete."));
 		if (RequestingController)
 		{
 			RequestingController->ClientMessage(TEXT("All players must be ready before starting the rift mission."));
@@ -109,8 +113,15 @@ bool APRShipLobbyGameMode::StartRiftMission(APlayerController* RequestingControl
 	}
 
 	const FString TravelURL = BuildRiftTravelURL();
-	UE_LOG(LogProjectA, Log, TEXT("Starting rift mission via ServerTravel: %s"), *TravelURL);
-	return World->ServerTravel(TravelURL);
+	UE_LOG(LogProjectRiftFlow, Log, TEXT("Starting rift mission via ServerTravel: %s"), *TravelURL);
+	const bool bTravelStarted = World->ServerTravel(TravelURL);
+	PRRecordDiagnosticEvent(
+		this,
+		bTravelStarted ? EPRDiagnosticSeverity::Info : EPRDiagnosticSeverity::Error,
+		TEXT("Flow"),
+		bTravelStarted ? TEXT("Lobby.TravelStarted") : TEXT("Lobby.TravelFailed"),
+		TravelURL);
+	return bTravelStarted;
 }
 
 void APRShipLobbyGameMode::HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer)

@@ -25,6 +25,7 @@ public:
 	FString GetProfileCorruptPath(const FGuid& ProfileId) const;
 	FString GetProfileTempPath(const FGuid& ProfileId) const;
 	const FString& GetRootDirectory() const { return RootDirectory; }
+	void ArmNextSaveFailureForDevelopment() { bFailNextSaveForDevelopment = true; }
 
 private:
 	struct FFileSet
@@ -45,4 +46,5 @@ private:
 	bool IsPathInsideRoot(const FString& Path) const;
 
 	FString RootDirectory;
+	bool bFailNextSaveForDevelopment = false;
 };

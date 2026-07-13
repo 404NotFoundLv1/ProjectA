@@ -305,6 +305,14 @@ FPRSafeSaveStore::FFileSet FPRSafeSaveStore::GetCatalogFiles() const
 FPRProfileOperationResult FPRSafeSaveStore::SaveObject(USaveGame* SaveGame, const FFileSet& Files, const FGuid& ProfileId)
 {
 	IFileManager& FileManager = IFileManager::Get();
+	if (bFailNextSaveForDevelopment)
+	{
+		bFailNextSaveForDevelopment = false;
+		return FPRProfileOperationResult::MakeFailure(
+			EPRProfileOperationStatus::IOError,
+			TEXT("An isolated development-only save failure was injected before any file was changed."),
+			ProfileId);
+	}
 	if (FileManager.FileExists(*Files.Primary))
 	{
 		USaveGame* ExistingSave = nullptr;

@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.5.5] - 2026-07-13
+
+### Added
+
+- Added a local-only diagnostics subsystem with a configurable 500-entry structured event ring buffer, runtime snapshots, filtering, health summaries, and validated UTF-8 JSON export under `Saved/Diagnostics`.
+- Added a unified native diagnostics HUD with Overview, Player, Team & Rift, Events, and Tools tabs; F1 toggles it and Escape closes it outside Shipping builds.
+- Added local developer actions for profile lifecycle, checkpoint saving, legacy-v1 samples, repair acceptance preparation, test loot, ready/start flow, and isolated fault injection.
+- Added dedicated Gameplay, Network, Save, Assets, UI, and Diagnostics log categories while retaining the existing Flow category.
+
+### Changed
+
+- Replaced automatically opened, overlapping profile/ready/GAS debug overlays with the centered unified HUD while preserving the legacy classes for compatibility.
+- Main menu sessions without an active profile open directly to the Tools tab; Inventory and Ship Repair remain mutually exclusive with diagnostics.
+- Corrupt-primary and fail-next-save actions are now rejected unless the save root is explicitly isolated beneath ProjectA `Saved/Automation`.
+- Updated the displayed project version to `0.5.5`; the player save schema remains v4.
+
+### Verified
+
+- ProjectAEditor Win64 Development, ProjectA Win64 Development, and ProjectA Win64 Shipping targets build successfully with Unreal Engine 5.8.
+- All 59 ProjectRift automation leaf tests pass after the final DPI-aware diagnostics layout fix.
+- ProjectA-only 8001 MCP verified two-player PIE, isolated profile roots, removal of the scattered debug overlays, and the centered main-menu Tools panel.
+
 ## [0.5.4] - 2026-07-13
 
 ### Added

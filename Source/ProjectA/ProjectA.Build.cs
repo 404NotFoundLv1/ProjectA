@@ -29,7 +29,9 @@ public class ProjectA : ModuleRules
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
-			"OnlineSubsystem"
+			"OnlineSubsystem",
+			"Json",
+			"JsonUtilities"
 		});
 
 		PublicIncludePaths.AddRange(new string[] {

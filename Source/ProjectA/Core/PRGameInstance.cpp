@@ -2,11 +2,10 @@
 
 #include "Blueprint/UserWidget.h"
 #include "Engine/World.h"
+#include "Diagnostics/PRDiagnosticsLog.h"
 #include "GameFramework/PlayerController.h"
 #include "Persistence/PRSaveSubsystem.h"
 #include "ProjectA.h"
-#include "UI/PRDebugUILayout.h"
-#include "UI/PRProfileDebugWidget.h"
 #include "UObject/UObjectGlobals.h"
 
 UPRGameInstance::UPRGameInstance()
@@ -21,7 +20,7 @@ void UPRGameInstance::Init()
 	Super::Init();
 	FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(this, &UPRGameInstance::HandlePostLoadMapWithWorld);
 
-	UE_LOG(LogProjectA, Log, TEXT("ProjectRift game instance initialized."));
+	UE_LOG(LogProjectRiftNetwork, Log, TEXT("ProjectRift game instance initialized."));
 }
 
 void UPRGameInstance::OnStart()
@@ -41,11 +40,6 @@ void UPRGameInstance::Shutdown()
 		SaveSubsystem->SaveForApplicationExit();
 	}
 	FCoreUObjectDelegates::PostLoadMapWithWorld.RemoveAll(this);
-	if (ProfileDebugWidget)
-	{
-		ProfileDebugWidget->RemoveFromParent();
-		ProfileDebugWidget = nullptr;
-	}
 	Super::Shutdown();
 }
 
@@ -54,44 +48,9 @@ void UPRGameInstance::HandlePostLoadMapWithWorld(UWorld* LoadedWorld)
 #if UE_BUILD_SHIPPING
 	return;
 #else
-	if (!LoadedWorld || LoadedWorld != GetWorld())
-	{
-		return;
-	}
-	const bool bIsMainMenu = LoadedWorld->GetMapName().EndsWith(TEXT("L_MainMenu"));
-	if (!bIsMainMenu)
-	{
-		if (ProfileDebugWidget)
-		{
-			ProfileDebugWidget->RemoveFromParent();
-			ProfileDebugWidget = nullptr;
-			if (APlayerController* Controller = LoadedWorld->GetFirstPlayerController())
-			{
-				Controller->bShowMouseCursor = false;
-				Controller->SetInputMode(FInputModeGameOnly());
-			}
-		}
-		return;
-	}
-	if (!ProfileDebugWidget)
-	{
-		ProfileDebugWidget = CreateWidget<UPRProfileDebugWidget>(this, UPRProfileDebugWidget::StaticClass());
-		if (ProfileDebugWidget)
-		{
-			ProfileDebugWidget->AddToViewport(100);
-			ProfileDebugWidget->SetPositionInViewport(FPRDebugUILayout::ProfilePosition(), false);
-			ProfileDebugWidget->SetDesiredSizeInViewport(FPRDebugUILayout::ProfileSize());
-			ProfileDebugWidget->SetAnchorsInViewport(FPRDebugUILayout::ProfileAnchors());
-			ProfileDebugWidget->SetAlignmentInViewport(FPRDebugUILayout::ProfileAlignment());
-			if (APlayerController* Controller = LoadedWorld->GetFirstPlayerController())
-			{
-				Controller->bShowMouseCursor = true;
-				FInputModeUIOnly InputMode;
-				InputMode.SetWidgetToFocus(ProfileDebugWidget->TakeWidget());
-				Controller->SetInputMode(InputMode);
-			}
-		}
-	}
+	// The legacy profile debug widget remains available as a class for compatibility,
+	// but v0.5.5 no longer opens any scattered debug HUD from the game instance.
+	(void)LoadedWorld;
 #endif
 }
 
@@ -187,10 +146,30 @@ bool UPRGameInstance::StartSession()
 
 void UPRGameInstance::SetSessionInterfaceState(const EPRSessionInterfaceState NewState)
 {
+	const EPRSessionInterfaceState PreviousState = SessionInterfaceState;
 	SessionInterfaceState = NewState;
+	PRRecordDiagnosticEvent(
+		this,
+		NewState == EPRSessionInterfaceState::Error ? EPRDiagnosticSeverity::Error : EPRDiagnosticSeverity::Info,
+		TEXT("Network"),
+		TEXT("Session.StateChanged"),
+		FString::Printf(
+			TEXT("Session state changed from %s to %s."),
+			*StaticEnum<EPRSessionInterfaceState>()->GetNameStringByValue(static_cast<int64>(PreviousState)),
+			*StaticEnum<EPRSessionInterfaceState>()->GetNameStringByValue(static_cast<int64>(NewState))));
 }
 
 void UPRGameInstance::SetLastSessionError(const FString& ErrorMessage)
 {
 	LastSessionError = ErrorMessage;
+	if (!LastSessionError.IsEmpty())
+	{
+		UE_LOG(LogProjectRiftNetwork, Warning, TEXT("Session error: %s"), *LastSessionError);
+		PRRecordDiagnosticEvent(
+			this,
+			EPRDiagnosticSeverity::Error,
+			TEXT("Network"),
+			TEXT("Session.Error"),
+			LastSessionError);
+	}
 }

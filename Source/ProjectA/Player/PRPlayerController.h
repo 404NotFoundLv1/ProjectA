@@ -14,6 +14,7 @@ class UPRInventoryWidget;
 class UPRLobbyReadyDebugWidget;
 class UPRRiftSettlementWidget;
 class UPRShipRepairWidget;
+class UPRDiagnosticsWidget;
 class UPRLootTableDataAsset;
 class UGameplayEffect;
 class APRPickupActor;
@@ -68,6 +69,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Loot|Debug")
 	void SpawnTestLoot();
+
+	UFUNCTION(BlueprintCallable, Category = "Diagnostics|UI")
+	void ToggleDiagnosticsPanel();
+
+	UFUNCTION(BlueprintCallable, Category = "Diagnostics|UI")
+	void HideDiagnosticsPanel();
+
+	UFUNCTION(BlueprintPure, Category = "Diagnostics|UI")
+	bool IsDiagnosticsPanelVisible() const;
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
 	bool IsInventoryVisible() const;
@@ -198,6 +208,11 @@ private:
 	void DestroyGASDebugHUD();
 	void CreateLobbyReadyDebugHUD();
 	void DestroyLobbyReadyDebugHUD();
+	void ShowDiagnosticsPanel(bool bOpenToolsTab = false);
+	void CreateDiagnosticsUI();
+	void DestroyDiagnosticsUI();
+	void ApplyDiagnosticsInputMode();
+	void RestoreDiagnosticsInputMode();
 	void CreateInventoryUI();
 	void DestroyInventoryUI();
 	void CreateRiftSettlementUI();
@@ -238,6 +253,12 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UPRLobbyReadyDebugWidget> LobbyReadyDebugWidget;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Diagnostics|UI")
+	TSubclassOf<UPRDiagnosticsWidget> DiagnosticsWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPRDiagnosticsWidget> DiagnosticsWidget;
+
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory|UI")
 	TSubclassOf<UPRInventoryWidget> InventoryWidgetClass;
 
@@ -260,6 +281,8 @@ private:
 	bool bSavedMouseCursorVisibilityForInventory = false;
 	bool bShipRepairInputModeActive = false;
 	bool bSavedMouseCursorVisibilityForShipRepair = false;
+	bool bDiagnosticsInputModeActive = false;
+	bool bSavedMouseCursorVisibilityForDiagnostics = false;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory|Use")
 	TSubclassOf<UGameplayEffect> HealthInjectorEffectClass;

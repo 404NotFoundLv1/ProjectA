@@ -48,4 +48,7 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Extraction", meta=(ClampMin="1.0", UIMin="1.0"))
 	float ExtractionRadius = 320.0f;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Diagnostics", meta=(ClampMin="100", ClampMax="5000", UIMin="100", UIMax="5000"))
+	int32 DiagnosticEventCapacity = 500;
 };

@@ -4,12 +4,14 @@
 #include "Abilities/PRAttributeSet.h"
 #include "Abilities/PRHealthConsumableGameplayEffect.h"
 #include "Abilities/PRShieldConsumableGameplayEffect.h"
+#include "Blueprint/WidgetLayoutLibrary.h"
 #include "Characters/PRCharacter.h"
 #include "Core/PRAssetManager.h"
 #include "Core/PRGameState.h"
 #include "Core/PRShipLobbyGameMode.h"
 #include "Core/PRRiftGameMode.h"
 #include "Core/PRRiftObjectiveActor.h"
+#include "Diagnostics/PRDiagnosticsLog.h"
 #include "Engine/Engine.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/World.h"
@@ -29,6 +31,7 @@
 #include "Progression/PRMissionProgressionDataAsset.h"
 #include "Ship/PRShipRepairDataAsset.h"
 #include "UI/PRDebugUILayout.h"
+#include "UI/PRDiagnosticsWidget.h"
 #include "UI/PRGASDebugWidget.h"
 #include "UI/PRInventoryWidget.h"
 #include "UI/PRLobbyReadyDebugWidget.h"
@@ -130,6 +133,7 @@ APRPlayerController::APRPlayerController()
 	InventoryWidgetClass = UPRInventoryWidget::StaticClass();
 	RiftSettlementWidgetClass = UPRRiftSettlementWidget::StaticClass();
 	ShipRepairWidgetClass = UPRShipRepairWidget::StaticClass();
+	DiagnosticsWidgetClass = UPRDiagnosticsWidget::StaticClass();
 	HealthInjectorEffectClass = UPRHealthConsumableGameplayEffect::StaticClass();
 	ShieldPackEffectClass = UPRShieldConsumableGameplayEffect::StaticClass();
 	PickupActorClass = APRPickupActor::StaticClass();
@@ -142,13 +146,6 @@ void APRPlayerController::BeginPlay()
 	if (IsLocalPlayerController())
 	{
 		GetWorldTimerManager().SetTimer(
-			LobbyReadyDebugTimerHandle,
-			this,
-			&APRPlayerController::RefreshLobbyReadyDebugDisplay,
-			1.0f,
-			true,
-			0.25f);
-		GetWorldTimerManager().SetTimer(
 			ShipRepairRetryTimerHandle,
 			this,
 			&APRPlayerController::RetryPendingShipRepairSave,
@@ -156,11 +153,20 @@ void APRPlayerController::BeginPlay()
 			true,
 			5.0f);
 
-		CreateGASDebugHUD();
 		CreateInventoryUI();
 		CreateRiftSettlementUI();
 		CreateShipRepairUI();
 		SubmitLocalMultiplayerProfile();
+
+#if !UE_BUILD_SHIPPING
+		const bool bIsMainMenu = GetWorld() && UWorld::RemovePIEPrefix(GetWorld()->GetMapName()).Contains(TEXT("L_MainMenu"));
+		const UGameInstance* GameInstance = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+		const UPRSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<UPRSaveSubsystem>() : nullptr;
+		if (bIsMainMenu && (!SaveSubsystem || !SaveSubsystem->GetActiveProfileId().IsValid()))
+		{
+			ShowDiagnosticsPanel(true);
+		}
+#endif
 	}
 }
 
@@ -169,6 +175,7 @@ void APRPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	DestroyRiftSettlementUI();
 	DestroyShipRepairUI();
 	DestroyInventoryUI();
+	DestroyDiagnosticsUI();
 	DestroyLobbyReadyDebugHUD();
 	DestroyGASDebugHUD();
 	GetWorldTimerManager().ClearTimer(LobbyReadyDebugTimerHandle);
@@ -188,6 +195,10 @@ void APRPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::O, IE_Pressed, this, &APRPlayerController::StartRiftMission);
 		InputComponent->BindKey(EKeys::R, IE_Pressed, this, &APRPlayerController::ToggleShipRepairPanel);
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &APRPlayerController::HideShipRepairPanel);
+#if !UE_BUILD_SHIPPING
+		InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &APRPlayerController::ToggleDiagnosticsPanel);
+		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &APRPlayerController::HideDiagnosticsPanel);
+#endif
 	}
 }
 
@@ -423,6 +434,137 @@ void APRPlayerController::SpawnTestLoot()
 	ServerSpawnTestLoot();
 }
 
+void APRPlayerController::ToggleDiagnosticsPanel()
+{
+#if !UE_BUILD_SHIPPING
+	if (IsDiagnosticsPanelVisible())
+	{
+		HideDiagnosticsPanel();
+	}
+	else
+	{
+		ShowDiagnosticsPanel(false);
+	}
+#endif
+}
+
+void APRPlayerController::ShowDiagnosticsPanel(const bool bOpenToolsTab)
+{
+#if !UE_BUILD_SHIPPING
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
+	HideInventory();
+	HideShipRepairPanel();
+	CreateDiagnosticsUI();
+	if (!DiagnosticsWidget)
+	{
+		return;
+	}
+	DiagnosticsWidget->InitializeForController(
+		this,
+		bOpenToolsTab ? EPRDiagnosticsTab::Tools : DiagnosticsWidget->GetActiveTab());
+	DiagnosticsWidget->SetVisibility(ESlateVisibility::Visible);
+	ApplyDiagnosticsInputMode();
+#endif
+}
+
+void APRPlayerController::HideDiagnosticsPanel()
+{
+#if !UE_BUILD_SHIPPING
+	if (DiagnosticsWidget)
+	{
+		DiagnosticsWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	RestoreDiagnosticsInputMode();
+#endif
+}
+
+bool APRPlayerController::IsDiagnosticsPanelVisible() const
+{
+#if UE_BUILD_SHIPPING
+	return false;
+#else
+	return DiagnosticsWidget && DiagnosticsWidget->IsInViewport()
+		&& DiagnosticsWidget->GetVisibility() != ESlateVisibility::Collapsed
+		&& DiagnosticsWidget->GetVisibility() != ESlateVisibility::Hidden;
+#endif
+}
+
+void APRPlayerController::CreateDiagnosticsUI()
+{
+#if !UE_BUILD_SHIPPING
+	if (!IsLocalPlayerController() || DiagnosticsWidget)
+	{
+		return;
+	}
+	if (!DiagnosticsWidgetClass)
+	{
+		DiagnosticsWidgetClass = UPRDiagnosticsWidget::StaticClass();
+	}
+	DiagnosticsWidget = CreateWidget<UPRDiagnosticsWidget>(this, DiagnosticsWidgetClass);
+	if (DiagnosticsWidget)
+	{
+		DiagnosticsWidget->InitializeForController(this, EPRDiagnosticsTab::Overview);
+		DiagnosticsWidget->AddToPlayerScreen(100);
+		DiagnosticsWidget->SetAnchorsInViewport(FAnchors(0.0f, 0.0f, 1.0f, 1.0f));
+		DiagnosticsWidget->SetAlignmentInViewport(FVector2D::ZeroVector);
+		DiagnosticsWidget->SetPositionInViewport(FVector2D::ZeroVector, false);
+		int32 ViewportWidth = 0;
+		int32 ViewportHeight = 0;
+		GetViewportSize(ViewportWidth, ViewportHeight);
+		const float ViewportScale = FMath::Max(0.1f, UWidgetLayoutLibrary::GetViewportScale(this));
+		DiagnosticsWidget->SetDesiredSizeInViewport(FVector2D(
+			FMath::Max(1.0f, ViewportWidth / ViewportScale),
+			FMath::Max(1.0f, ViewportHeight / ViewportScale)));
+	}
+#endif
+}
+
+void APRPlayerController::DestroyDiagnosticsUI()
+{
+#if !UE_BUILD_SHIPPING
+	RestoreDiagnosticsInputMode();
+	if (DiagnosticsWidget)
+	{
+		DiagnosticsWidget->RemoveFromParent();
+		DiagnosticsWidget = nullptr;
+	}
+#endif
+}
+
+void APRPlayerController::ApplyDiagnosticsInputMode()
+{
+#if !UE_BUILD_SHIPPING
+	if (!DiagnosticsWidget || bDiagnosticsInputModeActive)
+	{
+		return;
+	}
+	bSavedMouseCursorVisibilityForDiagnostics = bShowMouseCursor;
+	bShowMouseCursor = true;
+	FInputModeGameAndUI InputMode;
+	InputMode.SetWidgetToFocus(DiagnosticsWidget->TakeWidget());
+	InputMode.SetHideCursorDuringCapture(false);
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(InputMode);
+	bDiagnosticsInputModeActive = true;
+#endif
+}
+
+void APRPlayerController::RestoreDiagnosticsInputMode()
+{
+#if !UE_BUILD_SHIPPING
+	if (!bDiagnosticsInputModeActive)
+	{
+		return;
+	}
+	bShowMouseCursor = bSavedMouseCursorVisibilityForDiagnostics;
+	SetInputMode(FInputModeGameOnly());
+	bDiagnosticsInputModeActive = false;
+#endif
+}
+
 APRPickupActor* APRPlayerController::FindBestPickupCandidate() const
 {
 	const APawn* ControlledPawn = GetPawn();
@@ -652,6 +794,16 @@ void APRPlayerController::ServerSetReady_Implementation(const bool bReady)
 	}
 
 	ProjectRiftPlayerState->SetReady(bReady);
+	FPRDiagnosticContext ReadyContext;
+	ReadyContext.PlayerId = ProjectRiftPlayerState->GetPlayerId();
+	ReadyContext.ProfileId = ProjectRiftPlayerState->GetBoundProfileId();
+	PRRecordDiagnosticEvent(
+		this,
+		EPRDiagnosticSeverity::Info,
+		TEXT("Network"),
+		TEXT("Lobby.ReadyStateChanged"),
+		bReady ? TEXT("Player requested ready state.") : TEXT("Player returned to waiting state."),
+		ReadyContext);
 	if (APRShipLobbyGameMode* LobbyGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<APRShipLobbyGameMode>() : nullptr)
 	{
 		LobbyGameMode->RefreshTeamMissionState();
@@ -836,6 +988,9 @@ void APRPlayerController::ServerBindMultiplayerProfile_Implementation(const FPRM
 
 	if (!ProjectRiftPlayerState->BindMultiplayerProfile(Projection, Diagnostic))
 	{
+		FPRDiagnosticContext BindingContext;
+		BindingContext.ProfileId = Projection.ProfileId;
+		PRRecordDiagnosticEvent(this, EPRDiagnosticSeverity::Warning, TEXT("Network"), TEXT("Profile.BindingRejected"), Diagnostic, BindingContext);
 		ProjectRiftPlayerState->ClearMultiplayerProfileBinding();
 		ClientMultiplayerProfileBindingResult(false, Diagnostic);
 		if (APRShipLobbyGameMode* LobbyGameMode = GetWorld()->GetAuthGameMode<APRShipLobbyGameMode>())
@@ -844,6 +999,10 @@ void APRPlayerController::ServerBindMultiplayerProfile_Implementation(const FPRM
 		}
 		return;
 	}
+	FPRDiagnosticContext BindingContext;
+	BindingContext.ProfileId = Projection.ProfileId;
+	BindingContext.PlayerId = ProjectRiftPlayerState->GetPlayerId();
+	PRRecordDiagnosticEvent(this, EPRDiagnosticSeverity::Info, TEXT("Network"), TEXT("Profile.BindingAccepted"), TEXT("Multiplayer profile projection accepted by the server."), BindingContext);
 	ClientMultiplayerProfileBindingResult(true, TEXT("Profile bound"));
 	if (APRShipLobbyGameMode* LobbyGameMode = GetWorld()->GetAuthGameMode<APRShipLobbyGameMode>())
 	{
@@ -854,6 +1013,12 @@ void APRPlayerController::ServerBindMultiplayerProfile_Implementation(const FPRM
 void APRPlayerController::ClientMultiplayerProfileBindingResult_Implementation(const bool bAccepted, const FString& Diagnostic)
 {
 	MultiplayerProfileStatus = bAccepted ? TEXT("Bound") : Diagnostic;
+	PRRecordDiagnosticEvent(
+		this,
+		bAccepted ? EPRDiagnosticSeverity::Info : EPRDiagnosticSeverity::Warning,
+		TEXT("Network"),
+		bAccepted ? TEXT("Profile.ClientBindingAccepted") : TEXT("Profile.ClientBindingRejected"),
+		bAccepted ? TEXT("The local client profile is bound for this session.") : Diagnostic);
 	if (!bAccepted)
 	{
 		if (UGameInstance* GameInstance = GetGameInstance())
@@ -1262,9 +1427,7 @@ void APRPlayerController::RefreshLobbyReadyDebugDisplay()
 	{
 		ShipRepairWidget->RefreshRepairDisplay();
 	}
-#if UE_BUILD_SHIPPING
-	return;
-#endif
+#if !UE_BUILD_SHIPPING
 	if (!IsLocalPlayerController())
 	{
 		return;
@@ -1282,12 +1445,10 @@ void APRPlayerController::RefreshLobbyReadyDebugDisplay()
 	const AGameStateBase* GameState = World ? World->GetGameState() : nullptr;
 	if (!GameState)
 	{
-#if !UE_BUILD_SHIPPING
 		if (LobbyReadyDebugWidget)
 		{
 			LobbyReadyDebugWidget->SetReadyText(FText::FromString(TEXT("Lobby Ready\nWaiting for game state...")));
 		}
-#endif
 		return;
 	}
 
@@ -1352,6 +1513,7 @@ void APRPlayerController::RefreshLobbyReadyDebugDisplay()
 	{
 		LobbyReadyDebugWidget->SetReadyText(FText::FromString(ReadyList));
 	}
+#endif
 }
 
 void APRPlayerController::CreateGASDebugHUD()

@@ -3,6 +3,7 @@
 #include "Core/PRRiftGameMode.h"
 #include "Core/PRAssetManager.h"
 #include "Core/PRShipLobbyGameMode.h"
+#include "Diagnostics/PRDiagnosticsLog.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
@@ -83,6 +84,7 @@ bool DoesReceiptMatchExpectedState(
 void UPRSaveSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+	bUsingIsolatedDevelopmentRoot = false;
 	FString SaveRoot = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("SaveGames"), TEXT("ProjectRift"));
 #if !UE_BUILD_SHIPPING
 	FString RequestedTestRoot;
@@ -104,6 +106,7 @@ void UPRSaveSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 			SaveRoot = PIEInstance == INDEX_NONE
 				? CandidateRoot
 				: FPaths::Combine(CandidateRoot, FString::Printf(TEXT("PIE_%d"), PIEInstance));
+			bUsingIsolatedDevelopmentRoot = true;
 			UE_LOG(LogProjectA, Log, TEXT("Using isolated ProjectRift development profile root: %s"), *SaveRoot);
 		}
 		else
@@ -134,6 +137,7 @@ void UPRSaveSubsystem::Deinitialize()
 	ActiveProfile = nullptr;
 	Catalog = nullptr;
 	SaveStore.Reset();
+	bUsingIsolatedDevelopmentRoot = false;
 	Super::Deinitialize();
 }
 
@@ -146,7 +150,15 @@ void UPRSaveSubsystem::InitializeForAutomation(const FString& RootDirectory)
 	SessionBoundProfileId.Invalidate();
 	bHasPendingSettlementReceipt = false;
 	bHasPendingShipRepairReceipt = false;
-	SaveStore = MakeUnique<FPRSafeSaveStore>(RootDirectory);
+	const FString CandidateRoot = FPaths::ConvertRelativePathToFull(RootDirectory);
+	const FString AutomationRoot = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation")));
+	bUsingIsolatedDevelopmentRoot = CandidateRoot == AutomationRoot || FPaths::IsUnderDirectory(CandidateRoot, AutomationRoot);
+	if (!bUsingIsolatedDevelopmentRoot)
+	{
+		SaveStore.Reset();
+		return;
+	}
+	SaveStore = MakeUnique<FPRSafeSaveStore>(CandidateRoot);
 	LoadOrRebuildCatalog();
 	if (Catalog && Catalog->ActiveProfileId.IsValid())
 	{
@@ -855,6 +867,15 @@ FPRProfileOperationResult UPRSaveSubsystem::CorruptActivePrimaryForDevelopment()
 	SetLastResult(Result);
 	return Result;
 #else
+	if (!bUsingIsolatedDevelopmentRoot)
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(
+			EPRProfileOperationStatus::ValidationFailed,
+			TEXT("Primary corruption is allowed only under ProjectA Saved/Automation isolated profile roots."),
+			GetActiveProfileId());
+		SetLastResult(Result);
+		return Result;
+	}
 	if (!SaveStore || !ActiveProfile)
 	{
 		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::NoActiveProfile, TEXT("No active profile is loaded."));
@@ -883,6 +904,32 @@ FPRProfileOperationResult UPRSaveSubsystem::CorruptActivePrimaryForDevelopment()
 		return Result;
 	}
 	return ActivateAndLoadProfile(ProfileId);
+#endif
+}
+
+FPRProfileOperationResult UPRSaveSubsystem::FailNextSaveForDevelopment()
+{
+#if UE_BUILD_SHIPPING
+	const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(
+		EPRProfileOperationStatus::ValidationFailed,
+		TEXT("Save failure injection is disabled in Shipping."),
+		GetActiveProfileId());
+	SetLastResult(Result);
+	return Result;
+#else
+	if (!bUsingIsolatedDevelopmentRoot || !SaveStore || !ActiveProfile)
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(
+			EPRProfileOperationStatus::ValidationFailed,
+			TEXT("Save failure injection requires an active profile under a ProjectA Saved/Automation isolated root."),
+			GetActiveProfileId());
+		SetLastResult(Result);
+		return Result;
+	}
+	SaveStore->ArmNextSaveFailureForDevelopment();
+	const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeSuccess(GetActiveProfileId());
+	SetLastResult(Result);
+	return Result;
 #endif
 }
 
@@ -1023,8 +1070,20 @@ bool UPRSaveSubsystem::IsUnsafeRiftCaptureContext(const APRPlayerState* PlayerSt
 void UPRSaveSubsystem::SetLastResult(const FPRProfileOperationResult& Result)
 {
 	LastOperationResult = Result;
+	FPRDiagnosticContext Context;
+	Context.ProfileId = Result.ProfileId;
+	const FString Message = Result.Diagnostic.IsEmpty()
+		? FString::Printf(TEXT("Profile operation completed with status %d."), static_cast<int32>(Result.Status))
+		: Result.Diagnostic;
+	PRRecordDiagnosticEvent(
+		GetGameInstance(),
+		Result.IsSuccess() ? EPRDiagnosticSeverity::Info : EPRDiagnosticSeverity::Warning,
+		TEXT("Save"),
+		Result.IsSuccess() ? TEXT("Save.OperationSucceeded") : TEXT("Save.OperationFailed"),
+		Message,
+		Context);
 	if (!Result.IsSuccess())
 	{
-		UE_LOG(LogProjectA, Warning, TEXT("Profile operation failed. Status=%d ProfileId=%s Diagnostic=%s"), static_cast<int32>(Result.Status), *Result.ProfileId.ToString(), *Result.Diagnostic);
+		UE_LOG(LogProjectRiftSave, Warning, TEXT("Profile operation failed. Status=%d ProfileId=%s Diagnostic=%s"), static_cast<int32>(Result.Status), *Result.ProfileId.ToString(), *Result.Diagnostic);
 	}
 }

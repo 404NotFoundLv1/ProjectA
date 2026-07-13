@@ -1,5 +1,7 @@
 #include "Core/PRRiftGameMode.h"
 
+#include "Diagnostics/PRDiagnosticsLog.h"
+
 #include "Characters/PRCharacter.h"
 #include "Core/PRSpawnManager.h"
 #include "Core/PRRiftObjectiveActor.h"
@@ -1166,6 +1168,17 @@ void APRRiftGameMode::PerformReturnToLobbyTravel()
 
 void APRRiftGameMode::LogFlowPhase(const TCHAR* Phase, const APlayerState* PlayerState) const
 {
+	FPRDiagnosticContext Context;
+	Context.PlayerId = PlayerState ? PlayerState->GetPlayerId() : INDEX_NONE;
+	Context.RunId = CurrentRunId;
+	Context.SettlementId = CurrentSettlementId;
+	PRRecordDiagnosticEvent(
+		this,
+		Phase && FCString::Strstr(Phase, TEXT("Failed")) ? EPRDiagnosticSeverity::Error : EPRDiagnosticSeverity::Info,
+		TEXT("Flow"),
+		FName(*FString::Printf(TEXT("Rift.%s"), Phase ? Phase : TEXT("Unknown"))),
+		FString::Printf(TEXT("Mission %s entered flow phase %s."), *MissionId.ToString(), Phase ? Phase : TEXT("Unknown")),
+		Context);
 	UE_LOG(
 		LogProjectRiftFlow,
 		Log,

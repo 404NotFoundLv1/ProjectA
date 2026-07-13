@@ -4,8 +4,6 @@
 #include "Engine/GameInstance.h"
 #include "PRGameInstance.generated.h"
 
-class UPRProfileDebugWidget;
-
 UENUM(BlueprintType)
 enum class EPRSessionInterfaceState : uint8
 {
@@ -99,6 +97,4 @@ private:
 
 	bool bLastRequestedLANMatch;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UPRProfileDebugWidget> ProfileDebugWidget;
 };

@@ -97,8 +97,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Profile|Development")
 	FPRProfileOperationResult CorruptActivePrimaryForDevelopment();
 
+	UFUNCTION(BlueprintCallable, Category = "Profile|Development")
+	FPRProfileOperationResult FailNextSaveForDevelopment();
+
+	UFUNCTION(BlueprintPure, Category = "Profile|Development")
+	bool IsUsingIsolatedDevelopmentRoot() const { return bUsingIsolatedDevelopmentRoot; }
+
 	UFUNCTION(BlueprintPure, Category = "Profile")
 	FGuid GetActiveProfileId() const { return ActiveProfile ? ActiveProfile->ProfileId : FGuid(); }
+
+	UFUNCTION(BlueprintPure, Category = "Profile")
+	FString GetActiveProfileDisplayName() const { return ActiveProfile ? ActiveProfile->DisplayName : FString(); }
 
 	UFUNCTION(BlueprintPure, Category = "Profile")
 	FPRProfileOperationResult GetLastOperationResult() const { return LastOperationResult; }
@@ -130,4 +139,5 @@ private:
 	bool bHasPendingSettlementReceipt = false;
 	FPRShipRepairReceipt PendingShipRepairReceipt;
 	bool bHasPendingShipRepairReceipt = false;
+	bool bUsingIsolatedDevelopmentRoot = false;
 };
