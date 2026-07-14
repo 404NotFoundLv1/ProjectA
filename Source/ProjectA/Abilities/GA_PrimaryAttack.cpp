@@ -2,6 +2,8 @@
 
 #include "Abilities/PRDamageGameplayEffect.h"
 #include "Abilities/PRAbilitySystemComponent.h"
+#include "Abilities/PRCombatEffectLibrary.h"
+#include "AbilitySystemBlueprintLibrary.h"
 #include "Characters/PRCharacter.h"
 #include "Core/PRGameplayTags.h"
 #include "DrawDebugHelpers.h"
@@ -113,72 +115,41 @@ bool UGA_PrimaryAttack::ExecuteServerAttack(
 
 	for (const FOverlapResult& Overlap : Overlaps)
 	{
-		if (APREnemyCharacter* TargetEnemy = Cast<APREnemyCharacter>(Overlap.GetActor()))
-		{
-			const FVector ToTarget = TargetEnemy->GetActorLocation() - AvatarActor->GetActorLocation();
-			if (FVector::DotProduct(Forward, ToTarget.GetSafeNormal()) < 0.1f)
-			{
-				continue;
-			}
-
-			if (TargetEnemy->ApplyEnemyDamage(DamageAmount, AvatarActor->GetInstigatorController()))
-			{
-				UE_LOG(
-					LogProjectA,
-					Log,
-					TEXT("Primary attack from %s hit enemy %s."),
-					*GetNameSafe(AvatarActor),
-					*GetNameSafe(TargetEnemy));
-				return true;
-			}
-		}
-
-		APRCharacter* TargetCharacter = Cast<APRCharacter>(Overlap.GetActor());
-		if (!TargetCharacter || TargetCharacter == AvatarActor)
+		AActor* TargetActor = Overlap.GetActor();
+		if (!TargetActor || TargetActor == AvatarActor)
 		{
 			continue;
 		}
 
-		const FVector ToTarget = TargetCharacter->GetActorLocation() - AvatarActor->GetActorLocation();
+		const FVector ToTarget = TargetActor->GetActorLocation() - AvatarActor->GetActorLocation();
 		if (FVector::DotProduct(Forward, ToTarget.GetSafeNormal()) < 0.1f)
 		{
 			continue;
 		}
 
-		UPRAbilitySystemComponent* TargetASC = TargetCharacter->GetProjectRiftAbilitySystemComponent();
+		UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
 		if (!TargetASC)
 		{
 			continue;
 		}
 
-		FGameplayEffectContextHandle EffectContext = SourceASC->MakeEffectContext();
-		EffectContext.AddSourceObject(this);
-		EffectContext.AddActors({ TargetCharacter }, true);
-
-		FGameplayEffectSpecHandle DamageSpecHandle = SourceASC->MakeOutgoingSpec(
-			DamageEffectClass,
-			GetAbilityLevel(Handle, ActorInfo),
-			EffectContext);
-		if (!DamageSpecHandle.IsValid())
+		if (!UPRCombatEffectLibrary::ApplyDamageToTarget(
+			SourceASC,
+			TargetASC,
+			DamageAmount,
+			ProjectRiftGameplayTags::Damage_Type_Physical,
+			const_cast<UGA_PrimaryAttack*>(this)))
 		{
-			return false;
+			continue;
 		}
 
-		const FGameplayTag DamageTag = ProjectRiftGameplayTags::Data_Damage;
-		if (!DamageTag.IsValid())
-		{
-			UE_LOG(LogProjectA, Warning, TEXT("Primary attack skipped for %s: Data.Damage tag is missing."), *GetNameSafe(AvatarActor));
-			return false;
-		}
-
-		DamageSpecHandle.Data->SetSetByCallerMagnitude(DamageTag, DamageAmount);
-		SourceASC->ApplyGameplayEffectSpecToTarget(*DamageSpecHandle.Data.Get(), TargetASC);
+		ApplyConfiguredStatusEffects(SourceASC, TargetASC);
 		UE_LOG(
 			LogProjectA,
 			Log,
 			TEXT("Primary attack from %s hit %s."),
 			*GetNameSafe(AvatarActor),
-			*GetNameSafe(TargetCharacter));
+			*GetNameSafe(TargetActor));
 		return true;
 	}
 

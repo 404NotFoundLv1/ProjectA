@@ -1,5 +1,8 @@
 #include "Abilities/GA_AssaultCharge.h"
 
+#include "Abilities/PRCombatEffectLibrary.h"
+#include "Abilities/PRStatusGameplayEffect.h"
+#include "AbilitySystemBlueprintLibrary.h"
 #include "Characters/PRCharacter.h"
 #include "Engine/OverlapResult.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -12,6 +15,10 @@ UGA_AssaultCharge::UGA_AssaultCharge()
 	ChargeDistance = 450.0f;
 	KnockbackRadius = 160.0f;
 	KnockbackStrength = 800.0f;
+	TargetStatusEffects.Add(FPRTargetStatusEffectDefinition(
+		UPRSlowStatusGameplayEffect::StaticClass(),
+		0.70f,
+		3.0f));
 }
 
 void UGA_AssaultCharge::ActivateAbility(
@@ -37,8 +44,9 @@ void UGA_AssaultCharge::ActivateAbility(
 bool UGA_AssaultCharge::ExecuteCharge(const FGameplayAbilityActorInfo* ActorInfo) const
 {
 	APRCharacter* AvatarCharacter = ActorInfo ? Cast<APRCharacter>(ActorInfo->AvatarActor.Get()) : nullptr;
+	UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
 	UWorld* World = AvatarCharacter ? AvatarCharacter->GetWorld() : nullptr;
-	if (!AvatarCharacter || !World)
+	if (!AvatarCharacter || !SourceASC || !World)
 	{
 		return false;
 	}
@@ -65,8 +73,14 @@ bool UGA_AssaultCharge::ExecuteCharge(const FGameplayAbilityActorInfo* ActorInfo
 
 	for (const FOverlapResult& Overlap : Overlaps)
 	{
-		APRCharacter* TargetCharacter = Cast<APRCharacter>(Overlap.GetActor());
+		ACharacter* TargetCharacter = Cast<ACharacter>(Overlap.GetActor());
 		if (!TargetCharacter || TargetCharacter == AvatarCharacter)
+		{
+			continue;
+		}
+
+		UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetCharacter);
+		if (!TargetASC || !ApplyConfiguredStatusEffects(SourceASC, TargetASC))
 		{
 			continue;
 		}

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AbilitySystemInterface.h"
+#include "Combat/PRCombatUnitInterface.h"
 #include "GameplayTagContainer.h"
 #include "ProjectACharacter.h"
 #include "PRCharacter.generated.h"
@@ -20,12 +22,15 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPRAttributeChangedSignature, float
  * Base playable avatar for ProjectRift.
  */
 UCLASS()
-class PROJECTA_API APRCharacter : public AProjectACharacter
+class PROJECTA_API APRCharacter : public AProjectACharacter, public IAbilitySystemInterface, public IPRCombatUnitInterface
 {
 	GENERATED_BODY()
 
 public:
 	APRCharacter();
+	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+	virtual bool IsCombatUnitInactive() const override;
+	virtual void HandleCombatUnitHealthDepleted(const FGameplayEffectContextHandle& EffectContext) override;
 
 	UFUNCTION(BlueprintCallable, Category = "Network|Debug")
 	void RefreshPlayerDebugLabel();
@@ -100,6 +105,9 @@ protected:
 	void HandleHealthChanged(const FOnAttributeChangeData& Data);
 	void HandleShieldChanged(const FOnAttributeChangeData& Data);
 	void HandleEnergyChanged(const FOnAttributeChangeData& Data);
+	void HandleMoveSpeedChanged(const FOnAttributeChangeData& Data);
+	void HandleStunnedTagChanged(FGameplayTag StatusTag, int32 NewCount);
+	void RefreshMovementFromAttributes();
 	void ScheduleAutoRespawn();
 	void HandleAutoRespawnTimer();
 	void ClearAutoRespawnTimer();
@@ -152,6 +160,8 @@ protected:
 	FDelegateHandle HealthChangedDelegateHandle;
 	FDelegateHandle ShieldChangedDelegateHandle;
 	FDelegateHandle EnergyChangedDelegateHandle;
+	FDelegateHandle MoveSpeedChangedDelegateHandle;
+	FDelegateHandle StunnedTagChangedDelegateHandle;
 	FTimerHandle AutoRespawnTimerHandle;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input|Actions")

@@ -23,7 +23,7 @@ Import-Module -Force -Name $modulePath
 
 $summary = [ordered]@{
     SchemaVersion = 1
-    ProjectVersion = '0.5.6'
+    ProjectVersion = '0.6.0'
     RunId = $runId
     Mode = $Mode
     Target = $Target
@@ -147,10 +147,11 @@ function Invoke-LocalPackage {
     $script:activeCandidateRoot = $localRoot
 
     $arguments = @(
+        '-WaitForUATMutex',
         'BuildCookRun',
         "-project=$projectFile", '-nop4', '-utf8output',
         '-platform=Win64', "-clientconfig=$PackageConfiguration",
-        '-build', '-cook', '-stage', '-pak', '-archive',
+        '-build', '-cook', '-AdditionalCookerOptions=-nozenstore', '-stage', '-pak', '-archive',
         "-archivedirectory=$candidate"
     )
     $result = Invoke-ProjectRiftNative -FilePath (Join-Path $resolvedEngine.Root 'Engine\Build\BatchFiles\RunUAT.bat') -ArgumentList $arguments -LogPath (Join-Path $runRoot 'package.log') -WorkingDirectory $projectRoot
@@ -169,6 +170,7 @@ function Invoke-LocalGauntlet {
     $testSpec = "ProjectRift.LocalSmoke(RunId='$runId',UserDir='$userDir')"
     $env:UE_ENGINE_ROOT = $resolvedEngine.Root
     $arguments = @(
+        '-WaitForUATMutex',
         "-ScriptDir=$(Join-Path $PSScriptRoot 'Gauntlet')",
         'RunUnreal',
         "-project=$projectFile", '-platform=Win64', '-configuration=Development',

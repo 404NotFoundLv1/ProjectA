@@ -6,6 +6,7 @@
 #include "Abilities/PRAttributeSet.h"
 #include "Characters/PRCharacter.h"
 #include "Core/PRGameplayTags.h"
+#include "Enemies/PREnemyCharacter.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameplayEffect.h"
@@ -104,24 +105,21 @@ bool FPRGASDownedRespawnTest::RunTest(const FString& Parameters)
 
 	TStrongObjectPtr<APRPlayerState> AttackerPlayerState{ World->SpawnActor<APRPlayerState>() };
 	TStrongObjectPtr<APRCharacter> Attacker{ World->SpawnActor<APRCharacter>(FVector::ZeroVector, FRotator::ZeroRotator) };
-	TStrongObjectPtr<APRPlayerState> TargetPlayerState{ World->SpawnActor<APRPlayerState>() };
-	TStrongObjectPtr<APRCharacter> Target{ World->SpawnActor<APRCharacter>(FVector(160.0f, 0.0f, 0.0f), FRotator::ZeroRotator) };
+	TStrongObjectPtr<APREnemyCharacter> Target{ World->SpawnActor<APREnemyCharacter>(FVector(160.0f, 0.0f, 0.0f), FRotator::ZeroRotator) };
 
 	TestNotNull(TEXT("Attacker PlayerState spawned"), AttackerPlayerState.Get());
 	TestNotNull(TEXT("Attacker Character spawned"), Attacker.Get());
-	TestNotNull(TEXT("Target PlayerState spawned"), TargetPlayerState.Get());
-	TestNotNull(TEXT("Target Character spawned"), Target.Get());
-	if (!AttackerPlayerState || !Attacker || !TargetPlayerState || !Target)
+	TestNotNull(TEXT("Target GAS enemy spawned"), Target.Get());
+	if (!AttackerPlayerState || !Attacker || !Target)
 	{
 		return false;
 	}
 
 	TestTrue(TEXT("Attacker initializes ASC"), PossessTestCharacterForDownedRespawnTest(World, AttackerPlayerState.Get(), Attacker.Get()));
-	TestTrue(TEXT("Target initializes ASC"), PossessTestCharacterForDownedRespawnTest(World, TargetPlayerState.Get(), Target.Get()));
 
 	UPRAbilitySystemComponent* AttackerASC = Attacker->GetProjectRiftAbilitySystemComponent();
 	UPRAttributeSet* AttackerAttributes = AttackerPlayerState->GetAttributeSet();
-	UPRAttributeSet* TargetAttributes = TargetPlayerState->GetAttributeSet();
+	UPRAttributeSet* TargetAttributes = Target->GetAttributeSet();
 	TestNotNull(TEXT("Attacker ASC exists"), AttackerASC);
 	TestNotNull(TEXT("Attacker AttributeSet exists"), AttackerAttributes);
 	TestNotNull(TEXT("Target AttributeSet exists"), TargetAttributes);
@@ -142,7 +140,9 @@ bool FPRGASDownedRespawnTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Auto respawn is scheduled"), Attacker->IsAutoRespawnScheduled());
 	TestEqual(TEXT("Downed movement is disabled"), Attacker->GetCharacterMovement()->MovementMode, MOVE_None);
 
+	TargetAttributes->SetMaxHealth(100.0f);
 	TargetAttributes->SetHealth(100.0f);
+	TargetAttributes->SetMaxShield(50.0f);
 	TargetAttributes->SetShield(50.0f);
 	Attacker->DoPrimaryAttack();
 	TestEqual(TEXT("Downed attacker cannot damage shield"), TargetAttributes->GetShield(), 50.0f);
@@ -158,7 +158,7 @@ bool FPRGASDownedRespawnTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Respawn restores walking movement"), Attacker->GetCharacterMovement()->MovementMode, MOVE_Walking);
 
 	Attacker->DoPrimaryAttack();
-	TestEqual(TEXT("Respawned attacker can damage shield again"), TargetAttributes->GetShield(), 40.0f);
+	TestEqual(TEXT("Respawned attacker applies AttackPower-scaled damage to shield"), TargetAttributes->GetShield(), 39.0f);
 	TestEqual(TEXT("Respawned attacker still leaves health while shield absorbs"), TargetAttributes->GetHealth(), 100.0f);
 
 	return true;

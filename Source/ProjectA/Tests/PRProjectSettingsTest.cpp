@@ -47,6 +47,24 @@ void TestSettingProperty(
 #endif
 }
 
+void TestFloatSettingDefault(
+	FAutomationTestBase& Test,
+	const UClass* SettingsClass,
+	const UObject* Settings,
+	const FName PropertyName,
+	const float ExpectedValue)
+{
+	const FFloatProperty* Property = FindFProperty<FFloatProperty>(SettingsClass, PropertyName);
+	Test.TestNotNull(*FString::Printf(TEXT("%s is a float setting"), *PropertyName.ToString()), Property);
+	if (Property && Settings)
+	{
+		Test.TestEqual(
+			*FString::Printf(TEXT("%s default"), *PropertyName.ToString()),
+			Property->GetPropertyValue_InContainer(Settings),
+			ExpectedValue);
+	}
+}
+
 template <typename TValue>
 void TestConfigValue(FAutomationTestBase& Test, const TCHAR* Key, const TValue ExpectedValue)
 {
@@ -85,6 +103,8 @@ bool FPRProjectSettingsTest::RunTest(const FString& Parameters)
 	TestSettingProperty(*this, SettingsClass, GET_MEMBER_NAME_CHECKED(UPRProjectSettings, MaxAliveEnemies), TEXT("1"));
 	TestSettingProperty(*this, SettingsClass, GET_MEMBER_NAME_CHECKED(UPRProjectSettings, WaveInterval), TEXT("0.1"));
 	TestSettingProperty(*this, SettingsClass, GET_MEMBER_NAME_CHECKED(UPRProjectSettings, ExtractionRadius), TEXT("1.0"));
+	TestSettingProperty(*this, SettingsClass, TEXT("AttackPowerDivisor"), TEXT("1.0"));
+	TestSettingProperty(*this, SettingsClass, TEXT("MaxPollutionDamageReduction"), TEXT("0.0"), TEXT("1.0"));
 
 	TestEqual(TEXT("Initial stability default"), Settings->InitialRiftStability, 100.0f);
 	TestEqual(TEXT("Stability drain default"), Settings->RiftStabilityDrainPerSecond, 1.0f);
@@ -97,6 +117,8 @@ bool FPRProjectSettingsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Max alive default"), Settings->MaxAliveEnemies, 8);
 	TestEqual(TEXT("Wave interval default"), Settings->WaveInterval, 6.0f);
 	TestEqual(TEXT("Extraction radius default"), Settings->ExtractionRadius, 320.0f);
+	TestFloatSettingDefault(*this, SettingsClass, Settings, TEXT("AttackPowerDivisor"), 100.0f);
+	TestFloatSettingDefault(*this, SettingsClass, Settings, TEXT("MaxPollutionDamageReduction"), 0.8f);
 
 	TestConfigValue(*this, TEXT("InitialRiftStability"), 100.0f);
 	TestConfigValue(*this, TEXT("RiftStabilityDrainPerSecond"), 1.0f);
@@ -109,6 +131,8 @@ bool FPRProjectSettingsTest::RunTest(const FString& Parameters)
 	TestConfigValue(*this, TEXT("MaxAliveEnemies"), 8);
 	TestConfigValue(*this, TEXT("WaveInterval"), 6.0f);
 	TestConfigValue(*this, TEXT("ExtractionRadius"), 320.0f);
+	TestConfigValue(*this, TEXT("AttackPowerDivisor"), 100.0f);
+	TestConfigValue(*this, TEXT("MaxPollutionDamageReduction"), 0.8f);
 
 	return true;
 }

@@ -22,6 +22,8 @@ public:
 		MaxAliveEnemies = Settings->MaxAliveEnemies;
 		WaveInterval = Settings->WaveInterval;
 		ExtractionRadius = Settings->ExtractionRadius;
+		AttackPowerDivisor = Settings->AttackPowerDivisor;
+		MaxPollutionDamageReduction = Settings->MaxPollutionDamageReduction;
 	}
 
 	~FScopedProjectSettingsOverride()
@@ -37,6 +39,8 @@ public:
 		Settings->MaxAliveEnemies = MaxAliveEnemies;
 		Settings->WaveInterval = WaveInterval;
 		Settings->ExtractionRadius = ExtractionRadius;
+		Settings->AttackPowerDivisor = AttackPowerDivisor;
+		Settings->MaxPollutionDamageReduction = MaxPollutionDamageReduction;
 	}
 
 	FScopedProjectSettingsOverride(const FScopedProjectSettingsOverride&) = delete;
@@ -60,5 +64,7 @@ private:
 	int32 MaxAliveEnemies = 0;
 	float WaveInterval = 0.0f;
 	float ExtractionRadius = 0.0f;
+	float AttackPowerDivisor = 0.0f;
+	float MaxPollutionDamageReduction = 0.0f;
 };
 }

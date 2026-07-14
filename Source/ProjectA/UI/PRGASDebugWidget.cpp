@@ -1,6 +1,8 @@
 #include "UI/PRGASDebugWidget.h"
 
 #include "Abilities/PRAttributeSet.h"
+#include "Abilities/PRAbilitySystemComponent.h"
+#include "Abilities/PRCombatEffectLibrary.h"
 #include "Characters/PRCharacter.h"
 #include "Fonts/SlateFontInfo.h"
 #include "GameFramework/PlayerController.h"
@@ -29,21 +31,23 @@ void UPRGASDebugWidget::NativeTick(const FGeometry& MyGeometry, const float InDe
 
 	if (DebugTextBlock.IsValid())
 	{
-		DebugTextBlock->SetText(FText::FromString(BuildDebugText()));
+		DebugTextBlock->SetText(FText::FromString(GetDebugText()));
 	}
 }
 
-FString UPRGASDebugWidget::BuildDebugText() const
+FString UPRGASDebugWidget::GetDebugText() const
 {
 	const APlayerController* OwningController = GetOwningPlayer();
 	const APRCharacter* ProjectRiftCharacter = OwningController ? Cast<APRCharacter>(OwningController->GetPawn()) : nullptr;
 	const APRPlayerState* ProjectRiftPlayerState = nullptr;
 	const UPRAttributeSet* AttributeSet = nullptr;
+	const UPRAbilitySystemComponent* AbilitySystemComponent = nullptr;
 
 	if (ProjectRiftCharacter)
 	{
 		ProjectRiftPlayerState = ProjectRiftCharacter->GetPlayerState<APRPlayerState>();
 		AttributeSet = ProjectRiftCharacter->GetAttributeSet();
+		AbilitySystemComponent = ProjectRiftCharacter->GetProjectRiftAbilitySystemComponent();
 	}
 
 	if (!ProjectRiftPlayerState && OwningController)
@@ -54,6 +58,10 @@ FString UPRGASDebugWidget::BuildDebugText() const
 	if (!AttributeSet && ProjectRiftPlayerState)
 	{
 		AttributeSet = ProjectRiftPlayerState->GetAttributeSet();
+	}
+	if (!AbilitySystemComponent && ProjectRiftPlayerState)
+	{
+		AbilitySystemComponent = ProjectRiftPlayerState->GetProjectRiftAbilitySystemComponent();
 	}
 
 	const FName SelectedRoleModule = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetSelectedRoleModule() : NAME_None;
@@ -69,13 +77,17 @@ FString UPRGASDebugWidget::BuildDebugText() const
 	}
 
 	return FString::Printf(
-		TEXT("ProjectRift GAS Debug\nHealth: %.0f / %.0f\nShield: %.0f / %.0f\nEnergy: %.0f / %.0f\nDowned: %s\nRole: %s\nASC Ready: %s\nDefault GE: %s\nRole Abilities: %s"),
+		TEXT("ProjectRift GAS Debug\nHealth: %.0f / %.0f\nShield: %.0f / %.0f\nEnergy: %.0f / %.0f\nAttackPower: %.0f\nMoveSpeed: %.0f\nPollutionResistance: %.0f%%\nStatuses: %s\nDowned: %s\nRole: %s\nASC Ready: %s\nDefault GE: %s\nRole Abilities: %s"),
 		AttributeSet->GetHealth(),
 		AttributeSet->GetMaxHealth(),
 		AttributeSet->GetShield(),
 		AttributeSet->GetMaxShield(),
 		AttributeSet->GetEnergy(),
 		AttributeSet->GetMaxEnergy(),
+		AttributeSet->GetAttackPower(),
+		AttributeSet->GetMoveSpeed(),
+		AttributeSet->GetPollutionResistance() * 100.0f,
+		*UPRCombatEffectLibrary::GetActiveNegativeStatusText(AbilitySystemComponent),
 		ProjectRiftCharacter && ProjectRiftCharacter->IsDowned() ? TEXT("true") : TEXT("false"),
 		*RoleText,
 		ProjectRiftCharacter && ProjectRiftCharacter->IsAbilitySystemInitialized() ? TEXT("true") : TEXT("false"),

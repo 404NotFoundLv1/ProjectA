@@ -69,6 +69,12 @@ bool FPRDebugUILayoutTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("Ready is below GAS"),
 		FPRDebugUILayout::LobbyReadyAnchors().Minimum.Y > FPRDebugUILayout::GASAnchors().Minimum.Y);
+	TestTrue(TEXT("GAS panel is tall enough for combat attributes and statuses"), FPRDebugUILayout::GASSize().Y >= 232.0f);
+
+	UClass* GASDebugWidgetClass = FindObject<UClass>(nullptr, TEXT("/Script/ProjectA.PRGASDebugWidget"));
+	UClass* EnemyClass = FindObject<UClass>(nullptr, TEXT("/Script/ProjectA.PREnemyCharacter"));
+	TestNotNull(TEXT("GAS debug widget exposes debug text for verification"), GASDebugWidgetClass ? GASDebugWidgetClass->FindFunctionByName(TEXT("GetDebugText")) : nullptr);
+	TestNotNull(TEXT("Enemy exposes active status text for its health bar"), EnemyClass ? EnemyClass->FindFunctionByName(TEXT("GetActiveStatusText")) : nullptr);
 
 	const FVector2D ProfileMin = CalculatePanelMin(
 		FPRDebugUILayout::ProfileAnchors(),

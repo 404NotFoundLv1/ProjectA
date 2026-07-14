@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.6.0] - 2026-07-14
+
+### Added
+
+- Added `UPRDamageExecutionCalculation` with AttackPower scaling, pollution resistance, typed damage tags, legacy physical fallback, and fail-closed invalid input handling.
+- Added declaration-driven pollution, slow, and stun GameplayEffects plus the shared `UPRCombatEffectLibrary` for hostile validation, damage, status replacement, and lifecycle cleanup.
+- Added a server-only enemy melee GameplayAbility and migrated rift enemies to a self-owned Minimal-replication ASC with the shared AttributeSet.
+- Added automation coverage for damage formulas, status timing and replacement, friendly-fire rejection, enemy GAS combat, lifecycle cleanup, and ability-defined debuffs.
+
+### Changed
+
+- Player attacks, assault abilities, and enemy melee now use the same server-authoritative GAS damage and status pipeline; player friendly fire and friendly debuffs are rejected.
+- Assault charge applies a three-second 0.70 slow, assault blast applies a 1.25-second stun, and enemy melee applies five seconds of pollution at two base damage per tick.
+- Player and enemy movement now follows aggregated MoveSpeed and State.Stunned; downed/dead combatants clear negative states and reject new combat effects.
+- GAS debug text now shows AttackPower, MoveSpeed, PollutionResistance, and active states; enemy health bars show active state text.
+- ProjectRift packaging now forwards `-nozenstore` to the Cook commandlet and waits for the UAT mutex, keeping local verification independent of shared Zen capacity without controlling another project process.
+- Updated the displayed project version to `0.6.0`; the player save schema remains v4.
+
+### Verified
+
+- All 64 ProjectRift automation leaf tests pass, including the 10-test GAS group and all new damage/status/enemy coverage.
+- Default Quick, Win64 Development BuildCookRun, and `ProjectRift.LocalSmoke` pass.
+- Win64 Shipping BuildCookRun passes, excludes test modules, and passes the bounded NullRHI launch check.
+- The shared `UnrealEditor.modules` remains byte-for-byte unchanged, and no ProjectRift content asset was modified.
+
 ## [0.5.6] - 2026-07-14
 
 ### Added

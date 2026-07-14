@@ -3,11 +3,16 @@
 #include "Misc/AutomationTest.h"
 
 #include "AIController.h"
+#include "AbilitySystemInterface.h"
+#include "Abilities/GameplayAbility.h"
+#include "Abilities/PRAbilitySystemComponent.h"
 #include "Abilities/PRAttributeSet.h"
 #include "Blueprint/UserWidget.h"
 #include "Characters/PRCharacter.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/WidgetComponent.h"
+#include "Core/PRGameplayTags.h"
 #include "Core/PRRiftGameMode.h"
 #include "Core/PRRiftGameState.h"
 #include "EngineUtils.h"
@@ -240,8 +245,11 @@ bool FPRBasicEnemyTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Enemy AI exposes GetCurrentTarget"), EnemyAIControllerClass->FindFunctionByName(TEXT("GetCurrentTarget")));
 	TestNotNull(TEXT("Rift GameMode exposes RegisterEnemyKilled for enemy death notifications"), RiftGameModeClass->FindFunctionByName(TEXT("RegisterEnemyKilled")));
 
-	TestBasicEnemyReplicatedProperty(*this, EnemyClass, TEXT("Health"));
-	TestBasicEnemyReplicatedProperty(*this, EnemyClass, TEXT("bDead"));
+	TestTrue(TEXT("Enemy implements IAbilitySystemInterface"), EnemyClass->ImplementsInterface(UAbilitySystemInterface::StaticClass()));
+	const FProperty* LegacyHealthProperty = EnemyClass->FindPropertyByName(TEXT("Health"));
+	const FProperty* LegacyDeadProperty = EnemyClass->FindPropertyByName(TEXT("bDead"));
+	TestFalse(TEXT("Enemy Health is no longer a replicated authority"), LegacyHealthProperty && LegacyHealthProperty->HasAnyPropertyFlags(CPF_Net));
+	TestFalse(TEXT("Enemy bDead is no longer a replicated authority"), LegacyDeadProperty && LegacyDeadProperty->HasAnyPropertyFlags(CPF_Net));
 
 	const ACharacter* EnemyDefaults = Cast<ACharacter>(EnemyClass->GetDefaultObject());
 	TestNotNull(TEXT("Enemy has a default object"), EnemyDefaults);
@@ -322,6 +330,31 @@ bool FPRBasicEnemyTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Near player initializes ASC"), PossessBasicEnemyTestCharacter(World, NearPlayerState, NearPlayer));
 	TestTrue(TEXT("Far player initializes ASC"), PossessBasicEnemyTestCharacter(World, FarPlayerState, FarPlayer));
 
+	IAbilitySystemInterface* EnemyAbilitySystemInterface = Cast<IAbilitySystemInterface>(Enemy);
+	UPRAbilitySystemComponent* EnemyASC = EnemyAbilitySystemInterface
+		? Cast<UPRAbilitySystemComponent>(EnemyAbilitySystemInterface->GetAbilitySystemComponent())
+		: nullptr;
+	const UPRAttributeSet* EnemyAttributes = EnemyASC ? EnemyASC->GetSet<UPRAttributeSet>() : nullptr;
+	TestNotNull(TEXT("Enemy exposes its ASC through IAbilitySystemInterface"), EnemyASC);
+	TestNotNull(TEXT("Enemy owns the shared ProjectRift AttributeSet"), EnemyAttributes);
+	if (!EnemyASC || !EnemyAttributes)
+	{
+		return false;
+	}
+	TestEqual(TEXT("Enemy starts with MaxHealth 50"), EnemyAttributes->GetMaxHealth(), 50.0f);
+	TestEqual(TEXT("Enemy starts with Health 50"), EnemyAttributes->GetHealth(), 50.0f);
+	TestEqual(TEXT("Enemy starts without shield"), EnemyAttributes->GetShield(), 0.0f);
+	TestEqual(TEXT("Enemy starts without energy"), EnemyAttributes->GetEnergy(), 0.0f);
+	TestEqual(TEXT("Enemy starts with AttackPower 10"), EnemyAttributes->GetAttackPower(), 10.0f);
+	TestEqual(TEXT("Enemy starts with MoveSpeed 360"), EnemyAttributes->GetMoveSpeed(), 360.0f);
+	TestEqual(TEXT("Enemy starts without pollution resistance"), EnemyAttributes->GetPollutionResistance(), 0.0f);
+
+	UClass* EnemyMeleeAbilityClass = LoadBasicEnemyRuntimeClass(TEXT("GA_EnemyMeleeAttack"), UGameplayAbility::StaticClass());
+	TestNotNull(TEXT("Enemy melee GameplayAbility exists"), EnemyMeleeAbilityClass);
+	TestNotNull(
+		TEXT("Enemy is granted its melee GameplayAbility"),
+		EnemyMeleeAbilityClass ? EnemyASC->FindAbilitySpecFromClass(EnemyMeleeAbilityClass) : nullptr);
+
 	Enemy->SpawnDefaultController();
 	AAIController* EnemyController = Cast<AAIController>(Enemy->GetController());
 	TestNotNull(TEXT("Enemy is server-possessed by an AI controller"), EnemyController);
@@ -339,6 +372,9 @@ bool FPRBasicEnemyTest::RunTest(const FString& Parameters)
 	float AttackDamage = 0.0f;
 	TestTrue(TEXT("Can query enemy attack damage"), CallBasicEnemyFloatFunctionNoParams(Enemy, TEXT("GetAttackDamage"), AttackDamage));
 	TestTrue(TEXT("Enemy attack damage is positive"), AttackDamage > 0.0f);
+	bool bAttackedFarPlayer = true;
+	TestTrue(TEXT("Can attempt an out-of-range enemy melee attack"), CallBasicEnemyBoolFunctionWithActorParam(Enemy, TEXT("TryMeleeAttack"), TEXT("TargetActor"), FarPlayer, bAttackedFarPlayer));
+	TestFalse(TEXT("Enemy melee rejects targets outside the ability-owned range"), bAttackedFarPlayer);
 
 	UPRAttributeSet* NearAttributes = NearPlayerState->GetAttributeSet();
 	TestNotNull(TEXT("Near player attributes exist"), NearAttributes);
@@ -355,12 +391,20 @@ bool FPRBasicEnemyTest::RunTest(const FString& Parameters)
 		World->Tick(ELevelTick::LEVELTICK_All, 0.1f);
 		EnemyController->Tick(0.1f);
 	}
-	TestEqual(TEXT("Enemy AI automatically melee attacks its current target in range"), NearAttributes->GetShield(), ShieldBeforeAutoAttack - AttackDamage);
+	TestTrue(
+		TEXT("Enemy AI automatically melee attacks its current target in range"),
+		NearAttributes->GetShield() < ShieldBeforeAutoAttack - AttackDamage);
+	TestTrue(
+		TEXT("Enemy melee applies pollution"),
+		NearPlayer->GetProjectRiftAbilitySystemComponent()->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(TEXT("Status.Debuff.Polluted"))));
+	TestTrue(
+		TEXT("Enemy melee keeps a duration-based status effect active"),
+		!NearPlayer->GetProjectRiftAbilitySystemComponent()->GetActiveEffects(FGameplayEffectQuery()).IsEmpty());
 
 	bool bAttackedPlayer = false;
 	TestTrue(TEXT("Can call enemy melee attack"), CallBasicEnemyBoolFunctionWithActorParam(Enemy, TEXT("TryMeleeAttack"), TEXT("TargetActor"), NearPlayer, bAttackedPlayer));
 	TestTrue(TEXT("Enemy melee attack succeeds in range"), bAttackedPlayer);
-	TestEqual(TEXT("Enemy melee attack damages player shield first"), NearAttributes->GetShield(), 50.0f - AttackDamage * 2.0f);
+	TestTrue(TEXT("Enemy melee attack damages player shield first"), NearAttributes->GetShield() < 50.0f - AttackDamage * 2.0f);
 	TestEqual(TEXT("Enemy melee attack leaves player health while shield absorbs"), NearAttributes->GetHealth(), 100.0f);
 
 	float MaxHealth = 0.0f;
@@ -412,7 +456,25 @@ bool FPRBasicEnemyTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Can query enemy health before primary attack"), CallBasicEnemyFloatFunctionNoParams(AttackTargetEnemy, TEXT("GetHealth"), EnemyHealthBeforePrimary));
 	Attacker->DoPrimaryAttack();
 	TestTrue(TEXT("Can query enemy health after primary attack"), CallBasicEnemyFloatFunctionNoParams(AttackTargetEnemy, TEXT("GetHealth"), EnemyHealthAfterPrimary));
-	TestEqual(TEXT("Player primary attack damages basic enemy"), EnemyHealthAfterPrimary, EnemyHealthBeforePrimary - 10.0f);
+	TestEqual(TEXT("Player primary attack damages basic enemy through unified execution"), EnemyHealthAfterPrimary, EnemyHealthBeforePrimary - 11.0f);
+
+	IAbilitySystemInterface* AttackTargetAbilitySystemInterface = Cast<IAbilitySystemInterface>(AttackTargetEnemy);
+	UPRAbilitySystemComponent* AttackTargetASC = AttackTargetAbilitySystemInterface
+		? Cast<UPRAbilitySystemComponent>(AttackTargetAbilitySystemInterface->GetAbilitySystemComponent())
+		: nullptr;
+	TestNotNull(TEXT("Primary target exposes its enemy ASC"), AttackTargetASC);
+	if (AttackTargetASC)
+	{
+		AttackTargetASC->AddLooseGameplayTag(
+			ProjectRiftGameplayTags::State_Dead,
+			1,
+			EGameplayTagReplicationState::TagOnly);
+		TestFalse(TEXT("Replicated dead tag hides the enemy mesh on the receiving instance"), AttackTargetEnemy->GetMesh()->IsVisible());
+		TestEqual(
+			TEXT("Replicated dead tag disables enemy collision on the receiving instance"),
+			AttackTargetEnemy->GetCapsuleComponent()->GetCollisionEnabled(),
+			ECollisionEnabled::NoCollision);
+	}
 
 	return true;
 }

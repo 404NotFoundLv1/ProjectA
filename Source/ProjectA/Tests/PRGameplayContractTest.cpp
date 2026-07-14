@@ -51,6 +51,22 @@ bool FPRGameplayTagContractTest::RunTest(const FString& Parameters)
 			UGameplayTagsManager::Get().RequestGameplayTag(FName(Expected.Name), false));
 	}
 
+	const TCHAR* NewCombatTagNames[] =
+	{
+		TEXT("Damage.Type.Physical"),
+		TEXT("Damage.Type.Pollution"),
+		TEXT("Data.Status.Magnitude"),
+		TEXT("Status.Debuff.Polluted"),
+		TEXT("Status.Debuff.Slowed"),
+		TEXT("Event.Ability.Enemy.Melee"),
+	};
+	for (const TCHAR* TagName : NewCombatTagNames)
+	{
+		const FGameplayTag Tag = UGameplayTagsManager::Get().RequestGameplayTag(FName(TagName), false);
+		TestTrue(*FString::Printf(TEXT("%s is registered"), TagName), Tag.IsValid());
+		TestEqual(*FString::Printf(TEXT("%s keeps its contract name"), TagName), Tag.ToString(), FString(TagName));
+	}
+
 	const FString LegacyTagConfig = FPaths::Combine(FPaths::ProjectConfigDir(), TEXT("Tags/ProjectRiftGameplayTags.ini"));
 	TestFalse(TEXT("Legacy GameplayTag INI is removed"), IFileManager::Get().FileExists(*LegacyTagConfig));
 
@@ -63,7 +79,7 @@ bool FPRGameplayTagContractTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("ProjectVersion is configured"),
 		GConfig->GetString(TEXT("/Script/EngineSettings.GeneralProjectSettings"), TEXT("ProjectVersion"), ProjectVersion, GGameIni));
-	TestEqual(TEXT("ProjectVersion is v0.5.6"), ProjectVersion, FString(TEXT("0.5.6")));
+	TestEqual(TEXT("ProjectVersion is v0.6.0"), ProjectVersion, FString(TEXT("0.6.0")));
 
 	return true;
 }

@@ -10,6 +10,7 @@
 #include "Abilities/PRAttributeSet.h"
 #include "Characters/PRCharacter.h"
 #include "Core/PRGameplayTags.h"
+#include "Enemies/PREnemyCharacter.h"
 #include "GameplayAbilitySpec.h"
 #include "GameFramework/PlayerController.h"
 #include "Player/PRPlayerState.h"
@@ -83,20 +84,18 @@ bool FPRGASInputBindingTest::RunTest(const FString& Parameters)
 
 	TStrongObjectPtr<APRPlayerState> AttackerPlayerState{ World->SpawnActor<APRPlayerState>() };
 	TStrongObjectPtr<APRCharacter> Attacker{ World->SpawnActor<APRCharacter>(FVector::ZeroVector, FRotator::ZeroRotator) };
-	TStrongObjectPtr<APRPlayerState> TargetPlayerState{ World->SpawnActor<APRPlayerState>() };
-	TStrongObjectPtr<APRCharacter> Target{ World->SpawnActor<APRCharacter>(FVector(160.0f, 0.0f, 0.0f), FRotator::ZeroRotator) };
-	if (!AttackerPlayerState || !Attacker || !TargetPlayerState || !Target)
+	TStrongObjectPtr<APREnemyCharacter> Target{ World->SpawnActor<APREnemyCharacter>(FVector(160.0f, 0.0f, 0.0f), FRotator::ZeroRotator) };
+	if (!AttackerPlayerState || !Attacker || !Target)
 	{
 		return false;
 	}
 
 	AttackerPlayerState->SetSelectedRoleModule(TEXT("Ability.Role.Assault"));
 	TestTrue(TEXT("Attacker initializes ASC"), PossessTestCharacterForInputBindingTest(World, AttackerPlayerState.Get(), Attacker.Get()));
-	TestTrue(TEXT("Target initializes ASC"), PossessTestCharacterForInputBindingTest(World, TargetPlayerState.Get(), Target.Get()));
 
 	UPRAbilitySystemComponent* AttackerASC = Attacker->GetProjectRiftAbilitySystemComponent();
 	UPRAttributeSet* AttackerAttributes = AttackerPlayerState->GetAttributeSet();
-	UPRAttributeSet* TargetAttributes = TargetPlayerState->GetAttributeSet();
+	UPRAttributeSet* TargetAttributes = Target->GetAttributeSet();
 	TestNotNull(TEXT("Attacker ASC exists"), AttackerASC);
 	TestNotNull(TEXT("Attacker attributes exist"), AttackerAttributes);
 	TestNotNull(TEXT("Target attributes exist"), TargetAttributes);
@@ -110,10 +109,12 @@ bool FPRGASInputBindingTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Primary ability has primary input tag"), SpecHasInputTag(PrimarySpec, PrimaryInputTag));
 	TestTrue(TEXT("Q ability has Q input tag"), SpecHasInputTag(ChargeSpec, QInputTag));
 
+	TargetAttributes->SetMaxHealth(100.0f);
 	TargetAttributes->SetHealth(100.0f);
+	TargetAttributes->SetMaxShield(50.0f);
 	TargetAttributes->SetShield(50.0f);
 	TestTrue(TEXT("Primary input tag press is handled"), AttackerASC->AbilityInputTagPressed(PrimaryInputTag));
-	TestEqual(TEXT("Primary input tag activates primary attack"), TargetAttributes->GetShield(), 40.0f);
+	TestEqual(TEXT("Primary input tag activates AttackPower-scaled primary attack"), TargetAttributes->GetShield(), 39.0f);
 	TestTrue(TEXT("Primary spec sees pressed input"), PrimarySpec && PrimarySpec->InputPressed);
 	TestTrue(TEXT("Primary input tag release is handled"), AttackerASC->AbilityInputTagReleased(PrimaryInputTag));
 	TestFalse(TEXT("Primary spec sees released input"), PrimarySpec && PrimarySpec->InputPressed);

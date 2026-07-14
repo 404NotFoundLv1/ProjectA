@@ -74,7 +74,10 @@ FText UPREnemyHealthBarWidget::BuildHealthText() const
 		return FText::FromString(TEXT("HOSTILE"));
 	}
 
-	return FText::FromString(FString::Printf(TEXT("HOSTILE %.0f / %.0f"), Enemy->GetHealth(), Enemy->GetMaxHealth()));
+	const FString StatusText = Enemy->GetActiveStatusText();
+	return FText::FromString(StatusText == TEXT("None")
+		? FString::Printf(TEXT("HOSTILE %.0f / %.0f"), Enemy->GetHealth(), Enemy->GetMaxHealth())
+		: FString::Printf(TEXT("HOSTILE %.0f / %.0f  [%s]"), Enemy->GetHealth(), Enemy->GetMaxHealth(), *StatusText));
 }
 
 void UPREnemyHealthBarWidget::RefreshSlate()

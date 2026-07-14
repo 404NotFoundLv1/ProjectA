@@ -13,6 +13,15 @@ namespace ProjectRiftGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Role_Medic, "Ability.Role.Medic", "Medic role module");
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_Damage, "Data.Damage", "SetByCaller damage amount");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_Status_Magnitude, "Data.Status.Magnitude", "SetByCaller status magnitude");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Damage_Type_Physical, "Damage.Type.Physical", "Physical damage type");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Damage_Type_Pollution, "Damage.Type.Pollution", "Pollution damage type");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Debuff_Polluted, "Status.Debuff.Polluted", "Pollution damage over time is active");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Debuff_Slowed, "Status.Debuff.Slowed", "Movement slow is active");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Ability_Enemy_Melee, "Event.Ability.Enemy.Melee", "Requests an enemy melee attack");
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Dead, "State.Dead", "Player is dead");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Downed, "State.Downed", "Player is downed");

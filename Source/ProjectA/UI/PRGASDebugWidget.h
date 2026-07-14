@@ -14,12 +14,14 @@ class PROJECTA_API UPRGASDebugWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
+public:
+	UFUNCTION(BlueprintPure, Category = "ProjectRift|GAS|Debug")
+	FString GetDebugText() const;
+
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
-	FString BuildDebugText() const;
-
 	TSharedPtr<STextBlock> DebugTextBlock;
 };

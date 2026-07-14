@@ -12,6 +12,7 @@
 #include "Abilities/PRTemporaryShieldGameplayEffect.h"
 #include "Characters/PRCharacter.h"
 #include "Core/PRGameplayTags.h"
+#include "Enemies/PREnemyCharacter.h"
 #include "GameplayAbilitySpec.h"
 #include "GameplayEffect.h"
 #include "GameFramework/PlayerController.h"
@@ -72,12 +73,16 @@ bool FPRGASAssaultModuleTest::RunTest(const FString& Parameters)
 	TStrongObjectPtr<APRCharacter> Attacker{ World->SpawnActor<APRCharacter>(FVector::ZeroVector, FRotator::ZeroRotator) };
 	TStrongObjectPtr<APRPlayerState> TargetPlayerState{ World->SpawnActor<APRPlayerState>() };
 	TStrongObjectPtr<APRCharacter> Target{ World->SpawnActor<APRCharacter>(FVector(220.0f, 0.0f, 0.0f), FRotator::ZeroRotator) };
+	TStrongObjectPtr<APREnemyCharacter> ChargeTarget{ World->SpawnActor<APREnemyCharacter>(FVector(450.0f, 0.0f, 0.0f), FRotator::ZeroRotator) };
+	TStrongObjectPtr<APREnemyCharacter> BlastTarget{ World->SpawnActor<APREnemyCharacter>(FVector(220.0f, 80.0f, 0.0f), FRotator::ZeroRotator) };
 
 	TestNotNull(TEXT("Attacker PlayerState spawned"), AttackerPlayerState.Get());
 	TestNotNull(TEXT("Attacker Character spawned"), Attacker.Get());
 	TestNotNull(TEXT("Target PlayerState spawned"), TargetPlayerState.Get());
 	TestNotNull(TEXT("Target Character spawned"), Target.Get());
-	if (!AttackerPlayerState || !Attacker || !TargetPlayerState || !Target)
+	TestNotNull(TEXT("Charge enemy target spawned"), ChargeTarget.Get());
+	TestNotNull(TEXT("Blast enemy target spawned"), BlastTarget.Get());
+	if (!AttackerPlayerState || !Attacker || !TargetPlayerState || !Target || !ChargeTarget || !BlastTarget)
 	{
 		return false;
 	}
@@ -89,10 +94,14 @@ bool FPRGASAssaultModuleTest::RunTest(const FString& Parameters)
 	UPRAbilitySystemComponent* AttackerASC = Attacker->GetProjectRiftAbilitySystemComponent();
 	UPRAttributeSet* AttackerAttributes = AttackerPlayerState->GetAttributeSet();
 	UPRAttributeSet* TargetAttributes = TargetPlayerState->GetAttributeSet();
+	UPRAttributeSet* ChargeTargetAttributes = ChargeTarget->GetAttributeSet();
+	UPRAttributeSet* BlastTargetAttributes = BlastTarget->GetAttributeSet();
 	TestNotNull(TEXT("Attacker ASC exists"), AttackerASC);
 	TestNotNull(TEXT("Attacker AttributeSet exists"), AttackerAttributes);
 	TestNotNull(TEXT("Target AttributeSet exists"), TargetAttributes);
-	if (!AttackerASC || !AttackerAttributes || !TargetAttributes)
+	TestNotNull(TEXT("Charge enemy AttributeSet exists"), ChargeTargetAttributes);
+	TestNotNull(TEXT("Blast enemy AttributeSet exists"), BlastTargetAttributes);
+	if (!AttackerASC || !AttackerAttributes || !TargetAttributes || !ChargeTargetAttributes || !BlastTargetAttributes)
 	{
 		return false;
 	}
@@ -107,17 +116,26 @@ bool FPRGASAssaultModuleTest::RunTest(const FString& Parameters)
 	Attacker->DoSkillQ();
 	TestTrue(TEXT("Q charge moves the attacker forward"), Attacker->GetActorLocation().X > ChargeStart.X + 250.0f);
 	TestEqual(TEXT("Q charge consumes energy"), AttackerAttributes->GetEnergy(), 85.0f);
+	TestEqual(TEXT("Q charge slows an enemy through its ability definition"), ChargeTargetAttributes->GetMoveSpeed(), 252.0f);
+	TestTrue(
+		TEXT("Q charge grants the slow status tag"),
+		ChargeTarget->GetProjectRiftAbilitySystemComponent()->HasMatchingGameplayTag(ProjectRiftGameplayTags::Status_Debuff_Slowed));
 
 	TargetAttributes->SetHealth(100.0f);
 	TargetAttributes->SetShield(50.0f);
+	BlastTargetAttributes->SetHealth(50.0f);
 	Attacker->SetActorLocation(FVector::ZeroVector);
 	Attacker->DoSkillE();
-	TestEqual(TEXT("E blast damages target shield"), TargetAttributes->GetShield(), 25.0f);
-	TestEqual(TEXT("E blast leaves health while shield absorbs"), TargetAttributes->GetHealth(), 100.0f);
+	TestEqual(TEXT("E blast rejects player friendly fire"), TargetAttributes->GetShield(), 50.0f);
+	TestEqual(TEXT("E blast preserves friendly player health"), TargetAttributes->GetHealth(), 100.0f);
+	TestEqual(TEXT("E blast damages a GAS enemy through unified execution"), BlastTargetAttributes->GetHealth(), 22.5f);
+	TestTrue(
+		TEXT("E blast stuns the enemy"),
+		BlastTarget->GetProjectRiftAbilitySystemComponent()->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Stunned));
 	TestEqual(TEXT("E blast consumes energy"), AttackerAttributes->GetEnergy(), 60.0f);
 
 	Attacker->DoSkillE();
-	TestEqual(TEXT("E blast cooldown blocks immediate second damage"), TargetAttributes->GetShield(), 25.0f);
+	TestEqual(TEXT("E blast cooldown blocks immediate second damage"), BlastTargetAttributes->GetHealth(), 22.5f);
 	TestEqual(TEXT("E blast cooldown does not consume energy again"), AttackerAttributes->GetEnergy(), 60.0f);
 
 	AttackerAttributes->SetShield(10.0f);

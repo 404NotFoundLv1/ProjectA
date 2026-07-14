@@ -1,7 +1,10 @@
 #include "Abilities/GA_AssaultBlast.h"
 
 #include "Abilities/PRAbilitySystemComponent.h"
+#include "Abilities/PRCombatEffectLibrary.h"
 #include "Abilities/PRDamageGameplayEffect.h"
+#include "Abilities/PRStatusGameplayEffect.h"
+#include "AbilitySystemBlueprintLibrary.h"
 #include "Characters/PRCharacter.h"
 #include "Core/PRGameplayTags.h"
 #include "Enemies/PREnemyCharacter.h"
@@ -17,6 +20,10 @@ UGA_AssaultBlast::UGA_AssaultBlast()
 	BlastRadius = 180.0f;
 	DamageAmount = 25.0f;
 	DamageEffectClass = UPRDamageGameplayEffect::StaticClass();
+	TargetStatusEffects.Add(FPRTargetStatusEffectDefinition(
+		UPRStunStatusGameplayEffect::StaticClass(),
+		0.0f,
+		1.25f));
 }
 
 void UGA_AssaultBlast::ActivateAbility(
@@ -73,61 +80,38 @@ bool UGA_AssaultBlast::ExecuteBlast(
 		return false;
 	}
 
-	const FGameplayTag DamageTag = ProjectRiftGameplayTags::Data_Damage;
-	if (!DamageTag.IsValid())
-	{
-		UE_LOG(LogProjectA, Warning, TEXT("Assault blast skipped for %s: Data.Damage tag is missing."), *GetNameSafe(AvatarActor));
-		return false;
-	}
-
 	bool bDamagedAnyTarget = false;
 	for (const FOverlapResult& Overlap : Overlaps)
 	{
-		if (APREnemyCharacter* TargetEnemy = Cast<APREnemyCharacter>(Overlap.GetActor()))
-		{
-			const FVector ToTarget = TargetEnemy->GetActorLocation() - AvatarActor->GetActorLocation();
-			if (FVector::DotProduct(Forward, ToTarget.GetSafeNormal()) < 0.1f)
-			{
-				continue;
-			}
-
-			bDamagedAnyTarget |= TargetEnemy->ApplyEnemyDamage(DamageAmount, AvatarActor->GetInstigatorController());
-			continue;
-		}
-
-		APRCharacter* TargetCharacter = Cast<APRCharacter>(Overlap.GetActor());
-		if (!TargetCharacter || TargetCharacter == AvatarActor)
+		AActor* TargetActor = Overlap.GetActor();
+		if (!TargetActor || TargetActor == AvatarActor)
 		{
 			continue;
 		}
 
-		const FVector ToTarget = TargetCharacter->GetActorLocation() - AvatarActor->GetActorLocation();
+		const FVector ToTarget = TargetActor->GetActorLocation() - AvatarActor->GetActorLocation();
 		if (FVector::DotProduct(Forward, ToTarget.GetSafeNormal()) < 0.1f)
 		{
 			continue;
 		}
 
-		UPRAbilitySystemComponent* TargetASC = TargetCharacter->GetProjectRiftAbilitySystemComponent();
+		UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
 		if (!TargetASC)
 		{
 			continue;
 		}
 
-		FGameplayEffectContextHandle EffectContext = SourceASC->MakeEffectContext();
-		EffectContext.AddSourceObject(this);
-		EffectContext.AddActors({ TargetCharacter }, true);
-
-		FGameplayEffectSpecHandle DamageSpecHandle = SourceASC->MakeOutgoingSpec(
-			DamageEffectClass,
-			GetAbilityLevel(Handle, ActorInfo),
-			EffectContext);
-		if (!DamageSpecHandle.IsValid())
+		if (!UPRCombatEffectLibrary::ApplyDamageToTarget(
+			SourceASC,
+			TargetASC,
+			DamageAmount,
+			ProjectRiftGameplayTags::Damage_Type_Physical,
+			const_cast<UGA_AssaultBlast*>(this)))
 		{
 			continue;
 		}
 
-		DamageSpecHandle.Data->SetSetByCallerMagnitude(DamageTag, DamageAmount);
-		SourceASC->ApplyGameplayEffectSpecToTarget(*DamageSpecHandle.Data.Get(), TargetASC);
+		ApplyConfiguredStatusEffects(SourceASC, TargetASC);
 		bDamagedAnyTarget = true;
 	}
 

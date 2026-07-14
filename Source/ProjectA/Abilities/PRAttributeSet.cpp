@@ -1,7 +1,7 @@
 #include "Abilities/PRAttributeSet.h"
 
 #include "AbilitySystemComponent.h"
-#include "Characters/PRCharacter.h"
+#include "Combat/PRCombatUnitInterface.h"
 #include "GameplayEffectExtension.h"
 #include "Net/UnrealNetwork.h"
 
@@ -78,9 +78,9 @@ void UPRAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 
 		if (GetHealth() <= 0.0f)
 		{
-			if (APRCharacter* TargetCharacter = Cast<APRCharacter>(Data.Target.GetAvatarActor()))
+			if (IPRCombatUnitInterface* CombatUnit = Cast<IPRCombatUnitInterface>(Data.Target.GetAvatarActor()))
 			{
-				TargetCharacter->EnterDownedState();
+				CombatUnit->HandleCombatUnitHealthDepleted(Data.EffectSpec.GetEffectContext());
 			}
 		}
 	}

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Abilities/GameplayAbility.h"
+#include "Abilities/PRStatusEffectTypes.h"
 #include "PRGameplayAbility.generated.h"
 
 /**
@@ -14,4 +15,12 @@ class PROJECTA_API UPRGameplayAbility : public UGameplayAbility
 
 public:
 	UPRGameplayAbility();
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Status")
+	TArray<FPRTargetStatusEffectDefinition> TargetStatusEffects;
+
+protected:
+	bool ApplyConfiguredStatusEffects(
+		UAbilitySystemComponent* SourceAbilitySystem,
+		UAbilitySystemComponent* TargetAbilitySystem) const;
 };

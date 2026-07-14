@@ -121,8 +121,8 @@ bool FPRGASPrimaryAttackAbilityTest::RunTest(const FString& Parameters)
 	TargetAttributes->SetHealth(100.0f);
 	TargetAttributes->SetShield(50.0f);
 	Attacker->DoPrimaryAttack();
-	TestEqual(TEXT("Primary attack lowers target shield first"), TargetAttributes->GetShield(), 40.0f);
-	TestEqual(TEXT("Primary attack leaves health while shield absorbs damage"), TargetAttributes->GetHealth(), 100.0f);
+	TestEqual(TEXT("Primary attack rejects player friendly fire"), TargetAttributes->GetShield(), 50.0f);
+	TestEqual(TEXT("Friendly-fire rejection preserves player health"), TargetAttributes->GetHealth(), 100.0f);
 
 	const FGameplayTag DeadStateTag = ProjectRiftGameplayTags::State_Dead;
 	TestTrue(TEXT("Dead state tag is configured"), DeadStateTag.IsValid());

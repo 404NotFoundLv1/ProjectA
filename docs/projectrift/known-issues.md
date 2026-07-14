@@ -1,5 +1,13 @@
 # ProjectRift known issues
 
+## v0.6.0 acceptance-relevant items
+
+- Status feedback is intentionally text-only in this slice; production icons, VFX, audio, GameplayCues, stacking, immunity, armor, critical hits, and persistence are out of scope.
+- Pollution uses GAS periodic scheduling with a minimal boundary tolerance so the five-second effect executes exactly five times, including the first application frame.
+- Two-player PIE remains the required manual check for replicated status tags and player friendly-fire rejection.
+- The existing GameplayCue search-path warning remains unrelated; v0.6.0 adds no GameplayCue assets.
+- UAT may report unavailable SDKs for non-Win64 platforms while validating platforms. Win64 is the supported verification target for this slice.
+
 ## v0.5.6 acceptance-relevant items
 
 - The Gauntlet loop is single-client and deterministic. It proves the complete local authoritative loop but does not exercise two separate client processes.
@@ -34,4 +42,4 @@
 
 ## Release gate
 
-Do not accept v0.5.6 until the manual matrix in `v0.5.6-test-record.md` passes. Do not begin the next small version before explicit user authorization.
+Do not accept v0.6.0 until the manual matrix in `v0.6.0-test-record.md` passes. Do not begin the next small version before explicit user authorization.

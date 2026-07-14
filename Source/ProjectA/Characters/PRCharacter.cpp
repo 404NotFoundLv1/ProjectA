@@ -8,6 +8,7 @@
 #include "Abilities/PRAbilitySystemComponent.h"
 #include "Abilities/PRDefaultAttributesGameplayEffect.h"
 #include "Abilities/PRAttributeSet.h"
+#include "Abilities/PRCombatEffectLibrary.h"
 #include "Components/TextRenderComponent.h"
 #include "Core/PRGameplayTags.h"
 #include "EnhancedInputComponent.h"
@@ -161,6 +162,21 @@ APRCharacter::APRCharacter()
 	{
 		OpenInventoryAction = OpenInventoryActionAsset.Object;
 	}
+}
+
+UAbilitySystemComponent* APRCharacter::GetAbilitySystemComponent() const
+{
+	return AbilitySystemComponent.Get();
+}
+
+bool APRCharacter::IsCombatUnitInactive() const
+{
+	return !IsAlive();
+}
+
+void APRCharacter::HandleCombatUnitHealthDepleted(const FGameplayEffectContextHandle& EffectContext)
+{
+	EnterDownedState();
 }
 
 void APRCharacter::BeginPlay()
@@ -393,6 +409,8 @@ bool APRCharacter::EnterDownedState()
 	{
 		AbilitySystemComponent->AddLooseGameplayTag(DownedStateTag, 1, EGameplayTagReplicationState::TagOnly);
 	}
+	UPRCombatEffectLibrary::ClearNegativeStatusEffects(AbilitySystemComponent);
+	AbilitySystemComponent->CancelAllAbilities();
 
 	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
 	{
@@ -438,6 +456,7 @@ bool APRCharacter::RespawnFromDowned()
 	{
 		MovementComponent->SetMovementMode(MOVE_Walking);
 	}
+	RefreshMovementFromAttributes();
 
 	UE_LOG(LogProjectA, Log, TEXT("%s respawned from downed state."), *GetNameSafe(this));
 	return true;
@@ -552,6 +571,13 @@ void APRCharacter::BindAttributeChangeDelegates()
 	EnergyChangedDelegateHandle = AbilitySystemComponent
 		->GetGameplayAttributeValueChangeDelegate(UPRAttributeSet::GetEnergyAttribute())
 		.AddUObject(this, &APRCharacter::HandleEnergyChanged);
+	MoveSpeedChangedDelegateHandle = AbilitySystemComponent
+		->GetGameplayAttributeValueChangeDelegate(UPRAttributeSet::GetMoveSpeedAttribute())
+		.AddUObject(this, &APRCharacter::HandleMoveSpeedChanged);
+	StunnedTagChangedDelegateHandle = AbilitySystemComponent
+		->RegisterGameplayTagEvent(ProjectRiftGameplayTags::State_Stunned, EGameplayTagEventType::NewOrRemoved)
+		.AddUObject(this, &APRCharacter::HandleStunnedTagChanged);
+	RefreshMovementFromAttributes();
 }
 
 void APRCharacter::ClearAttributeChangeDelegates()
@@ -561,6 +587,8 @@ void APRCharacter::ClearAttributeChangeDelegates()
 		HealthChangedDelegateHandle.Reset();
 		ShieldChangedDelegateHandle.Reset();
 		EnergyChangedDelegateHandle.Reset();
+		MoveSpeedChangedDelegateHandle.Reset();
+		StunnedTagChangedDelegateHandle.Reset();
 		return;
 	}
 
@@ -587,6 +615,22 @@ void APRCharacter::ClearAttributeChangeDelegates()
 			.Remove(EnergyChangedDelegateHandle);
 		EnergyChangedDelegateHandle.Reset();
 	}
+
+	if (MoveSpeedChangedDelegateHandle.IsValid())
+	{
+		AbilitySystemComponent
+			->GetGameplayAttributeValueChangeDelegate(UPRAttributeSet::GetMoveSpeedAttribute())
+			.Remove(MoveSpeedChangedDelegateHandle);
+		MoveSpeedChangedDelegateHandle.Reset();
+	}
+
+	if (StunnedTagChangedDelegateHandle.IsValid())
+	{
+		AbilitySystemComponent
+			->RegisterGameplayTagEvent(ProjectRiftGameplayTags::State_Stunned, EGameplayTagEventType::NewOrRemoved)
+			.Remove(StunnedTagChangedDelegateHandle);
+		StunnedTagChangedDelegateHandle.Reset();
+	}
 }
 
 void APRCharacter::HandleHealthChanged(const FOnAttributeChangeData& Data)
@@ -610,6 +654,38 @@ void APRCharacter::HandleEnergyChanged(const FOnAttributeChangeData& Data)
 {
 	UE_LOG(LogProjectA, Log, TEXT("Energy changed for %s: %.2f -> %.2f"), *GetNameSafe(this), Data.OldValue, Data.NewValue);
 	OnEnergyChanged.Broadcast(Data.OldValue, Data.NewValue);
+}
+
+void APRCharacter::HandleMoveSpeedChanged(const FOnAttributeChangeData& Data)
+{
+	RefreshMovementFromAttributes();
+}
+
+void APRCharacter::HandleStunnedTagChanged(const FGameplayTag StatusTag, const int32 NewCount)
+{
+	if (NewCount > 0)
+	{
+		if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+		{
+			MovementComponent->StopMovementImmediately();
+		}
+	}
+	RefreshMovementFromAttributes();
+}
+
+void APRCharacter::RefreshMovementFromAttributes()
+{
+	if (!AttributeSet || IsDowned())
+	{
+		return;
+	}
+
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		const bool bStunned = AbilitySystemComponent
+			&& AbilitySystemComponent->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Stunned);
+		MovementComponent->MaxWalkSpeed = bStunned ? 0.0f : FMath::Max(AttributeSet->GetMoveSpeed(), 0.0f);
+	}
 }
 
 void APRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
