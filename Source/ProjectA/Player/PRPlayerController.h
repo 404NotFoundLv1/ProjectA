@@ -15,6 +15,7 @@ class UPRLobbyReadyDebugWidget;
 class UPRRiftSettlementWidget;
 class UPRShipRepairWidget;
 class UPRDiagnosticsWidget;
+class UPRWeaponHUDWidget;
 class UPRLootTableDataAsset;
 class UGameplayEffect;
 class APRPickupActor;
@@ -67,6 +68,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Drop", meta = (ClampMin = "1"))
 	void DropInventoryItem(FName ItemId, int32 Count = 1);
 
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Equipment")
+	void EquipInventoryWeapon(FName ItemId);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Equipment")
+	void UnequipPrimaryWeapon();
+
 	UFUNCTION(BlueprintCallable, Category = "Loot|Debug")
 	void SpawnTestLoot();
 
@@ -84,6 +91,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
 	UPRInventoryWidget* GetInventoryWidget() const { return InventoryWidget.Get(); }
+
+	UFUNCTION(BlueprintPure, Category = "Weapon|UI")
+	UPRWeaponHUDWidget* GetWeaponHUDWidget() const { return WeaponHUDWidget.Get(); }
 
 	UFUNCTION(BlueprintCallable, Category = "Ship Repair|UI")
 	void ToggleShipRepairPanel();
@@ -138,6 +148,12 @@ public:
 
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Inventory|Drop")
 	void ServerDropInventoryItem(FName ItemId, int32 Count);
+
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Inventory|Equipment")
+	void ServerEquipInventoryWeapon(FName ItemId);
+
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Inventory|Equipment")
+	void ServerUnequipPrimaryWeapon();
 
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Loot|Debug")
 	void ServerSpawnTestLoot();
@@ -215,6 +231,8 @@ private:
 	void RestoreDiagnosticsInputMode();
 	void CreateInventoryUI();
 	void DestroyInventoryUI();
+	void CreateWeaponHUD();
+	void DestroyWeaponHUD();
 	void CreateRiftSettlementUI();
 	void DestroyRiftSettlementUI();
 	void CreateShipRepairUI();
@@ -234,6 +252,12 @@ private:
 
 	UFUNCTION()
 	void HandleInventoryDropRequested(FName ItemId, int32 Count);
+
+	UFUNCTION()
+	void HandleInventoryEquipRequested(FName ItemId);
+
+	UFUNCTION()
+	void HandlePrimaryWeaponUnequipRequested();
 
 	bool CanServerPickup(APRPickupActor* PickupActor, FString* OutFailureReason = nullptr) const;
 	bool CanServerActivateRiftObjective(APRRiftObjectiveActor* ObjectiveActor, FString* OutFailureReason = nullptr) const;
@@ -264,6 +288,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPRInventoryWidget> InventoryWidget;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon|UI")
+	TSubclassOf<UPRWeaponHUDWidget> WeaponHUDWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPRWeaponHUDWidget> WeaponHUDWidget;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Rift|Settlement")
 	TSubclassOf<UPRRiftSettlementWidget> RiftSettlementWidgetClass;

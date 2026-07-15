@@ -6,6 +6,7 @@
 #include "Net/UnrealNetwork.h"
 #include "ProjectA.h"
 #include "Progression/PRMissionProgressionDataAsset.h"
+#include "Weapons/PRWeaponComponent.h"
 
 APRPlayerState::APRPlayerState()
 	: bIsReady(false)
@@ -17,6 +18,7 @@ APRPlayerState::APRPlayerState()
 	AbilitySystemComponent = CreateDefaultSubobject<UPRAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
 	AttributeSet = CreateDefaultSubobject<UPRAttributeSet>(TEXT("AttributeSet"));
 	InventoryComponent = CreateDefaultSubobject<UPRInventoryComponent>(TEXT("InventoryComponent"));
+	WeaponComponent = CreateDefaultSubobject<UPRWeaponComponent>(TEXT("WeaponComponent"));
 }
 
 void APRPlayerState::BeginPlay()
@@ -103,9 +105,14 @@ void APRPlayerState::SetReady(const bool bReady)
 
 bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjection& Projection, FString& OutDiagnostic)
 {
-	if (!Projection.IsValid(&OutDiagnostic) || !InventoryComponent)
+	if (!Projection.IsValid(&OutDiagnostic) || !InventoryComponent || !WeaponComponent)
 	{
 		return false;
+	}
+	if (bMultiplayerProfileBound && BoundProfileId == Projection.ProfileId)
+	{
+		OutDiagnostic = TEXT("Profile is already bound to this PlayerState.");
+		return true;
 	}
 
 	TArray<FPRShipResourceStack> RuntimeResources;
@@ -116,20 +123,40 @@ bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjectio
 		RuntimeResource.ResourceId = Balance.ResourceId;
 		RuntimeResource.Count = Balance.Count;
 	}
-	if (!InventoryComponent->ReplaceInventoryItems(Projection.BackpackItems)
-		|| !ReplaceShipResources(RuntimeResources))
+	TArray<FPRItemInstance> PreviousBackpack;
+	if (!WeaponComponent->BuildPersistentBackpack(PreviousBackpack, OutDiagnostic))
 	{
+		return false;
+	}
+	const TArray<FPRProfileEquipmentEntry> PreviousEquipment = WeaponComponent->GetEquipmentEntries();
+	const TArray<FPRShipResourceStack> PreviousResources = ShipResources;
+	if (!InventoryComponent->ReplaceInventoryItems(Projection.BackpackItems)
+		|| !ReplaceShipResources(RuntimeResources)
+		|| !WeaponComponent->ReplaceEquipmentEntries(Projection.Equipment, OutDiagnostic)
+		|| !WeaponComponent->EnsureStarterWeapon(TEXT("TestRifle"), OutDiagnostic))
+	{
+		InventoryComponent->ReplaceInventoryItems(PreviousBackpack);
+		ReplaceShipResources(PreviousResources);
+		FString RestoreDiagnostic;
+		WeaponComponent->ReplaceEquipmentEntries(PreviousEquipment, RestoreDiagnostic);
 		OutDiagnostic = TEXT("PlayerState rejected validated multiplayer profile runtime data.");
 		return false;
 	}
 
+	if (!WeaponComponent->BuildPersistentBackpack(MissionStartBackpackItems, OutDiagnostic))
+	{
+		InventoryComponent->ReplaceInventoryItems(PreviousBackpack);
+		ReplaceShipResources(PreviousResources);
+		FString RestoreDiagnostic;
+		WeaponComponent->ReplaceEquipmentEntries(PreviousEquipment, RestoreDiagnostic);
+		return false;
+	}
 	BoundProfileId = Projection.ProfileId;
 	bMultiplayerProfileBound = true;
 	BoundStoryProgress = Projection.Story;
 	BoundShipModules = Projection.ShipModules;
 	bRepairPersistencePending = false;
 	PendingRepairTransactionId.Invalidate();
-	MissionStartBackpackItems = Projection.BackpackItems;
 	MissionStartResourceWallet = Projection.ResourceWallet;
 	MissionStartRoleId = Projection.SelectedRoleId;
 	SetPlayerDisplayName(Projection.DisplayName);
@@ -176,6 +203,11 @@ bool APRPlayerState::BuildBoundShipRepairSnapshot(FPRProfileSnapshot& OutSnapsho
 		}
 		OutSnapshot.ResourceWallet.Emplace(Resource.ResourceId, Resource.Count);
 	}
+	if (!WeaponComponent || !WeaponComponent->BuildPersistentBackpack(OutSnapshot.BackpackItems, OutDiagnostic))
+	{
+		return false;
+	}
+	OutSnapshot.Equipment = WeaponComponent->GetEquipmentEntries();
 	OutSnapshot.ShipModules = BoundShipModules;
 	OutSnapshot.Story = BoundStoryProgress;
 	OutSnapshot.SelectedRoleId = SelectedRoleModule;
@@ -422,6 +454,10 @@ void APRPlayerState::CopyProjectRiftStateFrom(const APRPlayerState* SourcePlayer
 			UE_LOG(LogProjectA, Error, TEXT("Inventory state failed to copy during seamless PlayerState replacement. Source=%s Target=%s"),
 				*GetNameSafe(SourcePlayerState), *GetNameSafe(this));
 		}
+	}
+	if (WeaponComponent && SourcePlayerState->WeaponComponent)
+	{
+		WeaponComponent->CopyRuntimeStateFrom(SourcePlayerState->WeaponComponent);
 	}
 	SelectedRoleModule = SourcePlayerState->SelectedRoleModule;
 	PlayerDisplayName = SourcePlayerState->PlayerDisplayName;

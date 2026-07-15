@@ -8,6 +8,7 @@
 #include "Items/PRInventoryComponent.h"
 #include "Persistence/PRSaveSubsystem.h"
 #include "Progression/PRMissionProgressionDataAsset.h"
+#include "Weapons/PRWeaponComponent.h"
 
 namespace
 {
@@ -31,6 +32,7 @@ bool FPRMultiplayerProfileContractTest::RunTest(const FString& Parameters)
 	Projection.ProfileId = FGuid::NewGuid();
 	Projection.DisplayName = TEXT("Client Profile");
 	Projection.BackpackItems = { MakeMultiplayerItem(TEXT("HealthInjector"), 2) };
+	Projection.Equipment = { FPRProfileEquipmentEntry(TEXT("Slot.Primary"), MakeMultiplayerItem(TEXT("HealthInjector"), 1)) };
 	Projection.ResourceWallet = { FPRProfileResourceBalance{ TEXT("EnergyCrystal"), 5 } };
 	Projection.SelectedRoleId = TEXT("Ability.Role.Assault");
 	Projection.Story.UnlockedChapterIds = { TEXT("Chapter.Prologue") };
@@ -38,6 +40,10 @@ bool FPRMultiplayerProfileContractTest::RunTest(const FString& Parameters)
 
 	FString Diagnostic;
 	TestTrue(TEXT("Valid multiplayer projection is accepted"), Projection.IsValid(&Diagnostic));
+	FPRMultiplayerProfileProjection DuplicateEquipmentProjection = Projection;
+	const FPRProfileEquipmentEntry DuplicateEquipment = DuplicateEquipmentProjection.Equipment[0];
+	DuplicateEquipmentProjection.Equipment.Add(DuplicateEquipment);
+	TestFalse(TEXT("Projection rejects duplicate equipment slots"), DuplicateEquipmentProjection.IsValid(&Diagnostic));
 	FPRMultiplayerProfileProjection DuplicateStoryProjection = Projection;
 	DuplicateStoryProjection.Story.CompletedStoryNodeIds = { TEXT("Story.Prologue.Intro"), TEXT("Story.Prologue.Intro") };
 	TestFalse(TEXT("Projection rejects duplicate story nodes"), DuplicateStoryProjection.IsValid(&Diagnostic));
@@ -60,9 +66,14 @@ bool FPRMultiplayerProfileContractTest::RunTest(const FString& Parameters)
 	Receipt.bExtracted = true;
 	Receipt.bGrantStoryProgress = true;
 	Receipt.SettledBackpackItems = { MakeMultiplayerItem(TEXT("ShieldPack"), 1) };
+	Receipt.SettledEquipment = { FPRProfileEquipmentEntry(TEXT("Slot.Primary"), MakeMultiplayerItem(TEXT("TestRifle"), 1)) };
 	Receipt.SettledResourceWallet = { FPRProfileResourceBalance{ TEXT("EnergyCrystal"), 12 } };
 	Receipt.SettledRoleId = TEXT("Ability.Role.Assault");
 	TestTrue(TEXT("Valid personal settlement receipt is accepted"), Receipt.IsValid(&Diagnostic));
+	FPRPlayerSettlementReceipt DuplicateReceiptEquipment = Receipt;
+	const FPRProfileEquipmentEntry DuplicateSettledEquipmentEntry = DuplicateReceiptEquipment.SettledEquipment[0];
+	DuplicateReceiptEquipment.SettledEquipment.Add(DuplicateSettledEquipmentEntry);
+	TestFalse(TEXT("Receipt rejects duplicate equipment slots"), DuplicateReceiptEquipment.IsValid(&Diagnostic));
 
 	FPRPlayerSettlementReceipt WrongReceipt = Receipt;
 	WrongReceipt.SettlementId.Invalidate();
@@ -100,13 +111,33 @@ bool FPRMultiplayerProfileContractTest::RunTest(const FString& Parameters)
 	Projection.DisplayName = TEXT("Travel Profile");
 	Projection.BackpackItems = { MakeMultiplayerItem(TEXT("HealthInjector"), 2) };
 	TestTrue(TEXT("Travel source accepts its profile projection"), LobbyState->BindMultiplayerProfile(Projection, Diagnostic));
+	TestTrue(TEXT("Repeated binding of the same profile is accepted idempotently"), LobbyState->BindMultiplayerProfile(Projection, Diagnostic));
+	TestEqual(TEXT("Repeated profile binding does not duplicate starter ammo"), LobbyState->GetInventoryComponent()->GetItemCount(TEXT("RifleAmmo")), 60);
+	TestEqual(TEXT("Repeated profile binding does not duplicate the backpack starter rifle"), LobbyState->GetInventoryComponent()->GetItemCount(TEXT("TestRifle")), 1);
 	LobbyState->CopyProperties(RiftState);
 	TestTrue(TEXT("Profile binding survives seamless PlayerState replacement"), RiftState->IsMultiplayerProfileBound());
 	TestEqual(TEXT("Bound profile id survives seamless PlayerState replacement"), RiftState->GetBoundProfileId(), Projection.ProfileId);
-	TestEqual(TEXT("Mission baseline survives seamless PlayerState replacement"), RiftState->GetMissionStartBackpackItems().Num(), 1);
+	TestEqual(TEXT("Mission baseline includes the preserved bag plus starter rifle and ammo"), RiftState->GetMissionStartBackpackItems().Num(), 3);
 	TestEqual(TEXT("Runtime inventory survives seamless PlayerState replacement"), RiftState->GetInventoryComponent()->GetItemCount(TEXT("HealthInjector")), 2);
+	TestEqual(TEXT("Starter rifle remains in backpack beside unknown legacy primary"), RiftState->GetInventoryComponent()->GetItemCount(TEXT("TestRifle")), 1);
+	TestEqual(TEXT("Starter total ammo survives seamless PlayerState replacement"), RiftState->GetInventoryComponent()->GetItemCount(TEXT("RifleAmmo")), 60);
+	TestEqual(TEXT("Bound equipment is retained on lobby PlayerState"), LobbyState->GetWeaponComponent()->GetEquipmentEntries().Num(), 1);
+	TestEqual(TEXT("Bound equipment survives seamless PlayerState replacement"), RiftState->GetWeaponComponent()->GetEquipmentEntries().Num(), 1);
+	TestEqual(TEXT("Unknown legacy primary is preserved without replacement"), RiftState->GetWeaponComponent()->GetEquipmentEntries()[0].Item.ItemId, FName(TEXT("HealthInjector")));
 	TestEqual(TEXT("Bound ship modules are stored by PlayerState"), LobbyState->GetBoundShipModules().Num(), 1);
 	TestEqual(TEXT("Bound ship modules survive seamless PlayerState replacement"), RiftState->GetBoundShipModules().Num(), 1);
+
+	APRPlayerState* StarterLobbyState = NewObject<APRPlayerState>();
+	APRPlayerState* StarterReturnState = NewObject<APRPlayerState>();
+	FPRMultiplayerProfileProjection StarterProjection;
+	StarterProjection.ProfileId = FGuid::NewGuid();
+	StarterProjection.DisplayName = TEXT("Starter Travel Profile");
+	TestTrue(TEXT("Empty travel profile receives the equipped starter rifle"), StarterLobbyState->BindMultiplayerProfile(StarterProjection, Diagnostic));
+	StarterLobbyState->CopyProperties(StarterReturnState);
+	StarterProjection.BackpackItems = { MakeMultiplayerItem(TEXT("RifleAmmo"), 48) };
+	TestTrue(TEXT("Returning seamless PlayerState accepts the same stale profile projection"), StarterReturnState->BindMultiplayerProfile(StarterProjection, Diagnostic));
+	TestEqual(TEXT("Stale same-profile rebind preserves one starter magazine"), StarterReturnState->GetWeaponComponent()->GetMagazineAmmo(), 12);
+	TestEqual(TEXT("Stale same-profile rebind does not duplicate starter reserve"), StarterReturnState->GetInventoryComponent()->GetItemCount(TEXT("RifleAmmo")), 48);
 
 	const FGuid RepairTransactionId = FGuid::NewGuid();
 	LobbyState->SetRepairPersistencePending(RepairTransactionId, true);

@@ -215,7 +215,7 @@ bool FPRDiagnosticsSnapshotTest::RunTest(const FString& Parameters)
 	UPRDiagnosticsSubsystem* Diagnostics = NewObject<UPRDiagnosticsSubsystem>(GameInstance);
 	const FPRDiagnosticSnapshot Snapshot = Diagnostics->BuildSnapshot(Controller);
 	TestTrue(TEXT("Snapshot receives a UTC generation time"), Snapshot.GeneratedAtUtc.GetTicks() > 0);
-	TestEqual(TEXT("Snapshot reports v0.6.0"), Snapshot.Environment.ProjectVersion, FString(TEXT("0.6.0")));
+	TestEqual(TEXT("Snapshot reports v0.6.1"), Snapshot.Environment.ProjectVersion, FString(TEXT("0.6.1")));
 	TestFalse(TEXT("Snapshot reports a map"), Snapshot.Environment.MapName.IsEmpty());
 	TestEqual(TEXT("Snapshot reports the owning controller"), Snapshot.Player.ControllerName, GetNameSafe(Controller));
 	TestEqual(TEXT("Snapshot reports the bound profile"), Snapshot.Player.BoundProfileId, Projection.ProfileId);

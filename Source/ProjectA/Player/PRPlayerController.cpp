@@ -25,6 +25,7 @@
 #include "Items/PRLootTableDataAsset.h"
 #include "Items/PRLootTableLibrary.h"
 #include "Items/PRPickupActor.h"
+#include "Items/PRWeaponDataAsset.h"
 #include "Player/PRPlayerState.h"
 #include "ProjectA.h"
 #include "Persistence/PRSaveSubsystem.h"
@@ -37,7 +38,9 @@
 #include "UI/PRLobbyReadyDebugWidget.h"
 #include "UI/PRRiftSettlementWidget.h"
 #include "UI/PRShipRepairWidget.h"
+#include "UI/PRWeaponHUDWidget.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Weapons/PRWeaponComponent.h"
 
 namespace
 {
@@ -131,6 +134,7 @@ APRPlayerController::APRPlayerController()
 	}
 
 	InventoryWidgetClass = UPRInventoryWidget::StaticClass();
+	WeaponHUDWidgetClass = UPRWeaponHUDWidget::StaticClass();
 	RiftSettlementWidgetClass = UPRRiftSettlementWidget::StaticClass();
 	ShipRepairWidgetClass = UPRShipRepairWidget::StaticClass();
 	DiagnosticsWidgetClass = UPRDiagnosticsWidget::StaticClass();
@@ -154,6 +158,7 @@ void APRPlayerController::BeginPlay()
 			5.0f);
 
 		CreateInventoryUI();
+		CreateWeaponHUD();
 		CreateRiftSettlementUI();
 		CreateShipRepairUI();
 		SubmitLocalMultiplayerProfile();
@@ -175,6 +180,7 @@ void APRPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	DestroyRiftSettlementUI();
 	DestroyShipRepairUI();
 	DestroyInventoryUI();
+	DestroyWeaponHUD();
 	DestroyDiagnosticsUI();
 	DestroyLobbyReadyDebugHUD();
 	DestroyGASDebugHUD();
@@ -193,7 +199,6 @@ void APRPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APRPlayerController::SelectAssaultRoleModule);
 		InputComponent->BindKey(EKeys::P, IE_Pressed, this, &APRPlayerController::ToggleReady);
 		InputComponent->BindKey(EKeys::O, IE_Pressed, this, &APRPlayerController::StartRiftMission);
-		InputComponent->BindKey(EKeys::R, IE_Pressed, this, &APRPlayerController::ToggleShipRepairPanel);
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &APRPlayerController::HideShipRepairPanel);
 #if !UE_BUILD_SHIPPING
 		InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &APRPlayerController::ToggleDiagnosticsPanel);
@@ -421,6 +426,38 @@ void APRPlayerController::DropInventoryItem(const FName ItemId, const int32 Coun
 	}
 
 	ServerDropInventoryItem(ItemId, Count);
+}
+
+void APRPlayerController::EquipInventoryWeapon(const FName ItemId)
+{
+	if (!HasAuthority())
+	{
+		ServerEquipInventoryWeapon(ItemId);
+		return;
+	}
+
+	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	UPRWeaponComponent* Weapon = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetWeaponComponent() : nullptr;
+	if (Weapon)
+	{
+		Weapon->EquipWeaponFromInventory(ItemId);
+	}
+}
+
+void APRPlayerController::UnequipPrimaryWeapon()
+{
+	if (!HasAuthority())
+	{
+		ServerUnequipPrimaryWeapon();
+		return;
+	}
+
+	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	UPRWeaponComponent* Weapon = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetWeaponComponent() : nullptr;
+	if (Weapon)
+	{
+		Weapon->UnequipWeapon();
+	}
 }
 
 void APRPlayerController::SpawnTestLoot()
@@ -865,6 +902,16 @@ void APRPlayerController::ServerUseInventoryItem_Implementation(const FName Item
 void APRPlayerController::ServerDropInventoryItem_Implementation(const FName ItemId, const int32 Count)
 {
 	TryDropInventoryItemOnServer(ItemId, Count);
+}
+
+void APRPlayerController::ServerEquipInventoryWeapon_Implementation(const FName ItemId)
+{
+	EquipInventoryWeapon(ItemId);
+}
+
+void APRPlayerController::ServerUnequipPrimaryWeapon_Implementation()
+{
+	UnequipPrimaryWeapon();
 }
 
 void APRPlayerController::ServerSpawnTestLoot_Implementation()
@@ -1598,6 +1645,8 @@ void APRPlayerController::CreateInventoryUI()
 	{
 		InventoryWidget->OnUseItemRequested.AddUniqueDynamic(this, &APRPlayerController::HandleInventoryUseRequested);
 		InventoryWidget->OnDropItemRequested.AddUniqueDynamic(this, &APRPlayerController::HandleInventoryDropRequested);
+		InventoryWidget->OnEquipItemRequested.AddUniqueDynamic(this, &APRPlayerController::HandleInventoryEquipRequested);
+		InventoryWidget->OnUnequipPrimaryRequested.AddUniqueDynamic(this, &APRPlayerController::HandlePrimaryWeaponUnequipRequested);
 		InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
 		InventoryWidget->AddToPlayerScreen(30);
 		InventoryWidget->SetPositionInViewport(FVector2D::ZeroVector, false);
@@ -1616,8 +1665,49 @@ void APRPlayerController::DestroyInventoryUI()
 	{
 		InventoryWidget->OnUseItemRequested.RemoveDynamic(this, &APRPlayerController::HandleInventoryUseRequested);
 		InventoryWidget->OnDropItemRequested.RemoveDynamic(this, &APRPlayerController::HandleInventoryDropRequested);
+		InventoryWidget->OnEquipItemRequested.RemoveDynamic(this, &APRPlayerController::HandleInventoryEquipRequested);
+		InventoryWidget->OnUnequipPrimaryRequested.RemoveDynamic(this, &APRPlayerController::HandlePrimaryWeaponUnequipRequested);
 		InventoryWidget->RemoveFromParent();
 		InventoryWidget = nullptr;
+	}
+}
+
+void APRPlayerController::CreateWeaponHUD()
+{
+	if (!IsLocalPlayerController() || WeaponHUDWidget)
+	{
+		return;
+	}
+
+	if (!WeaponHUDWidgetClass)
+	{
+		WeaponHUDWidgetClass = UPRWeaponHUDWidget::StaticClass();
+	}
+
+	WeaponHUDWidget = CreateWidget<UPRWeaponHUDWidget>(this, WeaponHUDWidgetClass);
+	if (!WeaponHUDWidget)
+	{
+		return;
+	}
+
+	WeaponHUDWidget->InitializeForController(this);
+	WeaponHUDWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+	WeaponHUDWidget->AddToPlayerScreen(25);
+	int32 ViewportX = 1920;
+	int32 ViewportY = 1080;
+	GetViewportSize(ViewportX, ViewportY);
+	WeaponHUDWidget->SetPositionInViewport(FVector2D::ZeroVector, false);
+	WeaponHUDWidget->SetDesiredSizeInViewport(FVector2D(FMath::Max(1, ViewportX), FMath::Max(1, ViewportY)));
+	WeaponHUDWidget->SetAnchorsInViewport(FAnchors(0.0f, 0.0f));
+	WeaponHUDWidget->SetAlignmentInViewport(FVector2D::ZeroVector);
+}
+
+void APRPlayerController::DestroyWeaponHUD()
+{
+	if (WeaponHUDWidget)
+	{
+		WeaponHUDWidget->RemoveFromParent();
+		WeaponHUDWidget = nullptr;
 	}
 }
 
@@ -1919,6 +2009,11 @@ bool APRPlayerController::CanDropInventoryItemOnServer(const FName ItemId, const
 		return Reject(TEXT("drop count exceeds inventory count"));
 	}
 
+	if (const UPRItemDataAsset* ItemData = InventoryComponent->FindItemData(ItemId); ItemData && !ItemData->bCanDrop)
+	{
+		return Reject(TEXT("item cannot be dropped"));
+	}
+
 	FPRItemInstance ExistingItem;
 	if (!FindInventoryItemById(InventoryComponent, ItemId, ExistingItem) || !ExistingItem.IsValid())
 	{
@@ -1980,6 +2075,16 @@ void APRPlayerController::HandleInventoryUseRequested(const FName ItemId)
 void APRPlayerController::HandleInventoryDropRequested(const FName ItemId, const int32 Count)
 {
 	DropInventoryItem(ItemId, Count);
+}
+
+void APRPlayerController::HandleInventoryEquipRequested(const FName ItemId)
+{
+	EquipInventoryWeapon(ItemId);
+}
+
+void APRPlayerController::HandlePrimaryWeaponUnequipRequested()
+{
+	UnequipPrimaryWeapon();
 }
 
 bool APRPlayerController::CanServerPickup(APRPickupActor* PickupActor, FString* OutFailureReason) const

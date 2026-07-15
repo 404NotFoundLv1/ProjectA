@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.6.1] - 2026-07-15
+
+### Added
+
+- Added a data-driven semi-automatic hitscan test rifle, rifle ammunition, a replicated PlayerState-owned weapon component, and a replicated native placeholder weapon actor.
+- Added server-authoritative magazine/reserve ammo, fire-rate limiting, camera-to-aim-point-to-muzzle tracing, manual partial reload, local ADS presentation, native weapon HUD, and inventory equip/unequip controls.
+- Added `IA_Aim` and `IA_Reload`, right-mouse/left-trigger ADS, R/gamepad-X reload, and right-trigger primary fire mappings.
+- Added focused weapon, hitscan, equipment, persistence, input, UI, asset, and multiplayer replacement automation coverage.
+
+### Changed
+
+- `UGA_PrimaryAttack` now delegates to the equipped weapon instead of the legacy spherical melee query while retaining its class, input tag, and public character input functions.
+- v4 snapshots, multiplayer projections, settlement receipts, and lobby application-exit capture now preserve `Slot.Primary`, merge the loaded magazine into total persisted ammo, and refill the magazine when applying a profile.
+- Empty or old profiles receive the test rifle exactly once; an unknown occupied primary slot is preserved while the rifle and its ammunition are placed in the backpack.
+- The inventory rejects drops for data assets with `bCanDrop=false`; existing items remain droppable by default.
+- GAS debug text now includes the equipped weapon, magazine, reserve, aiming, and reload state.
+- Updated the displayed project version to `0.6.1`; the player save schema remains v4.
+
+### Verification
+
+- Focused verification evidence and final package hashes are recorded in `docs/projectrift/v0.6.1-test-record.md`.
+
 ## [0.6.0] - 2026-07-14
 
 ### Added

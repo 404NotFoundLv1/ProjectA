@@ -4,11 +4,8 @@
 #include "Abilities/PRGameplayAbility.h"
 #include "GA_PrimaryAttack.generated.h"
 
-class UGameplayEffect;
-class UPRAbilitySystemComponent;
-
 /**
- * First-pass GAS primary attack: server-side short range hit check, then damage GE.
+ * Primary input ability that delegates server-authoritative firing to the equipped weapon component.
  */
 UCLASS()
 class PROJECTA_API UGA_PrimaryAttack : public UPRGameplayAbility
@@ -32,20 +29,5 @@ public:
 		const FGameplayEventData* TriggerEventData) override;
 
 private:
-	bool ExecuteServerAttack(
-		const FGameplayAbilitySpecHandle Handle,
-		const FGameplayAbilityActorInfo* ActorInfo,
-		const FGameplayAbilityActivationInfo ActivationInfo) const;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Primary Attack")
-	float AttackRange;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Primary Attack")
-	float AttackRadius;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Primary Attack")
-	float DamageAmount;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Primary Attack")
-	TSubclassOf<UGameplayEffect> DamageEffectClass;
+	bool ExecuteServerAttack(const FGameplayAbilityActorInfo* ActorInfo) const;
 };

@@ -13,6 +13,7 @@
 #include "Player/PRPlayerState.h"
 #include "Tests/AutomationCommon.h"
 #include "UObject/StrongObjectPtr.h"
+#include "Weapons/PRWeaponComponent.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPRGASDownedRespawnTest, "ProjectRift.GAS.DownedRespawn", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
@@ -116,6 +117,8 @@ bool FPRGASDownedRespawnTest::RunTest(const FString& Parameters)
 	}
 
 	TestTrue(TEXT("Attacker initializes ASC"), PossessTestCharacterForDownedRespawnTest(World, AttackerPlayerState.Get(), Attacker.Get()));
+	FString WeaponDiagnostic;
+	TestTrue(TEXT("Attacker equips the starter rifle"), AttackerPlayerState->GetWeaponComponent()->EnsureStarterWeapon(TEXT("TestRifle"), WeaponDiagnostic));
 
 	UPRAbilitySystemComponent* AttackerASC = Attacker->GetProjectRiftAbilitySystemComponent();
 	UPRAttributeSet* AttackerAttributes = AttackerPlayerState->GetAttributeSet();
@@ -158,7 +161,7 @@ bool FPRGASDownedRespawnTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Respawn restores walking movement"), Attacker->GetCharacterMovement()->MovementMode, MOVE_Walking);
 
 	Attacker->DoPrimaryAttack();
-	TestEqual(TEXT("Respawned attacker applies AttackPower-scaled damage to shield"), TargetAttributes->GetShield(), 39.0f);
+	TestTrue(TEXT("Respawned attacker applies rifle damage through AttackPower scaling"), FMath::IsNearlyEqual(TargetAttributes->GetShield(), 36.8f, 0.01f));
 	TestEqual(TEXT("Respawned attacker still leaves health while shield absorbs"), TargetAttributes->GetHealth(), 100.0f);
 
 	return true;

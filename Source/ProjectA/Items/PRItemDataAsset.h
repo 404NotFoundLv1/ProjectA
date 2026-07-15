@@ -43,6 +43,9 @@ public:
 	bool bCanEquip = false;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
+	bool bCanDrop = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
 	TSubclassOf<UGameplayEffect> UseEffect;
 
 	UFUNCTION(BlueprintPure, Category = "Items")

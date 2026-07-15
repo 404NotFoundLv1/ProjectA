@@ -25,6 +25,7 @@
 #include "Tests/AutomationCommon.h"
 #include "UObject/StructOnScope.h"
 #include "UObject/UnrealType.h"
+#include "Weapons/PRWeaponComponent.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPRBasicEnemyTest, "ProjectRift.Rift.BasicEnemy", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
@@ -451,12 +452,14 @@ bool FPRBasicEnemyTest::RunTest(const FString& Parameters)
 	}
 
 	TestTrue(TEXT("Primary attack test player initializes ASC"), PossessBasicEnemyTestCharacter(World, AttackerState, Attacker));
+	FString WeaponDiagnostic;
+	TestTrue(TEXT("Primary attack test player equips starter rifle"), AttackerState->GetWeaponComponent()->EnsureStarterWeapon(TEXT("TestRifle"), WeaponDiagnostic));
 	float EnemyHealthBeforePrimary = 0.0f;
 	float EnemyHealthAfterPrimary = 0.0f;
 	TestTrue(TEXT("Can query enemy health before primary attack"), CallBasicEnemyFloatFunctionNoParams(AttackTargetEnemy, TEXT("GetHealth"), EnemyHealthBeforePrimary));
 	Attacker->DoPrimaryAttack();
 	TestTrue(TEXT("Can query enemy health after primary attack"), CallBasicEnemyFloatFunctionNoParams(AttackTargetEnemy, TEXT("GetHealth"), EnemyHealthAfterPrimary));
-	TestEqual(TEXT("Player primary attack damages basic enemy through unified execution"), EnemyHealthAfterPrimary, EnemyHealthBeforePrimary - 11.0f);
+	TestTrue(TEXT("Player rifle damages basic enemy through unified execution"), FMath::IsNearlyEqual(EnemyHealthAfterPrimary, EnemyHealthBeforePrimary - 13.2f, 0.01f));
 
 	IAbilitySystemInterface* AttackTargetAbilitySystemInterface = Cast<IAbilitySystemInterface>(AttackTargetEnemy);
 	UPRAbilitySystemComponent* AttackTargetASC = AttackTargetAbilitySystemInterface

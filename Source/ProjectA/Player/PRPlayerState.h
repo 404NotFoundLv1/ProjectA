@@ -12,6 +12,7 @@ class UPRAttributeSet;
 class UAbilitySystemComponent;
 class UPRInventoryComponent;
 class UPRMissionProgressionDataAsset;
+class UPRWeaponComponent;
 
 USTRUCT(BlueprintType)
 struct PROJECTA_API FPRShipResourceStack
@@ -55,6 +56,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	UPRInventoryComponent* GetInventoryComponent() const { return InventoryComponent.Get(); }
+
+	UFUNCTION(BlueprintPure, Category = "Weapon")
+	UPRWeaponComponent* GetWeaponComponent() const { return WeaponComponent.Get(); }
 
 	UFUNCTION(BlueprintPure, Category = "Lobby")
 	bool IsReady() const { return bIsReady; }
@@ -142,6 +146,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPRInventoryComponent> InventoryComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPRWeaponComponent> WeaponComponent;
 
 	UPROPERTY(ReplicatedUsing = OnRep_IsReady, VisibleInstanceOnly, BlueprintReadOnly, Category = "Lobby", meta = (AllowPrivateAccess = "true"))
 	bool bIsReady;

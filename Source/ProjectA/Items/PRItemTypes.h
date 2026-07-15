@@ -9,7 +9,8 @@ enum class EPRItemType : uint8
 	Consumable,
 	Equipment,
 	Material,
-	QuestItem
+	QuestItem,
+	Ammunition
 };
 
 UENUM(BlueprintType)

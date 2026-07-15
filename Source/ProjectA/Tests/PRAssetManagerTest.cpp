@@ -119,9 +119,9 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 	const UGeneralProjectSettings* ProjectSettings = GetDefault<UGeneralProjectSettings>();
 	TestNotNull(TEXT("General project settings exist"), ProjectSettings);
 	TestEqual(
-		TEXT("Project version is v0.6.0"),
+		TEXT("Project version is v0.6.1"),
 		ProjectSettings ? ProjectSettings->ProjectVersion : FString(),
-		FString(TEXT("0.6.0")));
+		FString(TEXT("0.6.1")));
 
 	TestTrue(TEXT("Global manager is UPRAssetManager"), UAssetManager::Get().IsA<UPRAssetManager>());
 	TestEqual(
@@ -168,7 +168,9 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 	Manager->GetPrimaryAssetIdList(UPRLootTableDataAsset::LootTablePrimaryAssetType, LootTableIds);
 	Manager->GetPrimaryAssetIdList(UPRMissionProgressionDataAsset::MissionPrimaryAssetType, MissionIds);
 	Manager->GetPrimaryAssetIdList(UPRShipRepairDataAsset::ShipRepairPrimaryAssetType, ShipRepairIds);
-	TestEqual(TEXT("Four ProjectRift item assets are registered"), ItemIds.Num(), 4);
+	TestEqual(TEXT("Six ProjectRift item assets are registered"), ItemIds.Num(), 6);
+	TestTrue(TEXT("Test rifle is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("TestRifle"))));
+	TestTrue(TEXT("Rifle ammo is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("RifleAmmo"))));
 	TestEqual(TEXT("One ProjectRift loot table is registered"), LootTableIds.Num(), 1);
 	TestEqual(TEXT("One ProjectRift mission is registered"), MissionIds.Num(), 1);
 	TestEqual(TEXT("One ProjectRift ship repair is registered"), ShipRepairIds.Num(), 1);

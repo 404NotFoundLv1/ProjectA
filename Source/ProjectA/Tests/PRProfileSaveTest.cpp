@@ -7,10 +7,13 @@
 #include "Engine/GameInstance.h"
 #include "GameFramework/WorldSettings.h"
 #include "Items/PRInventoryComponent.h"
+#include "Items/PRItemDataAsset.h"
+#include "Items/PRWeaponDataAsset.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/Crc.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "Multiplayer/PRMultiplayerProfileTypes.h"
 #include "Persistence/PRProfileRuntimeBridge.h"
 #include "Persistence/PRProfileSave.h"
 #include "Persistence/PRSaveSubsystem.h"
@@ -22,6 +25,7 @@
 #include "Tests/AutomationCommon.h"
 #include "UObject/UnrealType.h"
 #include "Serialization/MemoryWriter.h"
+#include "Weapons/PRWeaponComponent.h"
 
 namespace
 {
@@ -417,27 +421,67 @@ bool FPRProfileRuntimeBridgeTest::RunTest(const FString& Parameters)
 	}
 
 	SourcePlayerState->SetSelectedRoleModule(TEXT("Ability.Role.Assault"));
+	TStrongObjectPtr<UPRWeaponDataAsset> WeaponData{ NewObject<UPRWeaponDataAsset>(GetTransientPackage()) };
+	WeaponData->ItemId = TEXT("TestRifle");
+	WeaponData->AmmoItemId = TEXT("RifleAmmo");
+	WeaponData->MagazineCapacity = 12;
+	WeaponData->InitialReserveAmmo = 48;
+	TStrongObjectPtr<UPRItemDataAsset> AmmoData{ NewObject<UPRItemDataAsset>(GetTransientPackage()) };
+	AmmoData->ItemId = TEXT("RifleAmmo");
+	AmmoData->ItemType = EPRItemType::Ammunition;
+	AmmoData->MaxStackCount = 120;
+	SourcePlayerState->GetInventoryComponent()->SetItemDataAssets({ WeaponData.Get(), AmmoData.Get() });
 	SourcePlayerState->AddShipResource(TEXT("EnergyCrystal"), 7);
 	TestTrue(
 		TEXT("Source inventory accepts a profile item"),
 		SourcePlayerState->GetInventoryComponent()->AddItem(MakeProfileTestItem(TEXT("HealthInjector"), 2)));
+	FString Diagnostic;
+	TestTrue(TEXT("Source receives equipped starter rifle"), SourcePlayerState->GetWeaponComponent()->EnsureStarterWeapon(TEXT("TestRifle"), Diagnostic));
 
 	FPRProfileSnapshot Snapshot;
-	FString Diagnostic;
+	Snapshot.Equipment.Emplace(TEXT("Slot.Utility"), MakeProfileTestItem(TEXT("LegacyScanner"), 1));
 	TestTrue(
 		TEXT("Runtime bridge captures current player data"),
 		FPRProfileRuntimeBridge::CaptureFromPlayerState(SourcePlayerState, Snapshot, Diagnostic));
 	TestEqual(TEXT("Captured selected role"), Snapshot.SelectedRoleId, FName(TEXT("Ability.Role.Assault")));
 	TestEqual(TEXT("Captured resource wallet"), Snapshot.GetResourceCount(TEXT("EnergyCrystal")), 7);
-	TestEqual(TEXT("Captured backpack"), Snapshot.BackpackItems.Num(), 1);
+	TestEqual(TEXT("Captured backpack includes item and normalized ammo"), Snapshot.BackpackItems.Num(), 2);
+	TestEqual(TEXT("Capture stores total rifle ammo rather than partial runtime pools"),
+		FPRMultiplayerSettlementPolicy::GetItemCount(Snapshot.BackpackItems, TEXT("RifleAmmo")), 60);
+	TestTrue(TEXT("Capture writes Slot.Primary"), Snapshot.Equipment.ContainsByPredicate([](const FPRProfileEquipmentEntry& Entry)
+	{
+		return Entry.SlotId == TEXT("Slot.Primary") && Entry.Item.ItemId == TEXT("TestRifle");
+	}));
+	TestTrue(TEXT("Capture preserves unknown legacy equipment"), Snapshot.Equipment.ContainsByPredicate([](const FPRProfileEquipmentEntry& Entry)
+	{
+		return Entry.SlotId == TEXT("Slot.Utility") && Entry.Item.ItemId == TEXT("LegacyScanner");
+	}));
 
 	APRPlayerState* TargetPlayerState = NewObject<APRPlayerState>(GetTransientPackage());
+	TargetPlayerState->GetInventoryComponent()->SetItemDataAssets({ WeaponData.Get(), AmmoData.Get() });
 	TestTrue(
 		TEXT("Runtime bridge applies the snapshot atomically"),
 		FPRProfileRuntimeBridge::ApplyToPlayerState(Snapshot, TargetPlayerState, Diagnostic));
 	TestEqual(TEXT("Applied selected role"), TargetPlayerState->GetSelectedRoleModule(), FName(TEXT("Ability.Role.Assault")));
 	TestEqual(TEXT("Applied resource wallet"), TargetPlayerState->GetShipResourceCount(TEXT("EnergyCrystal")), 7);
-	TestEqual(TEXT("Applied backpack"), TargetPlayerState->GetInventoryComponent()->GetInventoryItems().Num(), 1);
+	TestEqual(TEXT("Applied backpack keeps ordinary item and reserve ammo"), TargetPlayerState->GetInventoryComponent()->GetInventoryItems().Num(), 2);
+	TestEqual(TEXT("Applied profile repartitions full magazine"), TargetPlayerState->GetWeaponComponent()->GetMagazineAmmo(), 12);
+	TestEqual(TEXT("Applied profile leaves 48 reserve"), TargetPlayerState->GetWeaponComponent()->GetReserveAmmo(), 48);
+	TestEqual(TEXT("Applied profile equips primary rifle"), TargetPlayerState->GetWeaponComponent()->GetEquippedWeapon().ItemId, FName(TEXT("TestRifle")));
+	TestTrue(TEXT("Applied profile retains unknown legacy equipment"), TargetPlayerState->GetWeaponComponent()->GetEquipmentEntries().ContainsByPredicate([](const FPRProfileEquipmentEntry& Entry)
+	{
+		return Entry.SlotId == TEXT("Slot.Utility") && Entry.Item.ItemId == TEXT("LegacyScanner");
+	}));
+
+	APRPlayerState* EmptyProfilePlayerState = NewObject<APRPlayerState>(GetTransientPackage());
+	EmptyProfilePlayerState->GetInventoryComponent()->SetItemDataAssets({ WeaponData.Get(), AmmoData.Get() });
+	FPRProfileSnapshot EmptySnapshot;
+	TestTrue(
+		TEXT("Applying an empty v4 profile grants the starter weapon atomically"),
+		FPRProfileRuntimeBridge::ApplyToPlayerState(EmptySnapshot, EmptyProfilePlayerState, Diagnostic));
+	TestEqual(TEXT("Empty profile equips the starter rifle"), EmptyProfilePlayerState->GetWeaponComponent()->GetEquippedWeapon().ItemId, FName(TEXT("TestRifle")));
+	TestEqual(TEXT("Empty profile begins with a full magazine"), EmptyProfilePlayerState->GetWeaponComponent()->GetMagazineAmmo(), 12);
+	TestEqual(TEXT("Empty profile begins with 48 reserve"), EmptyProfilePlayerState->GetWeaponComponent()->GetReserveAmmo(), 48);
 
 	FPRProfileSnapshot InvalidSnapshot = Snapshot;
 	InvalidSnapshot.BackpackItems[0].Count = -1;
@@ -709,6 +753,7 @@ bool FPRMultiplayerSettlementPersistenceTest::RunTest(const FString& Parameters)
 	Receipt.bExtracted = true;
 	Receipt.bGrantStoryProgress = true;
 	Receipt.SettledBackpackItems = { MakeProfileTestItem(TEXT("ShieldPack"), 1) };
+	Receipt.SettledEquipment = { FPRProfileEquipmentEntry(TEXT("Slot.Primary"), MakeProfileTestItem(TEXT("TestRifle"), 1)) };
 	Receipt.SettledResourceWallet = { FPRProfileResourceBalance{ TEXT("EnergyCrystal"), 12 } };
 	Receipt.SettledRoleId = TEXT("Ability.Role.Assault");
 	const FPRProfileOperationResult ApplyResult = SaveSubsystem->ApplyMultiplayerSettlementReceipt(Receipt);
@@ -719,6 +764,8 @@ bool FPRMultiplayerSettlementPersistenceTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Applied multiplayer snapshot is available"), SaveSubsystem->GetActiveProfileSnapshot(AppliedSnapshot));
 	TestEqual(TEXT("Settled resource wallet replaces runtime wallet"), AppliedSnapshot.GetResourceCount(TEXT("EnergyCrystal")), 12);
 	TestEqual(TEXT("Settled backpack replaces runtime backpack"), AppliedSnapshot.BackpackItems.Num(), 1);
+	TestEqual(TEXT("Settled primary equipment replaces the snapshot primary slot"), AppliedSnapshot.Equipment.Num(), 1);
+	TestEqual(TEXT("Settled primary equipment keeps the rifle"), AppliedSnapshot.Equipment[0].Item.ItemId, FName(TEXT("TestRifle")));
 	TestTrue(TEXT("Settlement id is recorded durably"), AppliedSnapshot.ProcessedSettlementIds.Contains(Receipt.SettlementId));
 	TestTrue(TEXT("Eligible extracted player receives story completion"), AppliedSnapshot.Story.CompletedStoryNodeIds.Contains(TEXT("Story.Prologue.RiftTestHold")));
 
@@ -745,6 +792,7 @@ bool FPRMultiplayerSettlementPersistenceTest::RunTest(const FString& Parameters)
 	FPRProfileSnapshot ReloadedSnapshot;
 	ReloadSubsystem->GetActiveProfileSnapshot(ReloadedSnapshot);
 	TestEqual(TEXT("Reload preserves settled wallet"), ReloadedSnapshot.GetResourceCount(TEXT("EnergyCrystal")), 12);
+	TestEqual(TEXT("Reload preserves settled primary equipment"), ReloadedSnapshot.Equipment[0].Item.ItemId, FName(TEXT("TestRifle")));
 	TestTrue(TEXT("Reload preserves processed settlement id"), ReloadedSnapshot.ProcessedSettlementIds.Contains(Receipt.SettlementId));
 	ReloadSubsystem->Deinitialize();
 	IFileManager::Get().DeleteDirectory(*TestRoot, false, true);

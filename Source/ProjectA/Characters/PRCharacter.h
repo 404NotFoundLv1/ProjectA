@@ -96,6 +96,8 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void Tick(float DeltaSeconds) override;
 	virtual void OnRep_PlayerState() override;
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -171,6 +173,12 @@ protected:
 	UInputAction* PrimaryAttackAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input|Actions")
+	UInputAction* AimAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input|Actions")
+	UInputAction* ReloadAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input|Actions")
 	UInputAction* DodgeAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input|Actions")
@@ -196,6 +204,18 @@ public:
 	void DoPrimaryAttackReleased();
 
 	UFUNCTION(BlueprintCallable, Category = "Input")
+	void DoAim();
+
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	void DoAimReleased();
+
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	void DoReload();
+
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	void ApplyWeaponAimPresentation(bool bNewAiming);
+
+	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoDodge();
 
 	UFUNCTION(BlueprintCallable, Category = "Input")
@@ -218,4 +238,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoOpenInventory();
+
+private:
+	float DefaultCameraArmLength = 400.0f;
+	float DefaultCameraFieldOfView = 90.0f;
+	float TargetCameraArmLength = 400.0f;
+	float TargetCameraFieldOfView = 90.0f;
+	bool bDefaultUseControllerRotationYaw = false;
+	bool bDefaultOrientRotationToMovement = true;
+	bool bWeaponAimPresentationActive = false;
 };

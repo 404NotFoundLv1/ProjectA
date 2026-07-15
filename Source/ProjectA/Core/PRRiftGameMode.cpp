@@ -22,6 +22,7 @@
 #include "ProjectA.h"
 #include "Progression/PRMissionProgressionDataAsset.h"
 #include "Settings/PRProjectSettings.h"
+#include "Weapons/PRWeaponComponent.h"
 
 APRRiftGameMode::APRRiftGameMode()
 {
@@ -444,9 +445,26 @@ void APRRiftGameMode::FinalizePersonalSettlements(const EPRRiftMissionResult Res
 		}
 
 		UPRInventoryComponent* Inventory = PlayerState->GetInventoryComponent();
-		if (!Inventory || !Inventory->ReplaceInventoryItems(Receipt.SettledBackpackItems))
+		UPRWeaponComponent* Weapon = PlayerState->GetWeaponComponent();
+		TArray<FPRItemInstance> PreviousBackpack;
+		FString EquipmentDiagnostic;
+		const TArray<FPRProfileEquipmentEntry> PreviousEquipment = Weapon
+			? Weapon->GetEquipmentEntries()
+			: TArray<FPRProfileEquipmentEntry>();
+		const bool bPreviousWeaponStateCaptured = Weapon
+			&& Weapon->BuildPersistentBackpack(PreviousBackpack, EquipmentDiagnostic);
+		if (!Inventory || !Weapon
+			|| !bPreviousWeaponStateCaptured
+			|| !Inventory->ReplaceInventoryItems(Receipt.SettledBackpackItems)
+			|| !Weapon->ReplaceEquipmentEntries(Receipt.SettledEquipment, EquipmentDiagnostic))
 		{
-			UE_LOG(LogProjectA, Error, TEXT("Settled inventory could not be applied to PlayerState. Player=%s"), *GetNameSafe(PlayerState));
+			if (Inventory && Weapon && bPreviousWeaponStateCaptured)
+			{
+				Inventory->ReplaceInventoryItems(PreviousBackpack);
+				FString RestoreDiagnostic;
+				Weapon->ReplaceEquipmentEntries(PreviousEquipment, RestoreDiagnostic);
+			}
+			UE_LOG(LogProjectA, Error, TEXT("Settled weapon inventory could not be applied to PlayerState. Player=%s Diagnostic=%s"), *GetNameSafe(PlayerState), *EquipmentDiagnostic);
 			continue;
 		}
 		TArray<FPRShipResourceStack> SettledResources;
@@ -492,11 +510,17 @@ FPRPlayerSettlementReceipt APRRiftGameMode::BuildPersonalSettlementReceipt(
 	Receipt.bGrantStoryProgress = Result == EPRRiftMissionResult::Success
 		&& Receipt.bExtracted
 		&& Mission->IsEligible(PlayerState->GetBoundStoryProgress());
-	const UPRInventoryComponent* Inventory = PlayerState->GetInventoryComponent();
-	const TArray<FPRItemInstance> RuntimeItems = Inventory ? Inventory->GetInventoryItems() : TArray<FPRItemInstance>();
+	const UPRWeaponComponent* Weapon = PlayerState->GetWeaponComponent();
+	TArray<FPRItemInstance> RuntimeItems;
+	FString WeaponDiagnostic;
+	if (!Weapon || !Weapon->BuildPersistentBackpack(RuntimeItems, WeaponDiagnostic))
+	{
+		return FPRPlayerSettlementReceipt();
+	}
 	Receipt.SettledBackpackItems = Result == EPRRiftMissionResult::Success && Receipt.bExtracted
 		? RuntimeItems
 		: FPRMultiplayerSettlementPolicy::BuildNonExtractedInventory(PlayerState->GetMissionStartBackpackItems(), RuntimeItems);
+	Receipt.SettledEquipment = Weapon->GetEquipmentEntries();
 	for (const FPRShipResourceStack& Resource : PlayerState->GetShipResources())
 	{
 		if (Resource.IsValid())

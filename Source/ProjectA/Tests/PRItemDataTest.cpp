@@ -5,6 +5,7 @@
 #include "Engine/DataAsset.h"
 #include "Engine/Texture2D.h"
 #include "GameplayEffect.h"
+#include "Items/PRWeaponDataAsset.h"
 #include "UObject/StructOnScope.h"
 #include "UObject/UnrealType.h"
 
@@ -148,6 +149,7 @@ bool FPRItemDataTest::RunTest(const FString& Parameters)
 	TestEnumHasValue(*this, ItemTypeEnum, TEXT("Equipment"));
 	TestEnumHasValue(*this, ItemTypeEnum, TEXT("Material"));
 	TestEnumHasValue(*this, ItemTypeEnum, TEXT("QuestItem"));
+	TestEnumHasValue(*this, ItemTypeEnum, TEXT("Ammunition"));
 
 	UEnum* ItemRarityEnum = FindObject<UEnum>(nullptr, TEXT("/Script/ProjectA.EPRItemRarity"));
 	TestNotNull(TEXT("EPRItemRarity enum exists"), ItemRarityEnum);
@@ -177,6 +179,7 @@ bool FPRItemDataTest::RunTest(const FString& Parameters)
 	TestStructProperty<FIntProperty>(*this, ItemDataClass, TEXT("MaxStackCount"));
 	TestStructProperty<FBoolProperty>(*this, ItemDataClass, TEXT("bCanUse"));
 	TestStructProperty<FBoolProperty>(*this, ItemDataClass, TEXT("bCanEquip"));
+	TestStructProperty<FBoolProperty>(*this, ItemDataClass, TEXT("bCanDrop"));
 	FClassProperty* UseEffectProperty = TestStructProperty<FClassProperty>(*this, ItemDataClass, TEXT("UseEffect"));
 	TestTrue(TEXT("UPRItemDataAsset UseEffect stores GameplayEffect classes"), UseEffectProperty && UseEffectProperty->MetaClass->IsChildOf(UGameplayEffect::StaticClass()));
 
@@ -216,6 +219,43 @@ bool FPRItemDataTest::RunTest(const FString& Parameters)
 		TEXT("Material"),
 		99,
 		false);
+
+	UPRWeaponDataAsset* Rifle = LoadObject<UPRWeaponDataAsset>(
+		nullptr,
+		TEXT("/Game/ProjectRift/Items/DA_TestRifle.DA_TestRifle"));
+	TestNotNull(TEXT("Test rifle data asset exists"), Rifle);
+	if (Rifle)
+	{
+		TestEqual(TEXT("Test rifle ItemId"), Rifle->ItemId, FName(TEXT("TestRifle")));
+		TestEqual(TEXT("Test rifle item type"), Rifle->ItemType, EPRItemType::Equipment);
+		TestTrue(TEXT("Test rifle can equip"), Rifle->bCanEquip);
+		TestFalse(TEXT("Test rifle cannot drop"), Rifle->bCanDrop);
+		TestEqual(TEXT("Test rifle ammo ItemId"), Rifle->AmmoItemId, FName(TEXT("RifleAmmo")));
+		TestEqual(TEXT("Test rifle magazine capacity"), Rifle->MagazineCapacity, 12);
+		TestEqual(TEXT("Test rifle initial reserve"), Rifle->InitialReserveAmmo, 48);
+		TestTrue(TEXT("Test rifle damage is 12"), FMath::IsNearlyEqual(Rifle->BaseDamage, 12.0f));
+		TestTrue(TEXT("Test rifle range is 12000"), FMath::IsNearlyEqual(Rifle->Range, 12000.0f));
+		TestTrue(TEXT("Test rifle interval is 0.18"), FMath::IsNearlyEqual(Rifle->MinFireInterval, 0.18f));
+		TestTrue(TEXT("Test rifle hip spread is 2.5"), FMath::IsNearlyEqual(Rifle->HipSpreadDegrees, 2.5f));
+		TestTrue(TEXT("Test rifle ADS spread is 0.35"), FMath::IsNearlyEqual(Rifle->AimSpreadDegrees, 0.35f));
+		TestTrue(TEXT("Test rifle reload is 1.5"), FMath::IsNearlyEqual(Rifle->ReloadDuration, 1.5f));
+		TestTrue(TEXT("Test rifle ADS arm is 250"), FMath::IsNearlyEqual(Rifle->AimArmLength, 250.0f));
+		TestTrue(TEXT("Test rifle ADS FOV is 70"), FMath::IsNearlyEqual(Rifle->AimFieldOfView, 70.0f));
+		TestEqual(TEXT("Test rifle socket"), Rifle->AttachSocketName, FName(TEXT("HandGrip_R")));
+	}
+
+	UPRItemDataAsset* RifleAmmo = LoadObject<UPRItemDataAsset>(
+		nullptr,
+		TEXT("/Game/ProjectRift/Items/DA_RifleAmmo.DA_RifleAmmo"));
+	TestNotNull(TEXT("Rifle ammo data asset exists"), RifleAmmo);
+	if (RifleAmmo)
+	{
+		TestEqual(TEXT("Rifle ammo ItemId"), RifleAmmo->ItemId, FName(TEXT("RifleAmmo")));
+		TestEqual(TEXT("Rifle ammo item type"), RifleAmmo->ItemType, EPRItemType::Ammunition);
+		TestEqual(TEXT("Rifle ammo stack limit"), RifleAmmo->MaxStackCount, 120);
+		TestFalse(TEXT("Rifle ammo cannot use"), RifleAmmo->bCanUse);
+		TestFalse(TEXT("Rifle ammo cannot equip"), RifleAmmo->bCanEquip);
+	}
 
 	return true;
 }

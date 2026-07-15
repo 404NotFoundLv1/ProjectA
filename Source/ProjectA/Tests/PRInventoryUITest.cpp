@@ -77,6 +77,11 @@ bool FPRInventoryUITest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Inventory widget exposes IsInventoryEmpty"), InventoryWidgetClass->FindFunctionByName(TEXT("IsInventoryEmpty")));
 	TestNotNull(TEXT("Inventory widget exposes GetItemIcon"), InventoryWidgetClass->FindFunctionByName(TEXT("GetItemIcon")));
 	TestNotNull(TEXT("Inventory widget exposes ship resource summary text"), InventoryWidgetClass->FindFunctionByName(TEXT("GetShipResourceSummaryText")));
+	TestNotNull(TEXT("Inventory widget exposes primary weapon summary text"), InventoryWidgetClass->FindFunctionByName(TEXT("GetPrimaryWeaponSummaryText")));
+	TestNotNull(TEXT("Inventory widget exposes RequestEquipSelectedItem"), InventoryWidgetClass->FindFunctionByName(TEXT("RequestEquipSelectedItem")));
+	TestNotNull(TEXT("Inventory widget exposes RequestUnequipPrimaryWeapon"), InventoryWidgetClass->FindFunctionByName(TEXT("RequestUnequipPrimaryWeapon")));
+	TestNotNull(TEXT("Inventory widget exposes OnEquipItemRequested delegate"), FindFProperty<FMulticastDelegateProperty>(InventoryWidgetClass, TEXT("OnEquipItemRequested")));
+	TestNotNull(TEXT("Inventory widget exposes OnUnequipPrimaryRequested delegate"), FindFProperty<FMulticastDelegateProperty>(InventoryWidgetClass, TEXT("OnUnequipPrimaryRequested")));
 
 	UClass* PlayerControllerClass = APRPlayerController::StaticClass();
 	TestNotNull(TEXT("APRPlayerController class exists for inventory UI"), PlayerControllerClass);
@@ -86,6 +91,10 @@ bool FPRInventoryUITest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Player controller exposes RefreshInventoryDisplay"), PlayerControllerClass->FindFunctionByName(TEXT("RefreshInventoryDisplay")));
 	TestNotNull(TEXT("Player controller exposes IsInventoryVisible"), PlayerControllerClass->FindFunctionByName(TEXT("IsInventoryVisible")));
 	TestNotNull(TEXT("Player controller has configurable InventoryWidgetClass"), FindFProperty<FClassProperty>(PlayerControllerClass, TEXT("InventoryWidgetClass")));
+	TestNotNull(TEXT("Player controller has configurable WeaponHUDWidgetClass"), FindFProperty<FClassProperty>(PlayerControllerClass, TEXT("WeaponHUDWidgetClass")));
+	TestNotNull(TEXT("Player controller exposes GetWeaponHUDWidget"), PlayerControllerClass->FindFunctionByName(TEXT("GetWeaponHUDWidget")));
+	TestNotNull(TEXT("Player controller exposes EquipInventoryWeapon"), PlayerControllerClass->FindFunctionByName(TEXT("EquipInventoryWeapon")));
+	TestNotNull(TEXT("Player controller exposes UnequipPrimaryWeapon"), PlayerControllerClass->FindFunctionByName(TEXT("UnequipPrimaryWeapon")));
 
 	FTestWorldWrapper WorldWrapper;
 	TestTrue(TEXT("Inventory UI test world is created"), WorldWrapper.CreateTestWorld(EWorldType::Game));

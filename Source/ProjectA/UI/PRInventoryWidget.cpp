@@ -4,8 +4,10 @@
 #include "Fonts/SlateFontInfo.h"
 #include "Items/PRInventoryComponent.h"
 #include "Items/PRItemDataAsset.h"
+#include "Items/PRWeaponDataAsset.h"
 #include "Misc/Paths.h"
 #include "Player/PRPlayerState.h"
+#include "Weapons/PRWeaponComponent.h"
 #include "Styling/CoreStyle.h"
 #include "Engine/Texture2D.h"
 #include "Widgets/Input/SButton.h"
@@ -30,6 +32,10 @@ FSlateFontInfo GetProjectRiftInventoryFont(const float Size)
 
 void UPRInventoryWidget::BindInventory(UPRInventoryComponent* InInventoryComponent)
 {
+	if (UPRWeaponComponent* CurrentWeapon = GetBoundWeaponComponent())
+	{
+		CurrentWeapon->OnWeaponStateChanged.RemoveDynamic(this, &UPRInventoryWidget::HandleWeaponStateChanged);
+	}
 	if (UPRInventoryComponent* CurrentInventory = BoundInventory.Get())
 	{
 		CurrentInventory->OnInventoryChanged.RemoveDynamic(this, &UPRInventoryWidget::HandleInventoryChanged);
@@ -41,6 +47,10 @@ void UPRInventoryWidget::BindInventory(UPRInventoryComponent* InInventoryCompone
 	if (InInventoryComponent)
 	{
 		InInventoryComponent->OnInventoryChanged.AddUniqueDynamic(this, &UPRInventoryWidget::HandleInventoryChanged);
+		if (UPRWeaponComponent* Weapon = GetBoundWeaponComponent())
+		{
+			Weapon->OnWeaponStateChanged.AddUniqueDynamic(this, &UPRInventoryWidget::HandleWeaponStateChanged);
+		}
 	}
 
 	RefreshInventory();
@@ -63,6 +73,7 @@ void UPRInventoryWidget::RefreshInventory()
 	RebuildItemList();
 	RefreshSelectedItemDetails();
 	RefreshShipResourceSummary();
+	RefreshPrimaryWeaponSummary();
 }
 
 void UPRInventoryWidget::SelectDisplayedItem(const int32 ItemIndex)
@@ -182,6 +193,25 @@ FText UPRInventoryWidget::GetShipResourceSummaryText() const
 	return FText::FromString(FString::Printf(TEXT("\u8230\u8239\u8D44\u6E90\uFF1A%s"), *ResourceSummary));
 }
 
+FText UPRInventoryWidget::GetPrimaryWeaponSummaryText() const
+{
+	const UPRWeaponComponent* Weapon = GetBoundWeaponComponent();
+	const UPRWeaponDataAsset* WeaponData = Weapon ? Weapon->GetEquippedWeaponData() : nullptr;
+	if (!Weapon || !WeaponData)
+	{
+		return FText::FromString(TEXT("Primary: Empty"));
+	}
+
+	const FString WeaponName = WeaponData->DisplayName.IsEmpty()
+		? WeaponData->ItemId.ToString()
+		: WeaponData->DisplayName.ToString();
+	return FText::FromString(FString::Printf(
+		TEXT("Primary: %s    %d / %d"),
+		*WeaponName,
+		Weapon->GetMagazineAmmo(),
+		Weapon->GetReserveAmmo()));
+}
+
 void UPRInventoryWidget::RequestUseSelectedItem()
 {
 	if (HasSelectedItem())
@@ -220,6 +250,30 @@ void UPRInventoryWidget::RequestDropDisplayedItem(const int32 ItemIndex, const i
 	}
 }
 
+void UPRInventoryWidget::RequestEquipSelectedItem()
+{
+	if (!HasSelectedItem())
+	{
+		return;
+	}
+
+	const FPRItemInstance& Item = DisplayedItems[SelectedItemIndex];
+	const UPRItemDataAsset* ItemData = FindItemData(Item);
+	if (ItemData && ItemData->bCanEquip)
+	{
+		OnEquipItemRequested.Broadcast(Item.ItemId);
+	}
+}
+
+void UPRInventoryWidget::RequestUnequipPrimaryWeapon()
+{
+	const UPRWeaponComponent* Weapon = GetBoundWeaponComponent();
+	if (Weapon && Weapon->GetEquippedWeapon().IsValid())
+	{
+		OnUnequipPrimaryRequested.Broadcast();
+	}
+}
+
 TSharedRef<SWidget> UPRInventoryWidget::RebuildWidget()
 {
 	TSharedRef<SWidget> Widget = SNew(SBorder)
@@ -245,6 +299,16 @@ TSharedRef<SWidget> UPRInventoryWidget::RebuildWidget()
 				.ColorAndOpacity(FSlateColor(FLinearColor(0.46f, 0.95f, 0.88f, 1.0f)))
 				.Font(GetProjectRiftInventoryFont(13.0f))
 				.Text(GetShipResourceSummaryText())
+			]
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.0f, 0.0f, 0.0f, 8.0f)
+			[
+				SAssignNew(PrimaryWeaponSummaryTextBlock, STextBlock)
+				.AutoWrapText(true)
+				.ColorAndOpacity(FSlateColor(FLinearColor(0.95f, 0.78f, 0.35f, 1.0f)))
+				.Font(GetProjectRiftInventoryFont(13.0f))
+				.Text(GetPrimaryWeaponSummaryText())
 			]
 			+ SVerticalBox::Slot()
 			.FillHeight(1.0f)
@@ -300,11 +364,44 @@ TSharedRef<SWidget> UPRInventoryWidget::RebuildWidget()
 					]
 				]
 			]
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.0f, 8.0f, 0.0f, 0.0f)
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				.FillWidth(1.0f)
+				.Padding(0.0f, 0.0f, 5.0f, 0.0f)
+				[
+					SNew(SButton)
+					.OnClicked(FOnClicked::CreateUObject(this, &UPRInventoryWidget::HandleEquipSelectedClicked))
+					[
+						SNew(STextBlock)
+						.Justification(ETextJustify::Center)
+						.Font(GetProjectRiftInventoryFont(13.0f))
+						.Text(FText::FromString(TEXT("Equip Selected")))
+					]
+				]
+				+ SHorizontalBox::Slot()
+				.FillWidth(1.0f)
+				.Padding(5.0f, 0.0f, 0.0f, 0.0f)
+				[
+					SNew(SButton)
+					.OnClicked(FOnClicked::CreateUObject(this, &UPRInventoryWidget::HandleUnequipPrimaryClicked))
+					[
+						SNew(STextBlock)
+						.Justification(ETextJustify::Center)
+						.Font(GetProjectRiftInventoryFont(13.0f))
+						.Text(FText::FromString(TEXT("Unequip Primary")))
+					]
+				]
+			]
 		];
 
 	RebuildItemList();
 	RefreshSelectedItemDetails();
 	RefreshShipResourceSummary();
+	RefreshPrimaryWeaponSummary();
 
 	return Widget;
 }
@@ -316,10 +413,15 @@ void UPRInventoryWidget::ReleaseSlateResources(const bool bReleaseChildren)
 	ItemScrollBox.Reset();
 	DetailTextBlock.Reset();
 	ShipResourceSummaryTextBlock.Reset();
+	PrimaryWeaponSummaryTextBlock.Reset();
 }
 
 void UPRInventoryWidget::NativeDestruct()
 {
+	if (UPRWeaponComponent* Weapon = GetBoundWeaponComponent())
+	{
+		Weapon->OnWeaponStateChanged.RemoveDynamic(this, &UPRInventoryWidget::HandleWeaponStateChanged);
+	}
 	if (UPRInventoryComponent* InventoryComponent = BoundInventory.Get())
 	{
 		InventoryComponent->OnInventoryChanged.RemoveDynamic(this, &UPRInventoryWidget::HandleInventoryChanged);
@@ -331,6 +433,12 @@ void UPRInventoryWidget::NativeDestruct()
 
 void UPRInventoryWidget::HandleInventoryChanged()
 {
+	RefreshInventory();
+}
+
+void UPRInventoryWidget::HandleWeaponStateChanged()
+{
+	RefreshPrimaryWeaponSummary();
 	RefreshInventory();
 }
 
@@ -349,6 +457,18 @@ FReply UPRInventoryWidget::HandleUseSelectedClicked()
 FReply UPRInventoryWidget::HandleDropSelectedClicked()
 {
 	RequestDropSelectedItem(1);
+	return FReply::Handled();
+}
+
+FReply UPRInventoryWidget::HandleEquipSelectedClicked()
+{
+	RequestEquipSelectedItem();
+	return FReply::Handled();
+}
+
+FReply UPRInventoryWidget::HandleUnequipPrimaryClicked()
+{
+	RequestUnequipPrimaryWeapon();
 	return FReply::Handled();
 }
 
@@ -401,6 +521,21 @@ void UPRInventoryWidget::RefreshSelectedItemDetails()
 	{
 		DetailTextBlock->SetText(BuildSelectedItemDetails());
 	}
+}
+
+void UPRInventoryWidget::RefreshPrimaryWeaponSummary()
+{
+	if (PrimaryWeaponSummaryTextBlock.IsValid())
+	{
+		PrimaryWeaponSummaryTextBlock->SetText(GetPrimaryWeaponSummaryText());
+	}
+}
+
+UPRWeaponComponent* UPRInventoryWidget::GetBoundWeaponComponent() const
+{
+	const UPRInventoryComponent* InventoryComponent = BoundInventory.Get();
+	const APRPlayerState* PlayerState = InventoryComponent ? Cast<APRPlayerState>(InventoryComponent->GetOwner()) : nullptr;
+	return PlayerState ? PlayerState->GetWeaponComponent() : nullptr;
 }
 
 void UPRInventoryWidget::RefreshShipResourceSummary()

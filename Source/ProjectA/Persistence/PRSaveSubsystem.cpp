@@ -589,6 +589,7 @@ FPRProfileOperationResult UPRSaveSubsystem::BuildMultiplayerProfileProjection(FP
 	OutProjection.ProfileId = ActiveProfile->ProfileId;
 	OutProjection.DisplayName = ActiveProfile->DisplayName;
 	OutProjection.BackpackItems = ActiveProfile->Snapshot.BackpackItems;
+	OutProjection.Equipment = ActiveProfile->Snapshot.Equipment;
 	OutProjection.ResourceWallet = ActiveProfile->Snapshot.ResourceWallet;
 	OutProjection.SelectedRoleId = ActiveProfile->Snapshot.SelectedRoleId;
 	OutProjection.Story = ActiveProfile->Snapshot.Story;
@@ -662,6 +663,7 @@ FPRProfileOperationResult UPRSaveSubsystem::ApplyMultiplayerSettlementReceipt(co
 
 	UPRProfileSave* Candidate = DuplicateObject<UPRProfileSave>(ActiveProfile, this);
 	Candidate->Snapshot.BackpackItems = Receipt.SettledBackpackItems;
+	Candidate->Snapshot.Equipment = Receipt.SettledEquipment;
 	Candidate->Snapshot.ResourceWallet = Receipt.SettledResourceWallet;
 	Candidate->Snapshot.SelectedRoleId = Receipt.SettledRoleId;
 	if (!Receipt.SettledRoleId.IsNone())
@@ -1074,13 +1076,28 @@ FPRProfileOperationResult UPRSaveSubsystem::SaveForApplicationExit()
 		return FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::NoActiveProfile, TEXT("No active profile is loaded."));
 	}
 	UWorld* World = GetGameInstance() ? GetGameInstance()->GetWorld() : nullptr;
-	if (!IsSessionProfileBound() && World && Cast<APRShipLobbyGameMode>(World->GetAuthGameMode()))
+	if (World && Cast<APRShipLobbyGameMode>(World->GetAuthGameMode()))
 	{
 		if (APlayerController* Controller = World->GetFirstPlayerController())
 		{
 			if (Controller->IsLocalController())
 			{
-				return CaptureAndSaveAtSafeCheckpoint(Controller->GetPlayerState<APRPlayerState>());
+				FPRProfileSnapshot Candidate = ActiveProfile->Snapshot;
+				FString Diagnostic;
+				if (!FPRProfileRuntimeBridge::CaptureFromPlayerState(
+					Controller->GetPlayerState<APRPlayerState>(),
+					Candidate,
+					Diagnostic))
+				{
+					const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(
+						EPRProfileOperationStatus::ValidationFailed,
+						Diagnostic.IsEmpty() ? TEXT("Lobby runtime state could not be captured on application exit.") : Diagnostic,
+						ActiveProfile->ProfileId);
+					SetLastResult(Result);
+					return Result;
+				}
+				ActiveProfile->Snapshot = MoveTemp(Candidate);
+				return SaveActiveProfile(EPRSaveReason::ApplicationExit);
 			}
 		}
 	}

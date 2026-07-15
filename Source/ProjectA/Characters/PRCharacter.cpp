@@ -9,12 +9,14 @@
 #include "Abilities/PRDefaultAttributesGameplayEffect.h"
 #include "Abilities/PRAttributeSet.h"
 #include "Abilities/PRCombatEffectLibrary.h"
+#include "Camera/CameraComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Core/PRGameplayTags.h"
 #include "EnhancedInputComponent.h"
 #include "Engine/Engine.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerState.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "GameplayAbilitySpec.h"
 #include "InputAction.h"
 #include "Player/PRPlayerController.h"
@@ -22,6 +24,8 @@
 #include "ProjectA.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Weapons/PRWeaponComponent.h"
+#include "Items/PRWeaponDataAsset.h"
 
 namespace
 {
@@ -162,6 +166,18 @@ APRCharacter::APRCharacter()
 	{
 		OpenInventoryAction = OpenInventoryActionAsset.Object;
 	}
+
+	static ConstructorHelpers::FObjectFinder<UInputAction> AimActionAsset(TEXT("/Game/ProjectRift/Input/Actions/IA_Aim.IA_Aim"));
+	if (AimActionAsset.Succeeded())
+	{
+		AimAction = AimActionAsset.Object;
+	}
+
+	static ConstructorHelpers::FObjectFinder<UInputAction> ReloadActionAsset(TEXT("/Game/ProjectRift/Input/Actions/IA_Reload.IA_Reload"));
+	if (ReloadActionAsset.Succeeded())
+	{
+		ReloadAction = ReloadActionAsset.Object;
+	}
 }
 
 UAbilitySystemComponent* APRCharacter::GetAbilitySystemComponent() const
@@ -182,8 +198,52 @@ void APRCharacter::HandleCombatUnitHealthDepleted(const FGameplayEffectContextHa
 void APRCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	if (const USpringArmComponent* CameraBoomComponent = GetCameraBoom())
+	{
+		DefaultCameraArmLength = CameraBoomComponent->TargetArmLength;
+	}
+	if (const UCameraComponent* Camera = GetFollowCamera())
+	{
+		DefaultCameraFieldOfView = Camera->FieldOfView;
+	}
+	bDefaultUseControllerRotationYaw = bUseControllerRotationYaw;
+	if (const UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		bDefaultOrientRotationToMovement = MovementComponent->bOrientRotationToMovement;
+	}
+	TargetCameraArmLength = DefaultCameraArmLength;
+	TargetCameraFieldOfView = DefaultCameraFieldOfView;
 
 	RefreshPlayerDebugLabel();
+}
+
+void APRCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
+	{
+		if (UPRWeaponComponent* WeaponComponent = ProjectRiftPlayerState->GetWeaponComponent())
+		{
+			WeaponComponent->HandleAvatarChanged(nullptr);
+		}
+	}
+	Super::EndPlay(EndPlayReason);
+}
+
+void APRCharacter::Tick(const float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+	if (USpringArmComponent* CameraBoomComponent = GetCameraBoom())
+	{
+		CameraBoomComponent->TargetArmLength = FMath::FInterpTo(CameraBoomComponent->TargetArmLength, TargetCameraArmLength, DeltaSeconds, 12.0f);
+	}
+	if (UCameraComponent* Camera = GetFollowCamera())
+	{
+		Camera->SetFieldOfView(FMath::FInterpTo(Camera->FieldOfView, TargetCameraFieldOfView, DeltaSeconds, 12.0f));
+	}
 }
 
 void APRCharacter::OnRep_PlayerState()
@@ -244,6 +304,10 @@ bool APRCharacter::InitializeAbilitySystemFromPlayerState(APRPlayerState* InPlay
 	AbilitySystemComponent = NewAbilitySystemComponent;
 	AttributeSet = NewAttributeSet;
 	AbilitySystemComponent->InitAbilityActorInfo(InPlayerState, this);
+	if (UPRWeaponComponent* WeaponComponent = InPlayerState->GetWeaponComponent())
+	{
+		WeaponComponent->HandleAvatarChanged(this);
+	}
 
 	if (HasAuthority())
 	{
@@ -411,6 +475,14 @@ bool APRCharacter::EnterDownedState()
 	}
 	UPRCombatEffectLibrary::ClearNegativeStatusEffects(AbilitySystemComponent);
 	AbilitySystemComponent->CancelAllAbilities();
+	if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
+	{
+		if (UPRWeaponComponent* WeaponComponent = ProjectRiftPlayerState->GetWeaponComponent())
+		{
+			WeaponComponent->SetAiming(false);
+			WeaponComponent->CancelReload();
+		}
+	}
 
 	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
 	{
@@ -669,6 +741,14 @@ void APRCharacter::HandleStunnedTagChanged(const FGameplayTag StatusTag, const i
 		{
 			MovementComponent->StopMovementImmediately();
 		}
+		if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
+		{
+			if (UPRWeaponComponent* WeaponComponent = ProjectRiftPlayerState->GetWeaponComponent())
+			{
+				WeaponComponent->SetAiming(false);
+				WeaponComponent->CancelReload();
+			}
+		}
 	}
 	RefreshMovementFromAttributes();
 }
@@ -708,6 +788,18 @@ void APRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		EnhancedInputComponent->BindAction(PrimaryAttackAction, ETriggerEvent::Started, this, &APRCharacter::DoPrimaryAttack);
 		EnhancedInputComponent->BindAction(PrimaryAttackAction, ETriggerEvent::Completed, this, &APRCharacter::DoPrimaryAttackReleased);
 		EnhancedInputComponent->BindAction(PrimaryAttackAction, ETriggerEvent::Canceled, this, &APRCharacter::DoPrimaryAttackReleased);
+	}
+
+	if (AimAction)
+	{
+		EnhancedInputComponent->BindAction(AimAction, ETriggerEvent::Started, this, &APRCharacter::DoAim);
+		EnhancedInputComponent->BindAction(AimAction, ETriggerEvent::Completed, this, &APRCharacter::DoAimReleased);
+		EnhancedInputComponent->BindAction(AimAction, ETriggerEvent::Canceled, this, &APRCharacter::DoAimReleased);
+	}
+
+	if (ReloadAction)
+	{
+		EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Started, this, &APRCharacter::DoReload);
 	}
 
 	if (DodgeAction)
@@ -791,6 +883,56 @@ void APRCharacter::DoPrimaryAttackReleased()
 {
 	const FGameplayTag PrimaryInputTag = ProjectRiftGameplayTags::Input_Ability_Primary;
 	ReleaseAbilityInputTag(PrimaryInputTag, TEXT("PrimaryAttack"));
+}
+
+void APRCharacter::DoAim()
+{
+	ShowInputDebugMessage(this, TEXT("Aim"));
+	if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
+	{
+		if (UPRWeaponComponent* WeaponComponent = ProjectRiftPlayerState->GetWeaponComponent())
+		{
+			WeaponComponent->SetAiming(true);
+		}
+	}
+}
+
+void APRCharacter::DoAimReleased()
+{
+	if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
+	{
+		if (UPRWeaponComponent* WeaponComponent = ProjectRiftPlayerState->GetWeaponComponent())
+		{
+			WeaponComponent->SetAiming(false);
+		}
+	}
+}
+
+void APRCharacter::DoReload()
+{
+	ShowInputDebugMessage(this, TEXT("Reload"));
+	if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
+	{
+		if (UPRWeaponComponent* WeaponComponent = ProjectRiftPlayerState->GetWeaponComponent())
+		{
+			WeaponComponent->StartReload();
+		}
+	}
+}
+
+void APRCharacter::ApplyWeaponAimPresentation(const bool bNewAiming)
+{
+	bWeaponAimPresentationActive = bNewAiming;
+	const APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	const UPRWeaponComponent* WeaponComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetWeaponComponent() : nullptr;
+	const UPRWeaponDataAsset* WeaponData = WeaponComponent ? WeaponComponent->GetEquippedWeaponData() : nullptr;
+	TargetCameraArmLength = bNewAiming && WeaponData ? WeaponData->AimArmLength : DefaultCameraArmLength;
+	TargetCameraFieldOfView = bNewAiming && WeaponData ? WeaponData->AimFieldOfView : DefaultCameraFieldOfView;
+	bUseControllerRotationYaw = bNewAiming ? true : bDefaultUseControllerRotationYaw;
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		MovementComponent->bOrientRotationToMovement = bNewAiming ? false : bDefaultOrientRotationToMovement;
+	}
 }
 
 void APRCharacter::DoDodge()

@@ -7,6 +7,7 @@
 #include "GameFramework/DefaultPawn.h"
 #include "GameFramework/Pawn.h"
 #include "Items/PRInventoryComponent.h"
+#include "Items/PRItemDataAsset.h"
 #include "Items/PRPickupActor.h"
 #include "Player/PRPlayerController.h"
 #include "Player/PRPlayerState.h"
@@ -150,6 +151,17 @@ bool FPRInventoryDropTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Cannot drop a missing item"), Dropper->TryDropInventoryItemOnServer(TEXT("ShieldPack"), 1));
 	TestEqual(TEXT("Rejected drops keep inventory count"), DropperInventory->GetItemCount(TEXT("EnergyCrystal")), 3);
 	TestEqual(TEXT("Rejected drops do not create pickups"), GetAvailablePickups(World).Num(), PickupCountAfterClaim);
+
+	UPRItemDataAsset* NonDroppableRifleData = NewObject<UPRItemDataAsset>(GetTransientPackage());
+	NonDroppableRifleData->ItemId = TEXT("TestRifle");
+	NonDroppableRifleData->ItemType = EPRItemType::Equipment;
+	NonDroppableRifleData->MaxStackCount = 1;
+	NonDroppableRifleData->bCanDrop = false;
+	DropperInventory->SetItemDataAssets({ NonDroppableRifleData });
+	TestTrue(TEXT("Can seed non-droppable rifle"), DropperInventory->AddItem(MakeInventoryDropTestItem(TEXT("TestRifle"), 1)));
+	TestFalse(TEXT("Non-droppable rifle is rejected"), Dropper->TryDropInventoryItemOnServer(TEXT("TestRifle"), 1));
+	TestEqual(TEXT("Rejected non-droppable rifle remains in inventory"), DropperInventory->GetItemCount(TEXT("TestRifle")), 1);
+	TestEqual(TEXT("Rejected non-droppable rifle creates no pickup"), GetAvailablePickups(World).Num(), PickupCountAfterClaim);
 
 	return true;
 }

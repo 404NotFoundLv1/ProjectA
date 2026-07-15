@@ -16,6 +16,7 @@
 #include "Player/PRPlayerState.h"
 #include "Tests/AutomationCommon.h"
 #include "UObject/StrongObjectPtr.h"
+#include "Weapons/PRWeaponComponent.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPRGASInputBindingTest, "ProjectRift.GAS.InputBinding", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
@@ -92,6 +93,8 @@ bool FPRGASInputBindingTest::RunTest(const FString& Parameters)
 
 	AttackerPlayerState->SetSelectedRoleModule(TEXT("Ability.Role.Assault"));
 	TestTrue(TEXT("Attacker initializes ASC"), PossessTestCharacterForInputBindingTest(World, AttackerPlayerState.Get(), Attacker.Get()));
+	FString WeaponDiagnostic;
+	TestTrue(TEXT("Primary input attacker equips the starter rifle"), AttackerPlayerState->GetWeaponComponent()->EnsureStarterWeapon(TEXT("TestRifle"), WeaponDiagnostic));
 
 	UPRAbilitySystemComponent* AttackerASC = Attacker->GetProjectRiftAbilitySystemComponent();
 	UPRAttributeSet* AttackerAttributes = AttackerPlayerState->GetAttributeSet();
@@ -114,7 +117,7 @@ bool FPRGASInputBindingTest::RunTest(const FString& Parameters)
 	TargetAttributes->SetMaxShield(50.0f);
 	TargetAttributes->SetShield(50.0f);
 	TestTrue(TEXT("Primary input tag press is handled"), AttackerASC->AbilityInputTagPressed(PrimaryInputTag));
-	TestEqual(TEXT("Primary input tag activates AttackPower-scaled primary attack"), TargetAttributes->GetShield(), 39.0f);
+	TestTrue(TEXT("Primary input tag activates AttackPower-scaled rifle attack"), FMath::IsNearlyEqual(TargetAttributes->GetShield(), 36.8f, 0.01f));
 	TestTrue(TEXT("Primary spec sees pressed input"), PrimarySpec && PrimarySpec->InputPressed);
 	TestTrue(TEXT("Primary input tag release is handled"), AttackerASC->AbilityInputTagReleased(PrimaryInputTag));
 	TestFalse(TEXT("Primary spec sees released input"), PrimarySpec && PrimarySpec->InputPressed);

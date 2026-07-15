@@ -4,6 +4,7 @@ namespace
 {
 constexpr int32 MaxProjectionDisplayNameLength = 64;
 constexpr int32 MaxProjectionBackpackEntries = 256;
+constexpr int32 MaxProjectionEquipmentEntries = 64;
 constexpr int32 MaxProjectionResourceEntries = 128;
 constexpr int32 MaxProjectionStoryEntries = 512;
 constexpr int32 MaxProjectionShipModuleEntries = 128;
@@ -23,6 +24,20 @@ bool AreResourcesValid(const TArray<FPRProfileResourceBalance>& Resources)
 			return false;
 		}
 		Seen.Add(Resource.ResourceId);
+	}
+	return true;
+}
+
+bool IsEquipmentValid(const TArray<FPRProfileEquipmentEntry>& Equipment)
+{
+	TSet<FName> SeenSlots;
+	for (const FPRProfileEquipmentEntry& Entry : Equipment)
+	{
+		if (Entry.SlotId.IsNone() || !Entry.Item.IsValid() || SeenSlots.Contains(Entry.SlotId))
+		{
+			return false;
+		}
+		SeenSlots.Add(Entry.SlotId);
 	}
 	return true;
 }
@@ -74,9 +89,11 @@ bool FPRMultiplayerProfileProjection::IsValid(FString* OutDiagnostic) const
 		return false;
 	}
 	if (BackpackItems.Num() > MaxProjectionBackpackEntries
+		|| Equipment.Num() > MaxProjectionEquipmentEntries
 		|| ResourceWallet.Num() > MaxProjectionResourceEntries
 		|| ShipModules.Num() > MaxProjectionShipModuleEntries
 		|| !AreItemsValid(BackpackItems)
+		|| !IsEquipmentValid(Equipment)
 		|| !AreResourcesValid(ResourceWallet)
 		|| !AreShipModulesValid(ShipModules)
 		|| !IsStoryValid(Story))
@@ -101,8 +118,10 @@ bool FPRPlayerSettlementReceipt::IsValid(FString* OutDiagnostic) const
 		return false;
 	}
 	if (SettledBackpackItems.Num() > MaxProjectionBackpackEntries
+		|| SettledEquipment.Num() > MaxProjectionEquipmentEntries
 		|| SettledResourceWallet.Num() > MaxProjectionResourceEntries
 		|| !AreItemsValid(SettledBackpackItems)
+		|| !IsEquipmentValid(SettledEquipment)
 		|| !AreResourcesValid(SettledResourceWallet))
 	{
 		if (OutDiagnostic) { *OutDiagnostic = TEXT("Settlement receipt contains invalid runtime data."); }
