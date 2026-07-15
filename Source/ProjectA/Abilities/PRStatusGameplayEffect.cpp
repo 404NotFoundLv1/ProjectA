@@ -28,6 +28,10 @@ UPRPollutionStatusGameplayEffect::UPRPollutionStatusGameplayEffect(const FObject
 	FGameplayEffectExecutionDefinition DamageExecution;
 	DamageExecution.CalculationClass = UPRDamageExecutionCalculation::StaticClass();
 	Executions.Add(DamageExecution);
+	GameplayCues.Add(FGameplayEffectCue(
+		ProjectRiftGameplayTags::GameplayCue_Combat_Status_Polluted,
+		0.0f,
+		1.0f));
 }
 
 FGameplayTag UPRPollutionStatusGameplayEffect::GetStatusTag() const
@@ -55,6 +59,10 @@ UPRSlowStatusGameplayEffect::UPRSlowStatusGameplayEffect(const FObjectInitialize
 	MoveSpeedModifier.ModifierOp = EGameplayModOp::Multiplicitive;
 	MoveSpeedModifier.ModifierMagnitude = FGameplayEffectModifierMagnitude(SlowMagnitude);
 	Modifiers.Add(MoveSpeedModifier);
+	GameplayCues.Add(FGameplayEffectCue(
+		ProjectRiftGameplayTags::GameplayCue_Combat_Status_Slowed,
+		0.0f,
+		1.0f));
 }
 
 FGameplayTag UPRSlowStatusGameplayEffect::GetStatusTag() const
@@ -72,6 +80,10 @@ UPRStunStatusGameplayEffect::UPRStunStatusGameplayEffect(const FObjectInitialize
 	GrantedTags.Added.AddTag(ProjectRiftGameplayTags::State_Stunned);
 	TargetTagsComponent->SetAndApplyTargetTagChanges(GrantedTags);
 	GEComponents.Add(TargetTagsComponent);
+	GameplayCues.Add(FGameplayEffectCue(
+		ProjectRiftGameplayTags::GameplayCue_Combat_Status_Stunned,
+		0.0f,
+		1.0f));
 }
 
 FGameplayTag UPRStunStatusGameplayEffect::GetStatusTag() const

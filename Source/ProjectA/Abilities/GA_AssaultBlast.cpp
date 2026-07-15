@@ -6,6 +6,7 @@
 #include "Abilities/PRStatusGameplayEffect.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Characters/PRCharacter.h"
+#include "Components/PrimitiveComponent.h"
 #include "Core/PRGameplayTags.h"
 #include "Enemies/PREnemyCharacter.h"
 #include "Engine/OverlapResult.h"
@@ -20,6 +21,8 @@ UGA_AssaultBlast::UGA_AssaultBlast()
 	BlastRadius = 180.0f;
 	DamageAmount = 25.0f;
 	DamageEffectClass = UPRDamageGameplayEffect::StaticClass();
+	HitReaction.Strength = EPRHitReactionStrength::Heavy;
+	HitReaction.DurationSeconds = 0.0f;
 	TargetStatusEffects.Add(FPRTargetStatusEffectDefinition(
 		UPRStunStatusGameplayEffect::StaticClass(),
 		0.0f,
@@ -101,11 +104,28 @@ bool UGA_AssaultBlast::ExecuteBlast(
 			continue;
 		}
 
-		if (!UPRCombatEffectLibrary::ApplyDamageToTarget(
+		const FVector TargetLocation = TargetActor->GetActorLocation();
+		const FVector ToSource = AvatarActor->GetActorLocation() - TargetLocation;
+		const FVector ImpactNormal = ToSource.IsNearlyZero()
+			? -AvatarActor->GetActorForwardVector()
+			: ToSource.GetSafeNormal();
+		FHitResult SyntheticHit(
+			TargetActor,
+			Cast<UPrimitiveComponent>(TargetActor->GetRootComponent()),
+			TargetLocation,
+			ImpactNormal);
+		SyntheticHit.bBlockingHit = true;
+
+		FPRDamageRequest DamageRequest;
+		DamageRequest.BaseDamage = DamageAmount;
+		DamageRequest.DamageType = ProjectRiftGameplayTags::Damage_Type_Physical;
+		DamageRequest.HitResult = SyntheticHit;
+		DamageRequest.HitReaction = HitReaction;
+		DamageRequest.FeedbackPolicy = EPRCombatFeedbackPolicy::TargetAndSource;
+		if (!UPRCombatEffectLibrary::ApplyDamageRequestToTarget(
 			SourceASC,
 			TargetASC,
-			DamageAmount,
-			ProjectRiftGameplayTags::Damage_Type_Physical,
+			DamageRequest,
 			const_cast<UGA_AssaultBlast*>(this)))
 		{
 			continue;

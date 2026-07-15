@@ -7,8 +7,12 @@
 #include "Abilities/GameplayAbility.h"
 #include "Abilities/PRAbilitySystemComponent.h"
 #include "Abilities/PRAttributeSet.h"
+#include "Abilities/PRCombatEffectLibrary.h"
+#include "Abilities/PRCombatFeedbackTypes.h"
+#include "Abilities/PRStatusGameplayEffect.h"
 #include "Blueprint/UserWidget.h"
 #include "Characters/PRCharacter.h"
+#include "Combat/PRCombatFeedbackComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/WidgetComponent.h"
@@ -352,6 +356,26 @@ bool FPRBasicEnemyTest::RunTest(const FString& Parameters)
 
 	UClass* EnemyMeleeAbilityClass = LoadBasicEnemyRuntimeClass(TEXT("GA_EnemyMeleeAttack"), UGameplayAbility::StaticClass());
 	TestNotNull(TEXT("Enemy melee GameplayAbility exists"), EnemyMeleeAbilityClass);
+	const FStructProperty* EnemyMeleeHitReactionProperty = EnemyMeleeAbilityClass
+		? FindFProperty<FStructProperty>(EnemyMeleeAbilityClass, TEXT("HitReaction"))
+		: nullptr;
+	TestNotNull(TEXT("Enemy melee ability declares its HitReaction definition"), EnemyMeleeHitReactionProperty);
+	if (EnemyMeleeHitReactionProperty)
+	{
+		TestEqual(
+			TEXT("Enemy melee HitReaction uses FPRHitReactionDefinition"),
+			EnemyMeleeHitReactionProperty->Struct.Get(),
+			FPRHitReactionDefinition::StaticStruct());
+		if (EnemyMeleeHitReactionProperty->Struct == FPRHitReactionDefinition::StaticStruct())
+		{
+			const FPRHitReactionDefinition* EnemyMeleeHitReaction =
+				EnemyMeleeHitReactionProperty->ContainerPtrToValuePtr<FPRHitReactionDefinition>(EnemyMeleeAbilityClass->GetDefaultObject());
+			TestEqual(TEXT("Enemy melee defaults to a Heavy reaction"), EnemyMeleeHitReaction->Strength, EPRHitReactionStrength::Heavy);
+			TestTrue(
+				TEXT("Enemy melee defaults to a 0.30 second reaction"),
+				FMath::IsNearlyEqual(EnemyMeleeHitReaction->DurationSeconds, 0.30f));
+		}
+	}
 	TestNotNull(
 		TEXT("Enemy is granted its melee GameplayAbility"),
 		EnemyMeleeAbilityClass ? EnemyASC->FindAbilitySpecFromClass(EnemyMeleeAbilityClass) : nullptr);
@@ -378,8 +402,11 @@ bool FPRBasicEnemyTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Enemy melee rejects targets outside the ability-owned range"), bAttackedFarPlayer);
 
 	UPRAttributeSet* NearAttributes = NearPlayerState->GetAttributeSet();
+	UPRAbilitySystemComponent* NearASC = NearPlayer->GetProjectRiftAbilitySystemComponent();
+	UPRCombatFeedbackComponent* NearFeedback = NearPlayer->FindComponentByClass<UPRCombatFeedbackComponent>();
 	TestNotNull(TEXT("Near player attributes exist"), NearAttributes);
-	if (!NearAttributes)
+	TestNotNull(TEXT("Near player owns the shared feedback component"), NearFeedback);
+	if (!NearAttributes || !NearASC || !NearFeedback)
 	{
 		return false;
 	}
@@ -402,11 +429,48 @@ bool FPRBasicEnemyTest::RunTest(const FString& Parameters)
 		TEXT("Enemy melee keeps a duration-based status effect active"),
 		!NearPlayer->GetProjectRiftAbilitySystemComponent()->GetActiveEffects(FGameplayEffectQuery()).IsEmpty());
 
+	UPRCombatEffectLibrary::ClearNegativeStatusEffects(NearASC);
+	const int32 MeleeFeedbackCountBefore = NearFeedback->FeedbackDispatchCount;
 	bool bAttackedPlayer = false;
 	TestTrue(TEXT("Can call enemy melee attack"), CallBasicEnemyBoolFunctionWithActorParam(Enemy, TEXT("TryMeleeAttack"), TEXT("TargetActor"), NearPlayer, bAttackedPlayer));
 	TestTrue(TEXT("Enemy melee attack succeeds in range"), bAttackedPlayer);
 	TestTrue(TEXT("Enemy melee attack damages player shield first"), NearAttributes->GetShield() < 50.0f - AttackDamage * 2.0f);
 	TestEqual(TEXT("Enemy melee attack leaves player health while shield absorbs"), NearAttributes->GetHealth(), 100.0f);
+	TestEqual(
+		TEXT("Accepted enemy melee hit dispatches exactly one resolved target feedback event"),
+		NearFeedback->FeedbackDispatchCount,
+		MeleeFeedbackCountBefore + 1);
+	TestEqual(TEXT("Enemy melee uses its Heavy reaction definition"), NearFeedback->GetActiveStaggerStrength(), EPRHitReactionStrength::Heavy);
+	TestTrue(TEXT("Enemy melee grants State.HitStaggered"), NearASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_HitStaggered));
+	TestEqual(
+		TEXT("Enemy melee damage preserves the enemy as original instigator"),
+		NearFeedback->LastDamageEffectContext.GetOriginalInstigator(),
+		static_cast<AActor*>(Enemy));
+	const FHitResult* MeleeHitResult = NearFeedback->LastDamageEffectContext.GetHitResult();
+	TestNotNull(TEXT("Enemy melee synthesizes a target-position hit result"), MeleeHitResult);
+	if (MeleeHitResult)
+	{
+		TestEqual(TEXT("Enemy melee synthetic hit preserves the target actor"), MeleeHitResult->GetActor(), static_cast<AActor*>(NearPlayer));
+		TestTrue(
+			TEXT("Enemy melee synthetic hit uses the target position"),
+			MeleeHitResult->ImpactPoint.Equals(NearPlayer->GetActorLocation(), 1.0f));
+	}
+
+	bool bFoundPollutionEffect = false;
+	bool bPollutionPreservesEnemyInstigator = false;
+	for (const FActiveGameplayEffectHandle ActiveHandle : NearASC->GetActiveEffects(FGameplayEffectQuery()))
+	{
+		const FActiveGameplayEffect* ActiveEffect = NearASC->GetActiveGameplayEffect(ActiveHandle);
+		if (ActiveEffect && ActiveEffect->Spec.Def && ActiveEffect->Spec.Def->IsA(UPRPollutionStatusGameplayEffect::StaticClass()))
+		{
+			bFoundPollutionEffect = true;
+			bPollutionPreservesEnemyInstigator =
+				ActiveEffect->Spec.GetEffectContext().GetOriginalInstigator() == Enemy;
+			break;
+		}
+	}
+	TestTrue(TEXT("Structured enemy melee still applies pollution"), bFoundPollutionEffect);
+	TestTrue(TEXT("Enemy melee pollution preserves the original enemy instigator"), bPollutionPreservesEnemyInstigator);
 
 	float MaxHealth = 0.0f;
 	float InitialHealth = 0.0f;

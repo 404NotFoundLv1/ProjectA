@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.6.2] - 2026-07-15
+
+### Added
+
+- Added post-settlement `FPRResolvedDamage` reporting with exact shield/health splits, shield break, lethal state, preserved hit context, and original-instigator attribution.
+- Added declaration-driven Light/Heavy hit reactions, `State.HitStaggered`, refresh/priority rules, stun supersession, movement restoration, and lifecycle cleanup.
+- Added four replicated impact GameplayCues, three persistent status GameplayCues, ProjectRift-owned Cue notify assets, a tint overlay material, a lightweight impact particle, and shared player/enemy combat feedback presentation.
+- Added owner-only unreliable hit confirmation, 0.15-second hit markers, 0.65-second shield/health damage numbers, local hit-direction feedback, and camera shake honoring the v4 reduced-shake setting.
+- Added focused automation for result splitting, hit context, stagger timing/priority, Cue lifecycle and assets, hit-confirmation isolation, invalid post-settlement dispatch, and rapid Cue sequence rollover.
+
+### Changed
+
+- Rifle hits now request Light 0.12-second reactions, enemy melee requests Heavy 0.30-second reactions, assault blast reports Heavy presentation while its existing stun owns control, and pollution remains reaction/number-free.
+- All ProjectRift abilities are blocked by both stun and hit stagger; hit stagger cancels active abilities, ADS, and reload without changing authoritative damage or ammo rules.
+- GAS and enemy debug text now expose stagger, Cue, and source hit-confirmation state.
+- `GameplayCueNotifyPaths` is narrowed to `/Game/ProjectRift/GameplayCues`, resolving the earlier broad GameplayCue search-path warning.
+- Updated the displayed project version to `0.6.2`; the player save schema remains v4.
+
+### Verification
+
+- Focused evidence and the final build/package matrix are recorded in `docs/projectrift/v0.6.2-test-record.md`.
+
 ## [0.6.1] - 2026-07-15
 
 ### Added

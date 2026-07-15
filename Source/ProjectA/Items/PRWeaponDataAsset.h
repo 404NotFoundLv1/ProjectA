@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Abilities/PRCombatFeedbackTypes.h"
 #include "GameplayTagContainer.h"
 #include "Items/PRItemDataAsset.h"
 #include "PRWeaponDataAsset.generated.h"
@@ -30,6 +31,9 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Damage")
 	FGameplayTag DamageType;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Damage")
+	FPRHitReactionDefinition HitReaction;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Firing", meta = (ClampMin = "0.0"))
 	float Range = 12000.0f;

@@ -11,5 +11,7 @@ UPRWeaponDataAsset::UPRWeaponDataAsset()
 	bCanEquip = true;
 	bCanDrop = false;
 	DamageType = ProjectRiftGameplayTags::Damage_Type_Physical;
+	HitReaction.Strength = EPRHitReactionStrength::Light;
+	HitReaction.DurationSeconds = 0.12f;
 	WeaponActorClass = APRWeaponActor::StaticClass();
 }

@@ -10,6 +10,7 @@
 #include "Abilities/PRAttributeSet.h"
 #include "Abilities/PRCombatEffectLibrary.h"
 #include "Camera/CameraComponent.h"
+#include "Combat/PRCombatFeedbackComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Core/PRGameplayTags.h"
 #include "EnhancedInputComponent.h"
@@ -89,6 +90,7 @@ APRCharacter::APRCharacter()
 	AssaultShieldAbilityClass = UGA_AssaultShield::StaticClass();
 	AutoRespawnDelay = 5.0f;
 	bShowPlayerDebugLabel = false;
+	CombatFeedbackComponent = CreateDefaultSubobject<UPRCombatFeedbackComponent>(TEXT("CombatFeedbackComponent"));
 
 	PlayerDebugLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("PlayerDebugLabel"));
 	PlayerDebugLabel->SetupAttachment(GetRootComponent());
@@ -219,6 +221,7 @@ void APRCharacter::BeginPlay()
 
 void APRCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	ClearAttributeChangeDelegates();
 	if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
 	{
 		if (UPRWeaponComponent* WeaponComponent = ProjectRiftPlayerState->GetWeaponComponent())
@@ -649,6 +652,9 @@ void APRCharacter::BindAttributeChangeDelegates()
 	StunnedTagChangedDelegateHandle = AbilitySystemComponent
 		->RegisterGameplayTagEvent(ProjectRiftGameplayTags::State_Stunned, EGameplayTagEventType::NewOrRemoved)
 		.AddUObject(this, &APRCharacter::HandleStunnedTagChanged);
+	HitStaggeredTagChangedDelegateHandle = AbilitySystemComponent
+		->RegisterGameplayTagEvent(ProjectRiftGameplayTags::State_HitStaggered, EGameplayTagEventType::NewOrRemoved)
+		.AddUObject(this, &APRCharacter::HandleHitStaggeredTagChanged);
 	RefreshMovementFromAttributes();
 }
 
@@ -661,6 +667,7 @@ void APRCharacter::ClearAttributeChangeDelegates()
 		EnergyChangedDelegateHandle.Reset();
 		MoveSpeedChangedDelegateHandle.Reset();
 		StunnedTagChangedDelegateHandle.Reset();
+		HitStaggeredTagChangedDelegateHandle.Reset();
 		return;
 	}
 
@@ -702,6 +709,14 @@ void APRCharacter::ClearAttributeChangeDelegates()
 			->RegisterGameplayTagEvent(ProjectRiftGameplayTags::State_Stunned, EGameplayTagEventType::NewOrRemoved)
 			.Remove(StunnedTagChangedDelegateHandle);
 		StunnedTagChangedDelegateHandle.Reset();
+	}
+
+	if (HitStaggeredTagChangedDelegateHandle.IsValid())
+	{
+		AbilitySystemComponent
+			->RegisterGameplayTagEvent(ProjectRiftGameplayTags::State_HitStaggered, EGameplayTagEventType::NewOrRemoved)
+			.Remove(HitStaggeredTagChangedDelegateHandle);
+		HitStaggeredTagChangedDelegateHandle.Reset();
 	}
 }
 
@@ -753,6 +768,30 @@ void APRCharacter::HandleStunnedTagChanged(const FGameplayTag StatusTag, const i
 	RefreshMovementFromAttributes();
 }
 
+void APRCharacter::HandleHitStaggeredTagChanged(const FGameplayTag StatusTag, const int32 NewCount)
+{
+	if (NewCount > 0)
+	{
+		if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+		{
+			MovementComponent->StopMovementImmediately();
+		}
+		if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
+		{
+			if (UPRWeaponComponent* WeaponComponent = ProjectRiftPlayerState->GetWeaponComponent())
+			{
+				WeaponComponent->SetAiming(false);
+				WeaponComponent->CancelReload();
+			}
+		}
+	}
+	else if (CombatFeedbackComponent)
+	{
+		CombatFeedbackComponent->ClearActiveStagger();
+	}
+	RefreshMovementFromAttributes();
+}
+
 void APRCharacter::RefreshMovementFromAttributes()
 {
 	if (!AttributeSet || IsDowned())
@@ -762,9 +801,10 @@ void APRCharacter::RefreshMovementFromAttributes()
 
 	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
 	{
-		const bool bStunned = AbilitySystemComponent
-			&& AbilitySystemComponent->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Stunned);
-		MovementComponent->MaxWalkSpeed = bStunned ? 0.0f : FMath::Max(AttributeSet->GetMoveSpeed(), 0.0f);
+		const bool bMovementBlocked = AbilitySystemComponent
+			&& (AbilitySystemComponent->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Stunned)
+				|| AbilitySystemComponent->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_HitStaggered));
+		MovementComponent->MaxWalkSpeed = bMovementBlocked ? 0.0f : FMath::Max(AttributeSet->GetMoveSpeed(), 0.0f);
 	}
 }
 

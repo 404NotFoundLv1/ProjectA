@@ -4,9 +4,12 @@
 #include "Abilities/PRAbilitySystemComponent.h"
 #include "Abilities/PRCombatEffectLibrary.h"
 #include "Characters/PRCharacter.h"
+#include "Combat/PRCombatFeedbackComponent.h"
+#include "Core/PRGameplayTags.h"
 #include "Fonts/SlateFontInfo.h"
 #include "GameFramework/PlayerController.h"
 #include "Player/PRPlayerState.h"
+#include "Player/PRPlayerController.h"
 #include "Items/PRWeaponDataAsset.h"
 #include "Weapons/PRWeaponComponent.h"
 #include "Styling/CoreStyle.h"
@@ -23,7 +26,7 @@ TSharedRef<SWidget> UPRGASDebugWidget::RebuildWidget()
 			.AutoWrapText(true)
 			.ColorAndOpacity(FSlateColor(FLinearColor::White))
 			.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 14))
-			.Text(FText::FromString(TEXT("ProjectRift v0.6.1 GAS Debug\nWaiting for player state...")))
+			.Text(FText::FromString(TEXT("ProjectRift v0.6.2 GAS Debug\nWaiting for player state...")))
 		];
 }
 
@@ -70,6 +73,13 @@ FString UPRGASDebugWidget::GetDebugText() const
 	const FString RoleText = SelectedRoleModule.IsNone() ? TEXT("None") : SelectedRoleModule.ToString();
 	const UPRWeaponComponent* Weapon = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetWeaponComponent() : nullptr;
 	const UPRWeaponDataAsset* WeaponData = Weapon ? Weapon->GetEquippedWeaponData() : nullptr;
+	const UPRCombatFeedbackComponent* CombatFeedback = ProjectRiftCharacter
+		? ProjectRiftCharacter->FindComponentByClass<UPRCombatFeedbackComponent>()
+		: nullptr;
+	const APRPlayerController* ProjectRiftController = Cast<APRPlayerController>(OwningController);
+	const FString LastCueText = CombatFeedback && CombatFeedback->LastHandledCueTag.IsValid()
+		? CombatFeedback->LastHandledCueTag.ToString()
+		: TEXT("None");
 	const FString WeaponText = WeaponData
 		? (WeaponData->DisplayName.IsEmpty() ? WeaponData->ItemId.ToString() : WeaponData->DisplayName.ToString())
 		: TEXT("None");
@@ -77,14 +87,14 @@ FString UPRGASDebugWidget::GetDebugText() const
 	if (!AttributeSet)
 	{
 		return FString::Printf(
-			TEXT("ProjectRift v0.6.1 GAS Debug\nPawn: %s\nAttributeSet: Missing\nDowned: %s\nRole: %s"),
+			TEXT("ProjectRift v0.6.2 GAS Debug\nPawn: %s\nAttributeSet: Missing\nDowned: %s\nRole: %s"),
 			*GetNameSafe(ProjectRiftCharacter),
 			ProjectRiftCharacter && ProjectRiftCharacter->IsDowned() ? TEXT("true") : TEXT("false"),
 			*RoleText);
 	}
 
 	return FString::Printf(
-		TEXT("ProjectRift v0.6.1 GAS Debug\nHealth: %.0f / %.0f\nShield: %.0f / %.0f\nEnergy: %.0f / %.0f\nAttackPower: %.0f\nMoveSpeed: %.0f\nPollutionResistance: %.0f%%\nStatuses: %s\nWeapon: %s\nAmmo: %d / %d\nAiming: %s\nReloading: %s\nDowned: %s\nRole: %s\nASC Ready: %s\nDefault GE: %s\nRole Abilities: %s"),
+		TEXT("ProjectRift v0.6.2 GAS Debug\nHealth: %.0f / %.0f\nShield: %.0f / %.0f\nEnergy: %.0f / %.0f\nAttackPower: %.0f\nMoveSpeed: %.0f\nPollutionResistance: %.0f%%\nStatuses: %s\nHitStaggered: %s\nLast Cue: %s\nCue Active/Handled: %d / %d\nHit Confirm Sent/Received: %d / %d\nWeapon: %s\nAmmo: %d / %d\nAiming: %s\nReloading: %s\nDowned: %s\nRole: %s\nASC Ready: %s\nDefault GE: %s\nRole Abilities: %s"),
 		AttributeSet->GetHealth(),
 		AttributeSet->GetMaxHealth(),
 		AttributeSet->GetShield(),
@@ -95,6 +105,12 @@ FString UPRGASDebugWidget::GetDebugText() const
 		AttributeSet->GetMoveSpeed(),
 		AttributeSet->GetPollutionResistance() * 100.0f,
 		*UPRCombatEffectLibrary::GetActiveNegativeStatusText(AbilitySystemComponent),
+		AbilitySystemComponent && AbilitySystemComponent->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_HitStaggered) ? TEXT("true") : TEXT("false"),
+		*LastCueText,
+		CombatFeedback ? CombatFeedback->ActiveStatusCueTags.Num() : 0,
+		CombatFeedback ? CombatFeedback->GameplayCueHandledCount : 0,
+		ProjectRiftController ? ProjectRiftController->HitConfirmationSentCount : 0,
+		ProjectRiftController ? ProjectRiftController->HitConfirmationReceivedCount : 0,
 		*WeaponText,
 		Weapon ? Weapon->GetMagazineAmmo() : 0,
 		Weapon ? Weapon->GetReserveAmmo() : 0,

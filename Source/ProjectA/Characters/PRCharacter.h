@@ -12,6 +12,7 @@ class UGameplayAbility;
 class UGameplayEffect;
 class UPRAbilitySystemComponent;
 class UPRAttributeSet;
+class UPRCombatFeedbackComponent;
 class UTextRenderComponent;
 struct FOnAttributeChangeData;
 
@@ -109,6 +110,7 @@ protected:
 	void HandleEnergyChanged(const FOnAttributeChangeData& Data);
 	void HandleMoveSpeedChanged(const FOnAttributeChangeData& Data);
 	void HandleStunnedTagChanged(FGameplayTag StatusTag, int32 NewCount);
+	void HandleHitStaggeredTagChanged(FGameplayTag StatusTag, int32 NewCount);
 	void RefreshMovementFromAttributes();
 	void ScheduleAutoRespawn();
 	void HandleAutoRespawnTimer();
@@ -156,6 +158,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Network|Debug")
 	UTextRenderComponent* PlayerDebugLabel;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|Feedback")
+	TObjectPtr<UPRCombatFeedbackComponent> CombatFeedbackComponent;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Network|Debug")
 	bool bShowPlayerDebugLabel;
 
@@ -164,6 +169,7 @@ protected:
 	FDelegateHandle EnergyChangedDelegateHandle;
 	FDelegateHandle MoveSpeedChangedDelegateHandle;
 	FDelegateHandle StunnedTagChangedDelegateHandle;
+	FDelegateHandle HitStaggeredTagChangedDelegateHandle;
 	FTimerHandle AutoRespawnTimerHandle;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input|Actions")

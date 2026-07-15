@@ -8,9 +8,11 @@
 #include "Abilities/GameplayAbility.h"
 #include "Abilities/PRAbilitySystemComponent.h"
 #include "Abilities/PRAttributeSet.h"
+#include "Abilities/PRCombatFeedbackTypes.h"
 #include "Abilities/PRGameplayAbility.h"
 #include "Abilities/PRTemporaryShieldGameplayEffect.h"
 #include "Characters/PRCharacter.h"
+#include "Combat/PRCombatFeedbackComponent.h"
 #include "Core/PRGameplayTags.h"
 #include "Enemies/PREnemyCharacter.h"
 #include "GameplayAbilitySpec.h"
@@ -19,6 +21,7 @@
 #include "Player/PRPlayerState.h"
 #include "Tests/AutomationCommon.h"
 #include "UObject/StrongObjectPtr.h"
+#include "UObject/UnrealType.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPRGASAssaultModuleTest, "ProjectRift.GAS.AssaultModule", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
@@ -49,6 +52,24 @@ bool FPRGASAssaultModuleTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Assault blast derives from ProjectRift ability"), UGA_AssaultBlast::StaticClass()->IsChildOf(UPRGameplayAbility::StaticClass()));
 	TestTrue(TEXT("Assault shield derives from ProjectRift ability"), UGA_AssaultShield::StaticClass()->IsChildOf(UPRGameplayAbility::StaticClass()));
 	TestTrue(TEXT("Temporary shield derives from GameplayEffect"), UPRTemporaryShieldGameplayEffect::StaticClass()->IsChildOf(UGameplayEffect::StaticClass()));
+	const FStructProperty* BlastHitReactionProperty = FindFProperty<FStructProperty>(UGA_AssaultBlast::StaticClass(), TEXT("HitReaction"));
+	TestNotNull(TEXT("Assault blast declares its HitReaction definition"), BlastHitReactionProperty);
+	if (BlastHitReactionProperty)
+	{
+		TestEqual(
+			TEXT("Assault blast HitReaction uses FPRHitReactionDefinition"),
+			BlastHitReactionProperty->Struct.Get(),
+			FPRHitReactionDefinition::StaticStruct());
+		if (BlastHitReactionProperty->Struct == FPRHitReactionDefinition::StaticStruct())
+		{
+			const FPRHitReactionDefinition* BlastHitReaction =
+				BlastHitReactionProperty->ContainerPtrToValuePtr<FPRHitReactionDefinition>(UGA_AssaultBlast::StaticClass()->GetDefaultObject());
+			TestEqual(TEXT("Assault blast defaults to a Heavy presentation reaction"), BlastHitReaction->Strength, EPRHitReactionStrength::Heavy);
+			TestTrue(
+				TEXT("Assault blast reaction duration is zero because stun owns control"),
+				FMath::IsNearlyZero(BlastHitReaction->DurationSeconds));
+		}
+	}
 
 	UClass* CharacterClass = APRCharacter::StaticClass();
 	TestNotNull(TEXT("APRCharacter exposes selected role grant entry point"), CharacterClass->FindFunctionByName(TEXT("GrantSelectedRoleModuleAbilities")));
@@ -96,12 +117,14 @@ bool FPRGASAssaultModuleTest::RunTest(const FString& Parameters)
 	UPRAttributeSet* TargetAttributes = TargetPlayerState->GetAttributeSet();
 	UPRAttributeSet* ChargeTargetAttributes = ChargeTarget->GetAttributeSet();
 	UPRAttributeSet* BlastTargetAttributes = BlastTarget->GetAttributeSet();
+	UPRCombatFeedbackComponent* BlastTargetFeedback = BlastTarget->FindComponentByClass<UPRCombatFeedbackComponent>();
 	TestNotNull(TEXT("Attacker ASC exists"), AttackerASC);
 	TestNotNull(TEXT("Attacker AttributeSet exists"), AttackerAttributes);
 	TestNotNull(TEXT("Target AttributeSet exists"), TargetAttributes);
 	TestNotNull(TEXT("Charge enemy AttributeSet exists"), ChargeTargetAttributes);
 	TestNotNull(TEXT("Blast enemy AttributeSet exists"), BlastTargetAttributes);
-	if (!AttackerASC || !AttackerAttributes || !TargetAttributes || !ChargeTargetAttributes || !BlastTargetAttributes)
+	TestNotNull(TEXT("Blast enemy feedback component exists"), BlastTargetFeedback);
+	if (!AttackerASC || !AttackerAttributes || !TargetAttributes || !ChargeTargetAttributes || !BlastTargetAttributes || !BlastTargetFeedback)
 	{
 		return false;
 	}
@@ -125,6 +148,7 @@ bool FPRGASAssaultModuleTest::RunTest(const FString& Parameters)
 	TargetAttributes->SetShield(50.0f);
 	BlastTargetAttributes->SetHealth(50.0f);
 	Attacker->SetActorLocation(FVector::ZeroVector);
+	const int32 BlastFeedbackCountBefore = BlastTargetFeedback->FeedbackDispatchCount;
 	Attacker->DoSkillE();
 	TestEqual(TEXT("E blast rejects player friendly fire"), TargetAttributes->GetShield(), 50.0f);
 	TestEqual(TEXT("E blast preserves friendly player health"), TargetAttributes->GetHealth(), 100.0f);
@@ -132,6 +156,48 @@ bool FPRGASAssaultModuleTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("E blast stuns the enemy"),
 		BlastTarget->GetProjectRiftAbilitySystemComponent()->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Stunned));
+	TestEqual(
+		TEXT("E blast dispatches exactly one resolved target feedback event"),
+		BlastTargetFeedback->FeedbackDispatchCount,
+		BlastFeedbackCountBefore + 1);
+	TestTrue(TEXT("E blast feedback reports actual post-execution health damage"), FMath::IsNearlyEqual(BlastTargetFeedback->LastResolvedDamage.HealthDamage, 27.5f, 0.01f));
+	const FEnumProperty* ResolvedHitReactionProperty = FindFProperty<FEnumProperty>(
+		FPRResolvedDamage::StaticStruct(),
+		TEXT("HitReactionStrength"));
+	TestNotNull(
+		TEXT("Resolved damage carries the requested hit reaction for zero-duration presentation"),
+		ResolvedHitReactionProperty);
+	if (ResolvedHitReactionProperty)
+	{
+		const void* ResolvedHitReactionValue = ResolvedHitReactionProperty->ContainerPtrToValuePtr<void>(
+			&BlastTargetFeedback->LastResolvedDamage);
+		const uint64 EncodedHitReaction = ResolvedHitReactionProperty->GetUnderlyingProperty()
+			->GetUnsignedIntPropertyValue(ResolvedHitReactionValue);
+		TestEqual(
+			TEXT("E blast runtime feedback preserves its Heavy presentation reaction"),
+			EncodedHitReaction,
+			static_cast<uint64>(EPRHitReactionStrength::Heavy));
+	}
+	TestEqual(
+		TEXT("E blast Heavy/zero definition does not create an extra stagger effect"),
+		BlastTargetFeedback->GetActiveStaggerStrength(),
+		EPRHitReactionStrength::None);
+	TestFalse(
+		TEXT("E blast control remains exclusively State.Stunned"),
+		BlastTarget->GetProjectRiftAbilitySystemComponent()->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_HitStaggered));
+	TestEqual(
+		TEXT("E blast damage preserves the attacker as original instigator"),
+		BlastTargetFeedback->LastDamageEffectContext.GetOriginalInstigator(),
+		static_cast<AActor*>(Attacker.Get()));
+	const FHitResult* BlastHitResult = BlastTargetFeedback->LastDamageEffectContext.GetHitResult();
+	TestNotNull(TEXT("E blast synthesizes a target-position hit result"), BlastHitResult);
+	if (BlastHitResult)
+	{
+		TestEqual(TEXT("E blast synthetic hit preserves the enemy target"), BlastHitResult->GetActor(), static_cast<AActor*>(BlastTarget.Get()));
+		TestTrue(
+			TEXT("E blast synthetic hit uses the target position"),
+			BlastHitResult->ImpactPoint.Equals(BlastTarget->GetActorLocation(), 1.0f));
+	}
 	TestEqual(TEXT("E blast consumes energy"), AttackerAttributes->GetEnergy(), 60.0f);
 
 	Attacker->DoSkillE();

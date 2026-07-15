@@ -8,6 +8,7 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Animation/AnimInstance.h"
 #include "Characters/PRCharacter.h"
+#include "Combat/PRCombatFeedbackComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/WidgetComponent.h"
@@ -34,6 +35,7 @@ APREnemyCharacter::APREnemyCharacter()
 	AbilitySystemComponent = CreateDefaultSubobject<UPRAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 	AttributeSet = CreateDefaultSubobject<UPRAttributeSet>(TEXT("AttributeSet"));
+	CombatFeedbackComponent = CreateDefaultSubobject<UPRCombatFeedbackComponent>(TEXT("CombatFeedbackComponent"));
 	EnemyMeleeAbilityClass = UGA_EnemyMeleeAttack::StaticClass();
 
 	AIControllerClass = APREnemyAIController::StaticClass();
@@ -177,7 +179,19 @@ float APREnemyCharacter::GetAttackDamage() const
 
 FString APREnemyCharacter::GetActiveStatusText() const
 {
-	return UPRCombatEffectLibrary::GetActiveNegativeStatusText(AbilitySystemComponent);
+	FString StatusText = UPRCombatEffectLibrary::GetActiveNegativeStatusText(AbilitySystemComponent);
+	if (CombatFeedbackComponent && CombatFeedbackComponent->LastHandledCueTag.IsValid())
+	{
+		const FString CueDebugText = FString::Printf(
+			TEXT("CUE=%s A:%d H:%d"),
+			*CombatFeedbackComponent->LastHandledCueTag.ToString(),
+			CombatFeedbackComponent->ActiveStatusCueTags.Num(),
+			CombatFeedbackComponent->GameplayCueHandledCount);
+		StatusText = StatusText == TEXT("None")
+			? CueDebugText
+			: FString::Printf(TEXT("%s | %s"), *StatusText, *CueDebugText);
+	}
+	return StatusText;
 }
 
 bool APREnemyCharacter::ApplyEnemyDamage(const float DamageAmount, AController* DamageInstigator)
@@ -362,6 +376,9 @@ void APREnemyCharacter::BindCombatDelegates()
 	AbilitySystemComponent
 		->RegisterGameplayTagEvent(ProjectRiftGameplayTags::State_Stunned, EGameplayTagEventType::NewOrRemoved)
 		.AddUObject(this, &APREnemyCharacter::HandleStunnedTagChanged);
+	HitStaggeredTagChangedDelegateHandle = AbilitySystemComponent
+		->RegisterGameplayTagEvent(ProjectRiftGameplayTags::State_HitStaggered, EGameplayTagEventType::NewOrRemoved)
+		.AddUObject(this, &APREnemyCharacter::HandleHitStaggeredTagChanged);
 	DeadTagChangedDelegateHandle = AbilitySystemComponent
 		->RegisterGameplayTagEvent(ProjectRiftGameplayTags::State_Dead, EGameplayTagEventType::NewOrRemoved)
 		.AddUObject(this, &APREnemyCharacter::HandleDeadTagChanged);
@@ -389,6 +406,22 @@ void APREnemyCharacter::HandleStunnedTagChanged(const FGameplayTag StatusTag, co
 	RefreshMovementFromAttributes();
 }
 
+void APREnemyCharacter::HandleHitStaggeredTagChanged(const FGameplayTag StatusTag, const int32 NewCount)
+{
+	if (NewCount > 0)
+	{
+		if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+		{
+			MovementComponent->StopMovementImmediately();
+		}
+	}
+	else if (CombatFeedbackComponent)
+	{
+		CombatFeedbackComponent->ClearActiveStagger();
+	}
+	RefreshMovementFromAttributes();
+}
+
 void APREnemyCharacter::HandleDeadTagChanged(const FGameplayTag StatusTag, const int32 NewCount)
 {
 	if (NewCount > 0)
@@ -406,8 +439,9 @@ void APREnemyCharacter::RefreshMovementFromAttributes()
 
 	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
 	{
-		const bool bStunned = AbilitySystemComponent
-			&& AbilitySystemComponent->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Stunned);
-		MovementComponent->MaxWalkSpeed = bStunned ? 0.0f : FMath::Max(AttributeSet->GetMoveSpeed(), 0.0f);
+		const bool bMovementBlocked = AbilitySystemComponent
+			&& (AbilitySystemComponent->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Stunned)
+				|| AbilitySystemComponent->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_HitStaggered));
+		MovementComponent->MaxWalkSpeed = bMovementBlocked ? 0.0f : FMath::Max(AttributeSet->GetMoveSpeed(), 0.0f);
 	}
 }

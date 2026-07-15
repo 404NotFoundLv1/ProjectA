@@ -4,6 +4,7 @@
 #include "Abilities/PRStatusGameplayEffect.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
+#include "Components/PrimitiveComponent.h"
 #include "Core/PRGameplayTags.h"
 #include "GameplayAbilitySpec.h"
 
@@ -18,6 +19,8 @@ UGA_EnemyMeleeAttack::UGA_EnemyMeleeAttack()
 		UPRPollutionStatusGameplayEffect::StaticClass(),
 		2.0f,
 		5.0f));
+	HitReaction.Strength = EPRHitReactionStrength::Heavy;
+	HitReaction.DurationSeconds = 0.30f;
 }
 
 bool UGA_EnemyMeleeAttack::IsTargetInRange(const AActor* SourceActor, const AActor* TargetActor) const
@@ -47,11 +50,28 @@ void UGA_EnemyMeleeAttack::ActivateAbility(
 		&& TargetAbilitySystem
 		&& IsTargetInRange(SourceActor, TargetActor))
 	{
-		bApplied = UPRCombatEffectLibrary::ApplyDamageToTarget(
+		const FVector TargetLocation = TargetActor->GetActorLocation();
+		const FVector ToSource = SourceActor->GetActorLocation() - TargetLocation;
+		const FVector ImpactNormal = ToSource.IsNearlyZero()
+			? -SourceActor->GetActorForwardVector()
+			: ToSource.GetSafeNormal();
+		FHitResult SyntheticHit(
+			TargetActor,
+			Cast<UPrimitiveComponent>(TargetActor->GetRootComponent()),
+			TargetLocation,
+			ImpactNormal);
+		SyntheticHit.bBlockingHit = true;
+
+		FPRDamageRequest DamageRequest;
+		DamageRequest.BaseDamage = BaseDamage;
+		DamageRequest.DamageType = ProjectRiftGameplayTags::Damage_Type_Physical;
+		DamageRequest.HitResult = SyntheticHit;
+		DamageRequest.HitReaction = HitReaction;
+		DamageRequest.FeedbackPolicy = EPRCombatFeedbackPolicy::TargetOnly;
+		bApplied = UPRCombatEffectLibrary::ApplyDamageRequestToTarget(
 			SourceAbilitySystem,
 			TargetAbilitySystem,
-			BaseDamage,
-			ProjectRiftGameplayTags::Damage_Type_Physical,
+			DamageRequest,
 			this);
 
 		if (bApplied)

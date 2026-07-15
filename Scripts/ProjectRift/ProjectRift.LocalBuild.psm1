@@ -296,6 +296,24 @@ function New-ProjectRiftBuildArguments {
     return @($targetName, 'Win64', $Configuration, "-Project=$ProjectFile", '-WaitMutex', '-NoHotReloadFromIDE')
 }
 
+function New-ProjectRiftPackageArguments {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$ProjectFile,
+        [Parameter(Mandatory = $true)][ValidateSet('Development', 'Shipping')][string]$Configuration,
+        [Parameter(Mandatory = $true)][string]$ArchiveDirectory
+    )
+
+    return @(
+        '-WaitForUATMutex',
+        'BuildCookRun',
+        "-project=$ProjectFile", '-nop4', '-utf8output',
+        '-platform=Win64', "-clientconfig=$Configuration",
+        '-build', '-cook', '-AdditionalCookerOptions=-skipzenstore', '-stage', '-pak', '-archive',
+        "-archivedirectory=$ArchiveDirectory"
+    )
+}
+
 function Read-ProjectRiftAutomationReport {
     [CmdletBinding()]
     param([Parameter(Mandatory = $true)][string]$ReportRoot)
@@ -356,6 +374,23 @@ function Remove-ProjectRiftSafeDirectory {
     if (Test-Path -LiteralPath $Path) {
         Remove-Item -LiteralPath $Path -Recurse -Force
     }
+}
+
+function Remove-ProjectRiftStaleCookStoreMarker {
+    [CmdletBinding()]
+    param([Parameter(Mandatory = $true)][string]$ProjectRoot)
+
+    $canonicalProjectRoot = Get-ProjectRiftCanonicalPath $ProjectRoot
+    $marker = Join-Path $canonicalProjectRoot 'Saved\Cooked\Windows\ue.projectstore'
+    if (-not (Test-ProjectRiftContainedPath -Candidate $marker -AllowedRoot $canonicalProjectRoot)) {
+        throw 'Calculated ProjectA cook-store marker path is unsafe.'
+    }
+    if (-not (Test-Path -LiteralPath $marker -PathType Leaf)) {
+        return $false
+    }
+
+    Remove-Item -LiteralPath $marker -Force
+    return $true
 }
 
 function Publish-ProjectRiftPackage {
@@ -443,9 +478,11 @@ Export-ModuleMember -Function @(
     'New-ProjectRiftEditorProcessFilter',
     'New-ProjectRiftEngineManifestGuard',
     'New-ProjectRiftBuildArguments',
+    'New-ProjectRiftPackageArguments',
     'Publish-ProjectRiftPackage',
     'Read-ProjectRiftAutomationReport',
     'Remove-ProjectRiftSafeDirectory',
+    'Remove-ProjectRiftStaleCookStoreMarker',
     'Resolve-ProjectRiftEngineRoot',
     'Start-ProjectRiftEditor',
     'Test-ProjectRiftContainedPath',

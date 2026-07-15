@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Abilities/PRCombatFeedbackTypes.h"
 #include "CoreMinimal.h"
 #include "Items/PRItemTypes.h"
 #include "Multiplayer/PRMultiplayerProfileTypes.h"
@@ -94,6 +95,21 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Weapon|UI")
 	UPRWeaponHUDWidget* GetWeaponHUDWidget() const { return WeaponHUDWidget.Get(); }
+
+	/** Server-only endpoint used by resolved combat feedback to notify this owning client. */
+	void SendHitConfirmationToOwner(const FPRHitConfirmation& Confirmation);
+
+	UFUNCTION(Client, Unreliable, Category = "Combat|Feedback")
+	void ClientReceiveHitConfirmation(const FPRHitConfirmation& Confirmation);
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "Combat|Feedback")
+	FPRHitConfirmation LastHitConfirmation;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "Combat|Feedback")
+	int32 HitConfirmationSentCount = 0;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "Combat|Feedback")
+	int32 HitConfirmationReceivedCount = 0;
 
 	UFUNCTION(BlueprintCallable, Category = "Ship Repair|UI")
 	void ToggleShipRepairPanel();

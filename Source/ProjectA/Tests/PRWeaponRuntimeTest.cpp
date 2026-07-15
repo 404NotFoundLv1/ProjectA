@@ -2,7 +2,9 @@
 
 #include "Misc/AutomationTest.h"
 
+#include "Abilities/PRAbilitySystemComponent.h"
 #include "Characters/PRCharacter.h"
+#include "Core/PRGameplayTags.h"
 #include "GameFramework/PlayerController.h"
 #include "Items/PRInventoryComponent.h"
 #include "Items/PRItemDataAsset.h"
@@ -172,6 +174,29 @@ bool FPRWeaponRuntimeTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Non-positive weapon range fails closed"), Weapon->TryFire(), EPRWeaponFireResult::Invalid);
 	TestEqual(TEXT("Non-positive weapon range consumes no ammo"), Weapon->GetMagazineAmmo(), AmmoBeforeInvalidInput);
 	Data.Weapon->Range = 12000.0f;
+
+	UPRAbilitySystemComponent* PlayerASC = PlayerState->GetProjectRiftAbilitySystemComponent();
+	TestNotNull(TEXT("Weapon runtime PlayerState exposes its ASC"), PlayerASC);
+	if (!PlayerASC)
+	{
+		return false;
+	}
+	TestEqual(TEXT("Accepted shot prepares a partial magazine for stagger blocking"), Weapon->TryFire(), EPRWeaponFireResult::FiredMiss);
+	const int32 MagazineBeforeStagger = Weapon->GetMagazineAmmo();
+	const int32 ReserveBeforeStagger = Weapon->GetReserveAmmo();
+	PlayerASC->AddLooseGameplayTag(ProjectRiftGameplayTags::State_HitStaggered);
+	TestEqual(TEXT("State.HitStaggered blocks accepted weapon fire"), Weapon->TryFire(), EPRWeaponFireResult::Inactive);
+	TestEqual(TEXT("Stagger-blocked fire consumes no magazine ammo"), Weapon->GetMagazineAmmo(), MagazineBeforeStagger);
+	Weapon->SetAiming(true);
+	TestFalse(TEXT("State.HitStaggered blocks entering ADS"), Weapon->IsAiming());
+	TestFalse(TEXT("State.HitStaggered blocks starting reload"), Weapon->StartReload());
+	TestFalse(TEXT("Stagger-blocked reload never enters the reloading state"), Weapon->IsReloading());
+	TestEqual(TEXT("Stagger-blocked reload preserves magazine ammo"), Weapon->GetMagazineAmmo(), MagazineBeforeStagger);
+	TestEqual(TEXT("Stagger-blocked reload preserves reserve ammo"), Weapon->GetReserveAmmo(), ReserveBeforeStagger);
+	PlayerASC->RemoveLooseGameplayTag(ProjectRiftGameplayTags::State_HitStaggered);
+	// Keep the pre-existing downed-state regression independent while this new behavior is red.
+	Weapon->CancelReload();
+	Weapon->SetAiming(false);
 
 	TestEqual(TEXT("Shot before downed state is accepted"), Weapon->TryFire(), EPRWeaponFireResult::FiredMiss);
 	TestTrue(TEXT("Reload starts before downed state"), Weapon->StartReload());

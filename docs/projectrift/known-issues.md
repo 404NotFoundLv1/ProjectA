@@ -1,5 +1,14 @@
 # ProjectRift known issues
 
+## v0.6.2 acceptance-relevant items
+
+- v0.6.2 uses intentionally lightweight placeholder feedback: shared Quinn hit-reaction montages, a ProjectRift tint material, and a small ProjectRift impact particle. Production audio, VFX, recoil, hit locations, and poise remain out of scope.
+- Hit confirmations are owner-only unreliable presentation events. Network loss may omit a marker or number but never affects damage, ammo, status, stagger, death, or scoring authority.
+- Pollution intentionally emits no hit number or stagger for periodic ticks; its persistent status Cue remains active for the GameplayEffect lifetime.
+- `GameplayCueNotifyPaths` is now explicitly `/Game/ProjectRift/GameplayCues`; the earlier broad-search warning is resolved.
+- Two-player PIE remains the required manual check for remote Cue visibility, source-only hit numbers, and reduced camera shake feel.
+- UAT may report unavailable SDKs for non-Win64 platforms while validating platforms. Win64 is the supported verification target.
+
 ## v0.6.0 acceptance-relevant items
 
 - Status feedback is intentionally text-only in this slice; production icons, VFX, audio, GameplayCues, stacking, immunity, armor, critical hits, and persistence are out of scope.
@@ -42,4 +51,4 @@
 
 ## Release gate
 
-Do not accept v0.6.0 until the manual matrix in `v0.6.0-test-record.md` passes. Do not begin the next small version before explicit user authorization.
+Do not accept v0.6.2 until the manual matrix in `v0.6.2-test-record.md` passes. Do not begin the next small version before explicit user authorization.

@@ -2,9 +2,12 @@
 
 #include "Misc/AutomationTest.h"
 
+#include "Abilities/PRAbilitySystemComponent.h"
+#include "Abilities/PRCombatFeedbackTypes.h"
 #include "Abilities/PRAttributeSet.h"
 #include "Camera/CameraComponent.h"
 #include "Characters/PRCharacter.h"
+#include "Combat/PRCombatFeedbackComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Core/PRGameplayTags.h"
 #include "Engine/StaticMeshActor.h"
@@ -63,6 +66,18 @@ void AimCameraAt(APRCharacter* Character, const FVector& CameraLocation, const F
 		}
 	}
 }
+
+void TickHitscanWorld(UWorld* World, const float DurationSeconds)
+{
+	const float StepSeconds = 0.02f;
+	for (float Elapsed = 0.0f; World && Elapsed < DurationSeconds; Elapsed += StepSeconds)
+	{
+		++GFrameCounter;
+		World->Tick(
+			ELevelTick::LEVELTICK_All,
+			FMath::Min(StepSeconds, DurationSeconds - Elapsed));
+	}
+}
 }
 
 bool FPRWeaponHitscanTest::RunTest(const FString& Parameters)
@@ -103,6 +118,8 @@ bool FPRWeaponHitscanTest::RunTest(const FString& Parameters)
 	Rifle->HipSpreadDegrees = 0.0f;
 	Rifle->AimSpreadDegrees = 0.0f;
 	Rifle->WeaponActorClass = nullptr;
+	TestEqual(TEXT("Test rifle defaults to a Light hit reaction"), Rifle->HitReaction.Strength, EPRHitReactionStrength::Light);
+	TestTrue(TEXT("Test rifle defaults to a 0.12 second hit reaction"), FMath::IsNearlyEqual(Rifle->HitReaction.DurationSeconds, 0.12f));
 	AmmoData->ItemId = Rifle->AmmoItemId;
 	AmmoData->ItemType = EPRItemType::Ammunition;
 	AmmoData->MaxStackCount = 120;
@@ -123,6 +140,14 @@ bool FPRWeaponHitscanTest::RunTest(const FString& Parameters)
 	APREnemyCharacter* Enemy = World->SpawnActor<APREnemyCharacter>(FVector(1000.0f, 0.0f, 0.0f), FRotator::ZeroRotator);
 	TestNotNull(TEXT("Hitscan enemy exists"), Enemy);
 	if (!Enemy)
+	{
+		return false;
+	}
+	UPRCombatFeedbackComponent* EnemyFeedback = Enemy->FindComponentByClass<UPRCombatFeedbackComponent>();
+	UPRAbilitySystemComponent* EnemyASC = Enemy->GetProjectRiftAbilitySystemComponent();
+	TestNotNull(TEXT("Hitscan enemy owns the shared feedback component"), EnemyFeedback);
+	TestNotNull(TEXT("Hitscan enemy owns the shared ASC"), EnemyASC);
+	if (!EnemyFeedback || !EnemyASC)
 	{
 		return false;
 	}
@@ -152,10 +177,33 @@ bool FPRWeaponHitscanTest::RunTest(const FString& Parameters)
 		Cover->Destroy();
 	}
 	const float EnemyHealthBeforeHit = Enemy->GetHealth();
+	const int32 FeedbackCountBeforeHit = EnemyFeedback->FeedbackDispatchCount;
 	TestEqual(TEXT("Clear dual trace hits the hostile enemy"), Weapon->TryFire(), EPRWeaponFireResult::FiredHit);
 	const float ExpectedPhysicalDamage = 12.0f * 1.1f;
 	TestTrue(TEXT("Hitscan delegates to unified physical Damage Execution"), FMath::IsNearlyEqual(Enemy->GetHealth(), EnemyHealthBeforeHit - ExpectedPhysicalDamage, 0.01f));
 	TestEqual(TEXT("Hostile hit consumes one round"), Weapon->GetMagazineAmmo(), 10);
+	TestEqual(
+		TEXT("Accepted hostile rifle hit dispatches exactly one resolved target feedback event"),
+		EnemyFeedback->FeedbackDispatchCount,
+		FeedbackCountBeforeHit + 1);
+	TestEqual(TEXT("Rifle hit uses its Light reaction definition"), EnemyFeedback->GetActiveStaggerStrength(), EPRHitReactionStrength::Light);
+	TestTrue(TEXT("Rifle hit grants State.HitStaggered"), EnemyASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_HitStaggered));
+	const FHitResult* RecordedRifleHit = EnemyFeedback->LastDamageEffectContext.GetHitResult();
+	TestNotNull(TEXT("Rifle structured damage stores the real muzzle hit in EffectContext"), RecordedRifleHit);
+	if (RecordedRifleHit)
+	{
+		TestEqual(TEXT("Rifle EffectContext preserves the actual hit actor"), RecordedRifleHit->GetActor(), static_cast<AActor*>(Enemy));
+		TestTrue(
+			TEXT("Rifle EffectContext preserves an impact point on the hit enemy"),
+			FVector::Dist(RecordedRifleHit->ImpactPoint, Enemy->GetActorLocation()) <= 100.0f);
+		TestTrue(TEXT("Rifle EffectContext preserves a normalized impact normal"), RecordedRifleHit->ImpactNormal.IsNormalized());
+		TestEqual(
+			TEXT("Rifle EffectContext preserves the original player avatar instigator"),
+			EnemyFeedback->LastDamageEffectContext.GetOriginalInstigator(),
+			static_cast<AActor*>(Shooter.Character));
+	}
+	TickHitscanWorld(World, 0.14f);
+	TestFalse(TEXT("Default 0.12 second rifle stagger expires"), EnemyASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_HitStaggered));
 
 	Enemy->SetActorLocation(FVector(1000.0f, 600.0f, 0.0f));
 	const FHitscanPlayer Friendly = SpawnHitscanPlayer(World, FVector(1000.0f, 0.0f, 0.0f));

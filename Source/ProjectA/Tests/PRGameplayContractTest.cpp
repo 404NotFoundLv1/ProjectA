@@ -79,7 +79,7 @@ bool FPRGameplayTagContractTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("ProjectVersion is configured"),
 		GConfig->GetString(TEXT("/Script/EngineSettings.GeneralProjectSettings"), TEXT("ProjectVersion"), ProjectVersion, GGameIni));
-	TestEqual(TEXT("ProjectVersion is v0.6.1"), ProjectVersion, FString(TEXT("0.6.1")));
+	TestEqual(TEXT("ProjectVersion is v0.6.2"), ProjectVersion, FString(TEXT("0.6.2")));
 
 	return true;
 }

@@ -19,6 +19,7 @@ public class ProjectA : ModuleRules
 			"StateTreeModule",
 			"GameplayStateTreeModule",
 			"GameplayAbilities",
+			"EngineCameras",
 			"GameplayTags",
 			"GameplayTasks",
 			"DeveloperSettings",

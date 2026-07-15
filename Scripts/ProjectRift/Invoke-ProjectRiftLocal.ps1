@@ -23,7 +23,7 @@ Import-Module -Force -Name $modulePath
 
 $summary = [ordered]@{
     SchemaVersion = 1
-    ProjectVersion = '0.6.1'
+    ProjectVersion = '0.6.2'
     RunId = $runId
     Mode = $Mode
     Target = $Target
@@ -133,6 +133,7 @@ function Invoke-LocalAutomation {
 
 function Invoke-LocalPackage {
     param([string]$PackageConfiguration)
+    $null = Remove-ProjectRiftStaleCookStoreMarker -ProjectRoot $projectRoot
     $localRoot = Join-Path $projectRoot 'Saved\StagedBuilds\Local'
     $candidate = Join-Path $localRoot ('.Candidate-{0}-{1}' -f $PackageConfiguration, $runId)
     New-Item -ItemType Directory -Force -Path $localRoot | Out-Null
@@ -146,14 +147,7 @@ function Invoke-LocalPackage {
     $script:activeCandidate = $candidate
     $script:activeCandidateRoot = $localRoot
 
-    $arguments = @(
-        '-WaitForUATMutex',
-        'BuildCookRun',
-        "-project=$projectFile", '-nop4', '-utf8output',
-        '-platform=Win64', "-clientconfig=$PackageConfiguration",
-        '-build', '-cook', '-AdditionalCookerOptions=-nozenstore', '-stage', '-pak', '-archive',
-        "-archivedirectory=$candidate"
-    )
+    $arguments = New-ProjectRiftPackageArguments -ProjectFile $projectFile -Configuration $PackageConfiguration -ArchiveDirectory $candidate
     $result = Invoke-ProjectRiftNative -FilePath (Join-Path $resolvedEngine.Root 'Engine\Build\BatchFiles\RunUAT.bat') -ArgumentList $arguments -LogPath (Join-Path $runRoot 'package.log') -WorkingDirectory $projectRoot
     Assert-LocalEngineManifest
     Add-LocalStage -Name "Package:$PackageConfiguration" -NativeExitCode $result.ExitCode -DurationSeconds $result.DurationSeconds -Log $result.Log

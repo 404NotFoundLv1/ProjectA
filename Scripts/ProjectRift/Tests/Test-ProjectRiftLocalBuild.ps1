@@ -115,6 +115,18 @@ try {
     Assert-True (-not (Test-ProjectRiftContainedPath -Candidate $allowedRoot -AllowedRoot $allowedRoot)) 'The allowed root itself must be rejected.'
     Assert-True (-not (Test-ProjectRiftContainedPath -Candidate (Join-Path $testRoot 'Outside') -AllowedRoot $allowedRoot)) 'A sibling path must be rejected.'
 
+    $cookStoreCleanupCommand = Get-Command Remove-ProjectRiftStaleCookStoreMarker -ErrorAction SilentlyContinue
+    Assert-True ($null -ne $cookStoreCleanupCommand) 'ProjectA packaging must expose a bounded stale cook-store marker cleanup.'
+    if ($null -ne $cookStoreCleanupCommand) {
+        $fakeProjectRoot = Join-Path $testRoot 'CookStoreProject'
+        $staleMarker = Join-Path $fakeProjectRoot 'Saved\Cooked\Windows\ue.projectstore'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $staleMarker) | Out-Null
+        Set-Content -LiteralPath $staleMarker -Encoding UTF8 -Value '{"project":"ProjectA-self-test"}'
+        Assert-True (Remove-ProjectRiftStaleCookStoreMarker -ProjectRoot $fakeProjectRoot) 'A ProjectA-local stale ue.projectstore marker should be removed before offline cook.'
+        Assert-True (-not (Test-Path -LiteralPath $staleMarker)) 'Stale ProjectA-local cook-store marker must no longer exist.'
+        Assert-True (-not (Remove-ProjectRiftStaleCookStoreMarker -ProjectRoot $fakeProjectRoot)) 'Cleanup should be idempotent when no stale marker remains.'
+    }
+
     Assert-Equal 2 (Get-ProjectRiftExitCode -Stage 'Prerequisite') 'Prerequisite exit code contract.'
     Assert-Equal 3 (Get-ProjectRiftExitCode -Stage 'EditorClose') 'Editor close exit code contract.'
     Assert-Equal 10 (Get-ProjectRiftExitCode -Stage 'Build') 'Build exit code contract.'
@@ -134,6 +146,14 @@ try {
     Assert-True ($buildArguments -is [Array]) 'Native build arguments must be returned as an array.'
     Assert-True ($buildArguments -contains '-WaitMutex') 'Native build arguments should include WaitMutex.'
     Assert-True (($buildArguments -join ' ') -notmatch 'Invoke-Expression') 'Native argument generation must not use Invoke-Expression.'
+
+    $packageArgumentsCommand = Get-Command New-ProjectRiftPackageArguments -ErrorAction SilentlyContinue
+    Assert-True ($null -ne $packageArgumentsCommand) 'ProjectA packaging must expose its BuildCookRun argument contract.'
+    if ($null -ne $packageArgumentsCommand) {
+        $packageArguments = New-ProjectRiftPackageArguments -ProjectFile $projectFile -Configuration 'Development' -ArchiveDirectory (Join-Path $testRoot 'PackageCandidate')
+        Assert-True ($packageArguments -contains '-AdditionalCookerOptions=-skipzenstore') 'ProjectA packaging must force the documented filesystem cook path instead of the shared Zen cooked-output store.'
+        Assert-True ($packageArguments -notcontains '-AdditionalCookerOptions=-nozenstore') 'The unsupported nozenstore spelling must not be used.'
+    }
 
     $shippingCandidate = Join-Path $testRoot 'ShippingCandidate'
     New-Item -ItemType Directory -Force -Path $shippingCandidate | Out-Null

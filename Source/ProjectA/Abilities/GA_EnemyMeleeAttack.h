@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Abilities/PRCombatFeedbackTypes.h"
 #include "Abilities/PRGameplayAbility.h"
 #include "GA_EnemyMeleeAttack.generated.h"
 
@@ -28,4 +29,7 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Enemy|Melee", meta = (ClampMin = "0.0"))
 	float BaseDamage = 10.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Enemy|Melee")
+	FPRHitReactionDefinition HitReaction;
 };

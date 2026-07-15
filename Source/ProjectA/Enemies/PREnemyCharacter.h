@@ -10,6 +10,7 @@ class APRPickupActor;
 class UGameplayAbility;
 class UPRAbilitySystemComponent;
 class UPRAttributeSet;
+class UPRCombatFeedbackComponent;
 class UPRLootTableDataAsset;
 class UWidgetComponent;
 struct FOnAttributeChangeData;
@@ -73,6 +74,7 @@ protected:
 	void HandleHealthChanged(const FOnAttributeChangeData& Data);
 	void HandleMoveSpeedChanged(const FOnAttributeChangeData& Data);
 	void HandleStunnedTagChanged(const FGameplayTag StatusTag, int32 NewCount);
+	void HandleHitStaggeredTagChanged(const FGameplayTag StatusTag, int32 NewCount);
 	void HandleDeadTagChanged(const FGameplayTag StatusTag, int32 NewCount);
 	void RefreshMovementFromAttributes();
 
@@ -84,6 +86,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|GAS")
 	TObjectPtr<UPRAttributeSet> AttributeSet;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Combat|Feedback")
+	TObjectPtr<UPRCombatFeedbackComponent> CombatFeedbackComponent;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|State", meta = (ClampMin = "1.0"))
 	float MaxHealth = 50.0f;
@@ -121,5 +126,6 @@ private:
 
 	FDelegateHandle HealthChangedDelegateHandle;
 	FDelegateHandle MoveSpeedChangedDelegateHandle;
+	FDelegateHandle HitStaggeredTagChangedDelegateHandle;
 	FDelegateHandle DeadTagChangedDelegateHandle;
 };

@@ -143,6 +143,27 @@ APRPlayerController::APRPlayerController()
 	PickupActorClass = APRPickupActor::StaticClass();
 }
 
+void APRPlayerController::SendHitConfirmationToOwner(const FPRHitConfirmation& Confirmation)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	++HitConfirmationSentCount;
+	ClientReceiveHitConfirmation(Confirmation);
+}
+
+void APRPlayerController::ClientReceiveHitConfirmation_Implementation(const FPRHitConfirmation& Confirmation)
+{
+	LastHitConfirmation = Confirmation;
+	++HitConfirmationReceivedCount;
+	if (UPRWeaponHUDWidget* WeaponHUD = GetWeaponHUDWidget())
+	{
+		WeaponHUD->PushHitConfirmation(Confirmation);
+	}
+}
+
 void APRPlayerController::BeginPlay()
 {
 	Super::BeginPlay();

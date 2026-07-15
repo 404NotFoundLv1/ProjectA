@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Abilities/PRCombatFeedbackTypes.h"
 #include "Abilities/GA_AssaultGameplayAbility.h"
 #include "GA_AssaultBlast.generated.h"
 
@@ -39,4 +40,7 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Assault|Blast")
 	TSubclassOf<UGameplayEffect> DamageEffectClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Assault|Blast")
+	FPRHitReactionDefinition HitReaction;
 };

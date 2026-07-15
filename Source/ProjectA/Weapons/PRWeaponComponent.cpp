@@ -126,6 +126,7 @@ bool UPRWeaponComponent::CanUseWeapon() const
 	}
 	return !ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Dead)
 		&& !ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Downed)
+		&& !ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_HitStaggered)
 		&& !ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Stunned);
 }
 
@@ -181,6 +182,7 @@ void UPRWeaponComponent::SetAiming(const bool bNewAiming)
 		if (bReloading || !CurrentAvatar || !GetEquippedWeaponData() || !ASC
 			|| ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Dead)
 			|| ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Downed)
+			|| ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_HitStaggered)
 			|| ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Stunned))
 		{
 			return;
@@ -391,11 +393,16 @@ EPRWeaponFireResult UPRWeaponComponent::TryFire()
 	APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
 	UAbilitySystemComponent* SourceASC = PlayerState ? PlayerState->GetAbilitySystemComponent() : nullptr;
 	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(MuzzleHit.GetActor());
-	return SourceASC && TargetASC && UPRCombatEffectLibrary::ApplyDamageToTarget(
+	FPRDamageRequest DamageRequest;
+	DamageRequest.BaseDamage = WeaponData->BaseDamage;
+	DamageRequest.DamageType = WeaponData->DamageType;
+	DamageRequest.HitResult = MuzzleHit;
+	DamageRequest.HitReaction = WeaponData->HitReaction;
+	DamageRequest.FeedbackPolicy = EPRCombatFeedbackPolicy::TargetAndSource;
+	return SourceASC && TargetASC && UPRCombatEffectLibrary::ApplyDamageRequestToTarget(
 		SourceASC,
 		TargetASC,
-		WeaponData->BaseDamage,
-		WeaponData->DamageType,
+		DamageRequest,
 		this)
 		? EPRWeaponFireResult::FiredHit
 		: EPRWeaponFireResult::FiredMiss;
