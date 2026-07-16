@@ -43,6 +43,7 @@ private:
 	FReply HandleCloseClicked();
 	FReply HandleAssaultClicked();
 	FReply HandleEngineerClicked();
+	FReply HandleMedicClicked();
 	FText BuildLoadoutSummary() const;
 	bool ResolveCanonicalDefaults(FName& OutRoleId, FPRRoleLoadout& OutLoadout) const;
 

@@ -6,11 +6,15 @@
 #include "Abilities/GA_EngineerRepairDrone.h"
 #include "Abilities/GA_EngineerSentry.h"
 #include "Abilities/GA_EngineerShieldGenerator.h"
+#include "Abilities/GA_MedicFieldHeal.h"
+#include "Abilities/GA_MedicPurificationPulse.h"
+#include "Abilities/GA_MedicReconScan.h"
 #include "Core/PRAssetManager.h"
 #include "Deployables/PRDeployableActor.h"
 #include "Engine/AssetManager.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Roles/PREngineerModuleDataAsset.h"
+#include "Roles/PRMedicModuleDataAsset.h"
 #include "Roles/PRRoleDataAsset.h"
 #include "Roles/PRRoleModuleDataAsset.h"
 
@@ -18,14 +22,18 @@
 
 namespace ProjectRiftRoleDataAssetTestPrivate
 {
-constexpr TCHAR AssaultRoleId[] = TEXT("Ability.Role.Assault");
-constexpr TCHAR EngineerRoleId[] = TEXT("Ability.Role.Engineer");
+	constexpr TCHAR AssaultRoleId[] = TEXT("Ability.Role.Assault");
+	constexpr TCHAR EngineerRoleId[] = TEXT("Ability.Role.Engineer");
+	constexpr TCHAR MedicRoleId[] = TEXT("Ability.Role.Medic");
 constexpr TCHAR ChargeModuleId[] = TEXT("Ability.Module.Assault.Charge");
 constexpr TCHAR BlastModuleId[] = TEXT("Ability.Module.Assault.Blast");
 constexpr TCHAR ShieldModuleId[] = TEXT("Ability.Module.Assault.Shield");
 constexpr TCHAR SentryModuleId[] = TEXT("Ability.Module.Engineer.Sentry");
 constexpr TCHAR RepairDroneModuleId[] = TEXT("Ability.Module.Engineer.RepairDrone");
-constexpr TCHAR ShieldGeneratorModuleId[] = TEXT("Ability.Module.Engineer.ShieldGenerator");
+	constexpr TCHAR ShieldGeneratorModuleId[] = TEXT("Ability.Module.Engineer.ShieldGenerator");
+	constexpr TCHAR FieldHealModuleId[] = TEXT("Ability.Module.Medic.FieldHeal");
+	constexpr TCHAR PurificationPulseModuleId[] = TEXT("Ability.Module.Medic.PurificationPulse");
+	constexpr TCHAR ReconScanModuleId[] = TEXT("Ability.Module.Medic.ReconScan");
 
 UPRRoleDataAsset* MakeRole()
 {
@@ -181,8 +189,8 @@ bool FPRRoleAssetManagerTest::RunTest(const FString& Parameters)
 		TArray<UPRRoleDataAsset*> Roles;
 		TArray<UPRRoleModuleDataAsset*> Modules;
 		TestTrue(TEXT("Shipped role catalog loads and validates"), Manager->LoadRoleCatalog(Roles, Modules));
-		TestEqual(TEXT("Both shipped starter roles are registered"), Roles.Num(), 2);
-		TestEqual(TEXT("All shipped role modules are registered"), Modules.Num(), 6);
+		TestEqual(TEXT("All three shipped starter roles are registered"), Roles.Num(), 3);
+		TestEqual(TEXT("All shipped role modules are registered"), Modules.Num(), 9);
 		TestTrue(TEXT("Assault role content asset is registered and loadable"), Roles.ContainsByPredicate([](const UPRRoleDataAsset* Role)
 		{
 			return Role && Role->RoleId == AssaultRoleId && Role->GetPrimaryAssetId() == UPRAssetManager::MakeRolePrimaryAssetId(AssaultRoleId);
@@ -199,9 +207,22 @@ bool FPRRoleAssetManagerTest::RunTest(const FString& Parameters)
 			TestEqual(TEXT("Engineer energy regeneration is configured"), EngineerRole->EnergyRegenPerSecond, 5.0f);
 			TestEqual(TEXT("Engineer has exactly three allowed modules"), EngineerRole->AllowedModuleIds.Num(), 3);
 		}
+		const UPRRoleDataAsset* const* MedicRoleEntry = Roles.FindByPredicate([](const UPRRoleDataAsset* Role)
+		{
+			return Role && Role->RoleId == MedicRoleId;
+		});
+		const UPRRoleDataAsset* MedicRole = MedicRoleEntry ? *MedicRoleEntry : nullptr;
+		TestNotNull(TEXT("Medic role content asset is registered and loadable"), MedicRole);
+		if (MedicRole)
+		{
+			TestTrue(TEXT("Medic is starter-unlocked"), MedicRole->bStarterUnlocked);
+			TestEqual(TEXT("Medic energy regeneration is configured"), MedicRole->EnergyRegenPerSecond, 6.0f);
+			TestEqual(TEXT("Medic has exactly three allowed modules"), MedicRole->AllowedModuleIds.Num(), 3);
+		}
 		const TSet<FName> ExpectedModuleIds{
 			ChargeModuleId, BlastModuleId, ShieldModuleId,
-			SentryModuleId, RepairDroneModuleId, ShieldGeneratorModuleId };
+			SentryModuleId, RepairDroneModuleId, ShieldGeneratorModuleId,
+			FieldHealModuleId, PurificationPulseModuleId, ReconScanModuleId };
 		TestTrue(TEXT("All shipped role module content assets are loadable and valid"), Modules.FilterByPredicate([&ExpectedModuleIds](const UPRRoleModuleDataAsset* Module)
 		{
 			return Module && ExpectedModuleIds.Contains(Module->ModuleId)
@@ -259,6 +280,53 @@ bool FPRRoleAssetManagerTest::RunTest(const FString& Parameters)
 			TestEqual(TEXT("Shield generator has the configured shield amount"), ShieldGenerator->PrimaryMagnitude, 30.0f);
 			TestTrue(TEXT("Shield generator uses the Engineer shield ability"), ShieldGenerator->GameplayAbilityClass == UGA_EngineerShieldGenerator::StaticClass());
 			TestEqual(TEXT("Shield generator uses its dedicated runtime actor"), GetNameSafe(ShieldGenerator->DeployableActorClass.Get()), FString(TEXT("PRShieldGeneratorDeployable")));
+		}
+		const UPRRoleModuleDataAsset* const* FieldHealEntry = Modules.FindByPredicate([](const UPRRoleModuleDataAsset* Module)
+		{
+			return Module && Module->ModuleId == FieldHealModuleId;
+		});
+		const UPRMedicModuleDataAsset* FieldHeal = FieldHealEntry ? Cast<UPRMedicModuleDataAsset>(*FieldHealEntry) : nullptr;
+		TestNotNull(TEXT("Medic field heal uses the Medic module schema"), FieldHeal);
+		if (FieldHeal)
+		{
+			TestEqual(TEXT("Field heal uses the Q slot"), FieldHeal->Slot, EPRRoleModuleSlot::Q);
+			TestEqual(TEXT("Field heal costs twenty energy"), FieldHeal->EnergyCost, 20.0f);
+			TestEqual(TEXT("Field heal has a six second cooldown"), FieldHeal->CooldownSeconds, 6.0f);
+			TestEqual(TEXT("Field heal restores thirty base health"), FieldHeal->PrimaryMagnitude, 30.0f);
+			TestEqual(TEXT("Field heal reaches 1800 units"), FieldHeal->TargetRange, 1800.0f);
+			TestEqual(TEXT("Field heal has the correct kind"), FieldHeal->MedicKind, EPRMedicModuleKind::FieldHeal);
+			TestTrue(TEXT("Field heal uses the native Medic ability"), FieldHeal->GameplayAbilityClass == UGA_MedicFieldHeal::StaticClass());
+		}
+		const UPRRoleModuleDataAsset* const* PurificationEntry = Modules.FindByPredicate([](const UPRRoleModuleDataAsset* Module)
+		{
+			return Module && Module->ModuleId == PurificationPulseModuleId;
+		});
+		const UPRMedicModuleDataAsset* Purification = PurificationEntry ? Cast<UPRMedicModuleDataAsset>(*PurificationEntry) : nullptr;
+		TestNotNull(TEXT("Medic purification uses the Medic module schema"), Purification);
+		if (Purification)
+		{
+			TestEqual(TEXT("Purification uses the E slot"), Purification->Slot, EPRRoleModuleSlot::E);
+			TestEqual(TEXT("Purification costs twenty-five energy"), Purification->EnergyCost, 25.0f);
+			TestEqual(TEXT("Purification has a twelve second cooldown"), Purification->CooldownSeconds, 12.0f);
+			TestEqual(TEXT("Purification has a 1000 unit radius"), Purification->EffectRadius, 1000.0f);
+			TestEqual(TEXT("Purification has the correct kind"), Purification->MedicKind, EPRMedicModuleKind::PurificationPulse);
+			TestTrue(TEXT("Purification uses the native Medic ability"), Purification->GameplayAbilityClass == UGA_MedicPurificationPulse::StaticClass());
+		}
+		const UPRRoleModuleDataAsset* const* ReconEntry = Modules.FindByPredicate([](const UPRRoleModuleDataAsset* Module)
+		{
+			return Module && Module->ModuleId == ReconScanModuleId;
+		});
+		const UPRMedicModuleDataAsset* Recon = ReconEntry ? Cast<UPRMedicModuleDataAsset>(*ReconEntry) : nullptr;
+		TestNotNull(TEXT("Medic recon uses the Medic module schema"), Recon);
+		if (Recon)
+		{
+			TestEqual(TEXT("Recon uses the R slot"), Recon->Slot, EPRRoleModuleSlot::R);
+			TestEqual(TEXT("Recon costs forty energy"), Recon->EnergyCost, 40.0f);
+			TestEqual(TEXT("Recon has a twenty second cooldown"), Recon->CooldownSeconds, 20.0f);
+			TestEqual(TEXT("Recon has a 3500 unit radius"), Recon->EffectRadius, 3500.0f);
+			TestEqual(TEXT("Recon lasts eight seconds"), Recon->DurationSeconds, 8.0f);
+			TestEqual(TEXT("Recon has the correct kind"), Recon->MedicKind, EPRMedicModuleKind::ReconScan);
+			TestTrue(TEXT("Recon uses the native Medic ability"), Recon->GameplayAbilityClass == UGA_MedicReconScan::StaticClass());
 		}
 	}
 	return true;

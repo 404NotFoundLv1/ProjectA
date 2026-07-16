@@ -56,6 +56,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Weapon|UI")
 	float GetHitMarkerRemainingSeconds() const { return HitMarkerRemainingSeconds; }
 
+	/** Number of currently replicated enemies carrying the team-visible recon status. */
+	UFUNCTION(BlueprintPure, Category = "Weapon|UI")
+	int32 GetRevealedEnemyCount() const;
+
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "Weapon|UI")
 	TArray<FPRHUDDamageNumber> ActiveDamageNumbers;
 
@@ -72,6 +76,7 @@ protected:
 private:
 	void RefreshText();
 	void RefreshHitFeedbackSlate();
+	void RefreshReconMarkers();
 	FText ResolveDirectionIndicatorText() const;
 
 	TWeakObjectPtr<APlayerController> LocalController;
@@ -80,6 +85,7 @@ private:
 	TSharedPtr<STextBlock> HitMarkerText;
 	TSharedPtr<STextBlock> LocalHitDirectionText;
 	TSharedPtr<SOverlay> DamageNumberOverlay;
+	TSharedPtr<SOverlay> ReconMarkerOverlay;
 	float HitMarkerRemainingSeconds = 0.0f;
 	FLinearColor HitMarkerColor = FLinearColor::White;
 };

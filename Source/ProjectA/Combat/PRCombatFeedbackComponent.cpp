@@ -28,7 +28,8 @@ bool IsPersistentStatusCue(const FGameplayTag CueTag)
 {
 	return CueTag == ProjectRiftGameplayTags::GameplayCue_Combat_Status_Polluted
 		|| CueTag == ProjectRiftGameplayTags::GameplayCue_Combat_Status_Slowed
-		|| CueTag == ProjectRiftGameplayTags::GameplayCue_Combat_Status_Stunned;
+		|| CueTag == ProjectRiftGameplayTags::GameplayCue_Combat_Status_Stunned
+		|| CueTag == ProjectRiftGameplayTags::GameplayCue_Combat_Status_Revealed;
 }
 
 bool IsImpactCue(const FGameplayTag CueTag)
@@ -37,6 +38,12 @@ bool IsImpactCue(const FGameplayTag CueTag)
 		|| CueTag == ProjectRiftGameplayTags::GameplayCue_Combat_Impact_ShieldBreak
 		|| CueTag == ProjectRiftGameplayTags::GameplayCue_Combat_Impact_Health
 		|| CueTag == ProjectRiftGameplayTags::GameplayCue_Combat_Impact_Lethal;
+}
+
+bool IsSupportCue(const FGameplayTag CueTag)
+{
+	return CueTag == ProjectRiftGameplayTags::GameplayCue_Combat_Support_Healed
+		|| CueTag == ProjectRiftGameplayTags::GameplayCue_Combat_Support_Purified;
 }
 
 FLinearColor GetCueTint(const FGameplayTag CueTag)
@@ -64,6 +71,18 @@ FLinearColor GetCueTint(const FGameplayTag CueTag)
 	if (CueTag == ProjectRiftGameplayTags::GameplayCue_Combat_Status_Slowed)
 	{
 		return FLinearColor(0.16f, 0.42f, 1.0f, 1.0f);
+	}
+	if (CueTag == ProjectRiftGameplayTags::GameplayCue_Combat_Status_Revealed)
+	{
+		return FLinearColor(0.08f, 0.95f, 1.0f, 1.0f);
+	}
+	if (CueTag == ProjectRiftGameplayTags::GameplayCue_Combat_Support_Healed)
+	{
+		return FLinearColor(0.12f, 1.0f, 0.38f, 1.0f);
+	}
+	if (CueTag == ProjectRiftGameplayTags::GameplayCue_Combat_Support_Purified)
+	{
+		return FLinearColor(0.38f, 1.0f, 0.86f, 1.0f);
 	}
 	return FLinearColor(1.0f, 0.72f, 0.12f, 1.0f);
 }
@@ -160,17 +179,29 @@ void UPRCombatFeedbackComponent::HandleGameplayCue(
 		{
 			PlayImpactPresentation(CueTag, Parameters);
 		}
+		else if (EventType == EGameplayCueEvent::Executed && IsSupportCue(CueTag))
+		{
+			ApplyOverlayTint(GetCueTint(CueTag), 0.18f);
+		}
 		return;
 	}
 
 	if (EventType == EGameplayCueEvent::OnActive || EventType == EGameplayCueEvent::WhileActive)
 	{
 		ActiveStatusCueTags.AddTag(CueTag);
+		if (CueTag == ProjectRiftGameplayTags::GameplayCue_Combat_Status_Revealed)
+		{
+			SetRevealPresentation(true);
+		}
 		RefreshPersistentOverlay();
 	}
 	else if (EventType == EGameplayCueEvent::Removed)
 	{
 		ActiveStatusCueTags.RemoveTag(CueTag);
+		if (CueTag == ProjectRiftGameplayTags::GameplayCue_Combat_Status_Revealed)
+		{
+			SetRevealPresentation(false);
+		}
 		RefreshPersistentOverlay();
 	}
 }
@@ -196,6 +227,7 @@ void UPRCombatFeedbackComponent::EndPlay(const EEndPlayReason::Type EndPlayReaso
 		World->GetTimerManager().ClearTimer(OverlayTimerHandle);
 	}
 	RestoreOriginalOverlay();
+	SetRevealPresentation(false);
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -366,7 +398,9 @@ void UPRCombatFeedbackComponent::RefreshPersistentOverlay()
 		return;
 	}
 
-	FGameplayTag SelectedTag = ProjectRiftGameplayTags::GameplayCue_Combat_Status_Polluted;
+	FGameplayTag SelectedTag = ActiveStatusCueTags.HasTagExact(ProjectRiftGameplayTags::GameplayCue_Combat_Status_Revealed)
+		? ProjectRiftGameplayTags::GameplayCue_Combat_Status_Revealed
+		: ProjectRiftGameplayTags::GameplayCue_Combat_Status_Polluted;
 	if (ActiveStatusCueTags.HasTagExact(ProjectRiftGameplayTags::GameplayCue_Combat_Status_Stunned))
 	{
 		SelectedTag = ProjectRiftGameplayTags::GameplayCue_Combat_Status_Stunned;
@@ -447,4 +481,31 @@ void UPRCombatFeedbackComponent::RestoreOriginalOverlay()
 	ActiveOverlayMaterial = nullptr;
 	OriginalOverlayMaterial = nullptr;
 	bHasOverriddenOverlay = false;
+}
+
+void UPRCombatFeedbackComponent::SetRevealPresentation(const bool bEnabled)
+{
+	USkeletalMeshComponent* Mesh = ResolveSkeletalMesh();
+	if (!Mesh)
+	{
+		return;
+	}
+	if (bEnabled)
+	{
+		if (!bHasSavedRevealDepthState)
+		{
+			bOriginalRenderCustomDepth = Mesh->bRenderCustomDepth;
+			OriginalCustomDepthStencilValue = Mesh->CustomDepthStencilValue;
+			bHasSavedRevealDepthState = true;
+		}
+		Mesh->SetRenderCustomDepth(true);
+		Mesh->SetCustomDepthStencilValue(253);
+		return;
+	}
+	if (bHasSavedRevealDepthState)
+	{
+		Mesh->SetRenderCustomDepth(bOriginalRenderCustomDepth);
+		Mesh->SetCustomDepthStencilValue(OriginalCustomDepthStencilValue);
+		bHasSavedRevealDepthState = false;
+	}
 }

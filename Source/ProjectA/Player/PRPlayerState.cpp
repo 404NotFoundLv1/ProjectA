@@ -10,6 +10,30 @@
 #include "Weapons/PRWeaponComponent.h"
 #include "Roles/PRRoleComponent.h"
 
+namespace
+{
+bool ContainsAllRoleIds(const TArray<FName>& Superset, const TArray<FName>& Required)
+{
+	return Required.ContainsByPredicate([&Superset](const FName Id) { return !Superset.Contains(Id); }) == false;
+}
+
+bool IsStarterUnlockExpansion(
+	const FName RequestedRoleId,
+	const TArray<FName>& RequestedRoleIds,
+	const TArray<FName>& RequestedModuleIds,
+	const FPRRoleLoadout& RequestedLoadout,
+	const FName AppliedRoleId,
+	const TArray<FName>& AppliedRoleIds,
+	const TArray<FName>& AppliedModuleIds,
+	const FPRRoleLoadout& AppliedLoadout)
+{
+	return AppliedRoleId == RequestedRoleId
+		&& AppliedLoadout.Entries == RequestedLoadout.Entries
+		&& ContainsAllRoleIds(AppliedRoleIds, RequestedRoleIds)
+		&& ContainsAllRoleIds(AppliedModuleIds, RequestedModuleIds);
+}
+}
+
 APRPlayerState::APRPlayerState()
 	: bIsReady(false)
 	, SelectedRoleModule(NAME_None)
@@ -197,10 +221,20 @@ bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjectio
 		AppliedUnlockedRoleIds,
 		AppliedLoadout,
 		AppliedUnlockedModuleIds);
-	if ((!bNeedsLegacyDefault && (AppliedRoleId != Projection.SelectedRoleId
-		|| AppliedUnlockedRoleIds != Projection.UnlockedRoleIds
-		|| AppliedUnlockedModuleIds != Projection.UnlockedRoleModuleIds
-		|| AppliedLoadout.Entries != Projection.EquippedRoleModules))
+	const bool bExactRolePayload = AppliedRoleId == Projection.SelectedRoleId
+		&& AppliedUnlockedRoleIds == Projection.UnlockedRoleIds
+		&& AppliedUnlockedModuleIds == Projection.UnlockedRoleModuleIds
+		&& AppliedLoadout.Entries == Projection.EquippedRoleModules;
+	const bool bStarterUnlocksExpanded = IsStarterUnlockExpansion(
+		Projection.SelectedRoleId,
+		Projection.UnlockedRoleIds,
+		Projection.UnlockedRoleModuleIds,
+		RequestedLoadout,
+		AppliedRoleId,
+		AppliedUnlockedRoleIds,
+		AppliedUnlockedModuleIds,
+		AppliedLoadout);
+	if ((!bNeedsLegacyDefault && !bExactRolePayload && !bStarterUnlocksExpanded)
 		|| (bNeedsLegacyDefault && !RoleComponent->IsLoadoutValid(AppliedRoleId, AppliedLoadout)))
 	{
 		RestorePreviousRuntimeState();

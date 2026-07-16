@@ -34,6 +34,14 @@ public:
 		float BaseRepair,
 		UObject* SourceObject = nullptr);
 
+	/** Applies server-authoritative health restoration using the source HealingPower multiplier. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "ProjectRift|Combat")
+	static bool ApplyHealthHealingToTarget(
+		UAbilitySystemComponent* SourceAbilitySystem,
+		UAbilitySystemComponent* TargetAbilitySystem,
+		float BaseHealing,
+		UObject* SourceObject = nullptr);
+
 	/** Applies the non-stacking shield-generator aura to an eligible friendly player. */
 	static bool ApplyShieldGeneratorAuraToTarget(
 		UAbilitySystemComponent* SourceAbilitySystem,
@@ -70,6 +78,17 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "ProjectRift|Combat")
 	static void ClearNegativeStatusEffects(UAbilitySystemComponent* TargetAbilitySystem);
+
+	/** Clears only Medic-purifiable statuses: pollution, slow, and stun. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "ProjectRift|Combat")
+	static bool ClearPurifiableStatusEffects(UAbilitySystemComponent* TargetAbilitySystem);
+
+	/** Applies or refreshes a single hostile recon reveal status. */
+	static FActiveGameplayEffectHandle ApplyReconRevealToTarget(
+		UAbilitySystemComponent* SourceAbilitySystem,
+		UAbilitySystemComponent* TargetAbilitySystem,
+		float DurationSeconds,
+		UObject* SourceObject = nullptr);
 
 	UFUNCTION(BlueprintPure, Category = "ProjectRift|Combat")
 	static FString GetActiveNegativeStatusText(const UAbilitySystemComponent* TargetAbilitySystem);

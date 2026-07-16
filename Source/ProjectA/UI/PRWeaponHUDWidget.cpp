@@ -1,8 +1,13 @@
 #include "UI/PRWeaponHUDWidget.h"
 
+#include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h"
+#include "Core/PRGameplayTags.h"
+#include "Enemies/PREnemyCharacter.h"
 #include "Items/PRWeaponDataAsset.h"
 #include "Player/PRPlayerState.h"
 #include "Weapons/PRWeaponComponent.h"
+#include "EngineUtils.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "Styling/CoreStyle.h"
@@ -111,6 +116,30 @@ void UPRWeaponHUDWidget::AdvanceHitFeedback(const float DeltaSeconds)
 	RefreshHitFeedbackSlate();
 }
 
+int32 UPRWeaponHUDWidget::GetRevealedEnemyCount() const
+{
+	const APlayerController* Controller = LocalController.Get();
+	const UWorld* World = Controller ? Controller->GetWorld() : nullptr;
+	if (!World)
+	{
+		return 0;
+	}
+
+	int32 RevealedEnemyCount = 0;
+	for (TActorIterator<APREnemyCharacter> It(World); It; ++It)
+	{
+		APREnemyCharacter* Enemy = *It;
+		const UAbilitySystemComponent* EnemyASC = Enemy
+			? UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Enemy)
+			: nullptr;
+		if (EnemyASC && EnemyASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::Status_Debuff_Revealed))
+		{
+			++RevealedEnemyCount;
+		}
+	}
+	return RevealedEnemyCount;
+}
+
 TSharedRef<SWidget> UPRWeaponHUDWidget::RebuildWidget()
 {
 	return SNew(SOverlay)
@@ -132,6 +161,10 @@ TSharedRef<SWidget> UPRWeaponHUDWidget::RebuildWidget()
 		[
 			SAssignNew(DamageNumberOverlay, SOverlay)
 		]
+		+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Fill)
+		[
+			SAssignNew(ReconMarkerOverlay, SOverlay)
+		]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(FMargin(0.0f, 118.0f, 0.0f, 0.0f))
 		[
 			SAssignNew(LocalHitDirectionText, STextBlock)
@@ -152,6 +185,54 @@ void UPRWeaponHUDWidget::NativeTick(const FGeometry& MyGeometry, const float InD
 	Super::NativeTick(MyGeometry, InDeltaTime);
 	AdvanceHitFeedback(InDeltaTime);
 	RefreshText();
+	RefreshReconMarkers();
+}
+
+void UPRWeaponHUDWidget::RefreshReconMarkers()
+{
+	if (!ReconMarkerOverlay)
+	{
+		return;
+	}
+
+	ReconMarkerOverlay->ClearChildren();
+	const APlayerController* Controller = LocalController.Get();
+	const APawn* LocalPawn = Controller ? Controller->GetPawn() : nullptr;
+	UWorld* World = Controller ? Controller->GetWorld() : nullptr;
+	if (!Controller || !LocalPawn || !World)
+	{
+		return;
+	}
+
+	for (TActorIterator<APREnemyCharacter> It(World); It; ++It)
+	{
+		APREnemyCharacter* Enemy = *It;
+		const UAbilitySystemComponent* EnemyASC = Enemy
+			? UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Enemy)
+			: nullptr;
+		if (!Enemy || !EnemyASC || !EnemyASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::Status_Debuff_Revealed))
+		{
+			continue;
+		}
+
+		FVector2D ScreenPosition;
+		if (!Controller->ProjectWorldLocationToScreen(Enemy->GetActorLocation() + FVector(0.0f, 0.0f, 125.0f), ScreenPosition, true))
+		{
+			continue;
+		}
+
+		const int32 DistanceMeters = FMath::RoundToInt(FVector::Distance(LocalPawn->GetActorLocation(), Enemy->GetActorLocation()) / 100.0f);
+		ReconMarkerOverlay->AddSlot()
+			.HAlign(HAlign_Left)
+			.VAlign(VAlign_Top)
+			.Padding(FMargin(ScreenPosition.X, ScreenPosition.Y, 0.0f, 0.0f))
+			[
+				SNew(STextBlock)
+				.Text(FText::FromString(FString::Printf(TEXT("RECON  %dm"), DistanceMeters)))
+				.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 14))
+				.ColorAndOpacity(FLinearColor(0.08f, 0.95f, 1.0f, 0.95f))
+			];
+	}
 }
 
 void UPRWeaponHUDWidget::RefreshHitFeedbackSlate()

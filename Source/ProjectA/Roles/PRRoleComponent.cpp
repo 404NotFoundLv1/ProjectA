@@ -302,9 +302,9 @@ void UPRRoleComponent::ApplyProfileRoleState(FName SelectedRoleId, const TArray<
 	ClearGrantedAbilities();
 	UnlockedRoleIds = InUnlockedRoles;
 	UnlockedModuleIds = InUnlockedModules;
+	PlayerState->SetSelectedRoleModule(SelectedRoleId);
 	MergeStarterUnlocks();
 	CurrentLoadout = InLoadout;
-	PlayerState->SetSelectedRoleModule(SelectedRoleId);
 	if (IsLoadoutValid(SelectedRoleId, CurrentLoadout))
 	{
 		RefreshGrantedAbilities();
@@ -318,6 +318,18 @@ void UPRRoleComponent::MergeStarterUnlocks()
 	TArray<UPRRoleDataAsset*> Roles;
 	TArray<UPRRoleModuleDataAsset*> Modules;
 	if (!AssetManager || !AssetManager->LoadRoleCatalog(Roles, Modules))
+	{
+		return;
+	}
+	const APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
+	const bool bSelectedRoleIsKnown = PlayerState && Roles.ContainsByPredicate([PlayerState](const UPRRoleDataAsset* Role)
+	{
+		return Role && Role->RoleId == PlayerState->GetSelectedRoleModule();
+	});
+	// A profile may carry roles from content that is no longer installed.  Such
+	// payloads are a v4 compatibility mirror, not a blank starter profile, and
+	// must remain byte-for-byte representable until their content returns.
+	if (!bSelectedRoleIsKnown)
 	{
 		return;
 	}

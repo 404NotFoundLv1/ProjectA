@@ -303,6 +303,39 @@ bool UPRCombatEffectLibrary::ApplyShieldRepairToTarget(
 	return true;
 }
 
+bool UPRCombatEffectLibrary::ApplyHealthHealingToTarget(
+	UAbilitySystemComponent* SourceAbilitySystem,
+	UAbilitySystemComponent* TargetAbilitySystem,
+	const float BaseHealing,
+	UObject* SourceObject)
+{
+	if (!HasAuthoritativeActorInfo(SourceAbilitySystem)
+		|| !HasAuthoritativeActorInfo(TargetAbilitySystem)
+		|| !IsFriendlyPlayerTarget(SourceAbilitySystem, TargetAbilitySystem)
+		|| !FMath::IsFinite(BaseHealing) || BaseHealing <= 0.0f)
+	{
+		return false;
+	}
+	const UPRAttributeSet* SourceAttributes = SourceAbilitySystem->GetSet<UPRAttributeSet>();
+	const UPRAttributeSet* TargetAttributes = TargetAbilitySystem->GetSet<UPRAttributeSet>();
+	if (!SourceAttributes || !TargetAttributes || TargetAttributes->GetHealth() >= TargetAttributes->GetMaxHealth())
+	{
+		return false;
+	}
+	const float HealingAmount = BaseHealing * (1.0f + FMath::Max(0.0f, SourceAttributes->GetHealingPower()) / 100.0f);
+	FGameplayEffectSpecHandle SpecHandle = SourceAbilitySystem->MakeOutgoingSpec(
+		UPRHealthHealingGameplayEffect::StaticClass(),
+		1.0f,
+		MakeCombatEffectContext(SourceAbilitySystem, TargetAbilitySystem, SourceObject));
+	if (!SpecHandle.IsValid())
+	{
+		return false;
+	}
+	SpecHandle.Data->SetSetByCallerMagnitude(ProjectRiftGameplayTags::Data_Healing, HealingAmount);
+	SourceAbilitySystem->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetAbilitySystem);
+	return true;
+}
+
 bool UPRCombatEffectLibrary::ApplyShieldGeneratorAuraToTarget(
 	UAbilitySystemComponent* SourceAbilitySystem,
 	UAbilitySystemComponent* TargetAbilitySystem,
@@ -651,11 +684,43 @@ void UPRCombatEffectLibrary::ClearNegativeStatusEffects(UAbilitySystemComponent*
 	NegativeStatusTags.AddTag(ProjectRiftGameplayTags::Status_Debuff_Slowed);
 	NegativeStatusTags.AddTag(ProjectRiftGameplayTags::State_Stunned);
 	NegativeStatusTags.AddTag(ProjectRiftGameplayTags::State_HitStaggered);
+	NegativeStatusTags.AddTag(ProjectRiftGameplayTags::Status_Debuff_Revealed);
 	TargetAbilitySystem->RemoveActiveEffectsWithGrantedTags(NegativeStatusTags);
 	if (UPRCombatFeedbackComponent* FeedbackComponent = ResolveFeedbackComponent(TargetAbilitySystem))
 	{
 		FeedbackComponent->ClearActiveStagger();
 	}
+}
+
+bool UPRCombatEffectLibrary::ClearPurifiableStatusEffects(UAbilitySystemComponent* TargetAbilitySystem)
+{
+	if (!TargetAbilitySystem)
+	{
+		return false;
+	}
+	FGameplayTagContainer PurifiableTags;
+	PurifiableTags.AddTag(ProjectRiftGameplayTags::Status_Debuff_Polluted);
+	PurifiableTags.AddTag(ProjectRiftGameplayTags::Status_Debuff_Slowed);
+	PurifiableTags.AddTag(ProjectRiftGameplayTags::State_Stunned);
+	const int32 RemovedCount = TargetAbilitySystem->RemoveActiveEffectsWithGrantedTags(PurifiableTags);
+	return RemovedCount > 0;
+}
+
+FActiveGameplayEffectHandle UPRCombatEffectLibrary::ApplyReconRevealToTarget(
+	UAbilitySystemComponent* SourceAbilitySystem,
+	UAbilitySystemComponent* TargetAbilitySystem,
+	const float DurationSeconds,
+	UObject* SourceObject)
+{
+	if (!FMath::IsFinite(DurationSeconds) || DurationSeconds <= 0.0f)
+	{
+		return FActiveGameplayEffectHandle();
+	}
+	return ApplyStatusEffectToTarget(
+		SourceAbilitySystem,
+		TargetAbilitySystem,
+		FPRTargetStatusEffectDefinition(UPRReconRevealGameplayEffect::StaticClass(), 1.0f, DurationSeconds),
+		SourceObject);
 }
 
 FString UPRCombatEffectLibrary::GetActiveNegativeStatusText(const UAbilitySystemComponent* TargetAbilitySystem)
@@ -681,6 +746,10 @@ FString UPRCombatEffectLibrary::GetActiveNegativeStatusText(const UAbilitySystem
 	if (TargetAbilitySystem->HasMatchingGameplayTag(ProjectRiftGameplayTags::Status_Debuff_Polluted))
 	{
 		ActiveStatuses.Add(TEXT("POLLUTED"));
+	}
+	if (TargetAbilitySystem->HasMatchingGameplayTag(ProjectRiftGameplayTags::Status_Debuff_Revealed))
+	{
+		ActiveStatuses.Add(TEXT("REVEALED"));
 	}
 
 	return ActiveStatuses.IsEmpty() ? TEXT("None") : FString::Join(ActiveStatuses, TEXT(" | "));

@@ -22,12 +22,14 @@ namespace ProjectRiftGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_Ability_CooldownDuration, "Data.Ability.CooldownDuration", "SetByCaller role module cooldown duration");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_Ability_EnergyRegen, "Data.Ability.EnergyRegen", "SetByCaller role energy regeneration per period");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_ShieldRepair, "Data.ShieldRepair", "SetByCaller friendly shield restoration amount");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_Healing, "Data.Healing", "SetByCaller friendly health restoration amount");
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Damage_Type_Physical, "Damage.Type.Physical", "Physical damage type");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Damage_Type_Pollution, "Damage.Type.Pollution", "Pollution damage type");
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Debuff_Polluted, "Status.Debuff.Polluted", "Pollution damage over time is active");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Debuff_Slowed, "Status.Debuff.Slowed", "Movement slow is active");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Debuff_Revealed, "Status.Debuff.Revealed", "Recon scan is revealing an enemy");
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Ability_Enemy_Melee, "Event.Ability.Enemy.Melee", "Requests an enemy melee attack");
 
@@ -46,6 +48,9 @@ namespace ProjectRiftGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Combat_Status_Polluted, "GameplayCue.Combat.Status.Polluted", "Pollution status feedback");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Combat_Status_Slowed, "GameplayCue.Combat.Status.Slowed", "Slow status feedback");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Combat_Status_Stunned, "GameplayCue.Combat.Status.Stunned", "Stun status feedback");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Combat_Support_Healed, "GameplayCue.Combat.Support.Healed", "Health restoration feedback");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Combat_Support_Purified, "GameplayCue.Combat.Support.Purified", "Purification feedback");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Combat_Status_Revealed, "GameplayCue.Combat.Status.Revealed", "Recon reveal feedback");
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill_Q, "Cooldown.Skill.Q", "Cooldown for Q skill");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill_E, "Cooldown.Skill.E", "Cooldown for E skill");

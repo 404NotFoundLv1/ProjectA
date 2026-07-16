@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.5] - 2026-07-16
+
+- Added the starter-unlocked Medic role with data-driven Field Heal, Purification Pulse, and Recon Scan Q/E/R modules.
+- Added server-authoritative health restoration, selective pollution/slow/stun purification, and replicated enemy recon reveal status.
+- Added Medic loadout selection, native support/reveal GameplayCue contracts, and v4-compatible starter role merging.
+- Updated the displayed project version to `0.6.5`; player save format remains v4.
+
 ## [0.6.4] - 2026-07-16
 
 - Added the starter-unlocked Engineer role, its replicated Q/E/R deployable loadout, and v4-compatible starter unlock merging.

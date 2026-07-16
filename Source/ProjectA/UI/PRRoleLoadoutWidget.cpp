@@ -90,6 +90,13 @@ TSharedRef<SWidget> UPRRoleLoadoutWidget::RebuildWidget()
 					SNew(STextBlock).Justification(ETextJustify::Center).Font(ProjectRiftRoleLoadoutWidgetPrivate::GetFont(15.0f)).Text(FText::FromString(TEXT("Engineer")))
 				]
 			]
+			+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(8.0f, 0.0f, 0.0f, 0.0f)
+			[
+				SNew(SButton).OnClicked_UObject(this, &UPRRoleLoadoutWidget::HandleMedicClicked)
+				[
+					SNew(STextBlock).Justification(ETextJustify::Center).Font(ProjectRiftRoleLoadoutWidgetPrivate::GetFont(15.0f)).Text(FText::FromString(TEXT("Medic")))
+				]
+			]
 		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)
 		[
@@ -208,6 +215,7 @@ FReply UPRRoleLoadoutWidget::HandleDefaultsClicked() { RequestRestoreDefaults();
 FReply UPRRoleLoadoutWidget::HandleCloseClicked() { RequestClose(); return FReply::Handled(); }
 FReply UPRRoleLoadoutWidget::HandleAssaultClicked() { RequestSelectRole(TEXT("Ability.Role.Assault")); return FReply::Handled(); }
 FReply UPRRoleLoadoutWidget::HandleEngineerClicked() { RequestSelectRole(TEXT("Ability.Role.Engineer")); return FReply::Handled(); }
+FReply UPRRoleLoadoutWidget::HandleMedicClicked() { RequestSelectRole(TEXT("Ability.Role.Medic")); return FReply::Handled(); }
 
 FText UPRRoleLoadoutWidget::BuildLoadoutSummary() const
 {

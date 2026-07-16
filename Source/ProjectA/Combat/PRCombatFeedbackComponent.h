@@ -82,6 +82,7 @@ private:
 	void ApplyOverlayTint(const FLinearColor& TintColor, float DurationSeconds);
 	void RestoreOverlayAfterImpact();
 	void RestoreOriginalOverlay();
+	void SetRevealPresentation(bool bEnabled);
 
 	UPROPERTY(EditDefaultsOnly, Category = "Combat|Feedback|Animation")
 	TSoftObjectPtr<UAnimMontage> FrontLightHitMontage;
@@ -106,6 +107,9 @@ private:
 
 	FTimerHandle OverlayTimerHandle;
 	bool bHasOverriddenOverlay = false;
+	bool bHasSavedRevealDepthState = false;
+	bool bOriginalRenderCustomDepth = false;
+	int32 OriginalCustomDepthStencilValue = 0;
 	bool bResolvedDamagePulsePending = false;
 	int32 LastPulsedFeedbackSequence = 0;
 	FActiveGameplayEffectHandle ActiveStaggerHandle;

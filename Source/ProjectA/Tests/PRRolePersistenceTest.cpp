@@ -142,9 +142,9 @@ bool FPRRolePersistenceTest::RunTest(const FString& Parameters)
 			TEXT("Ability.Role.Assault"),
 			LegacyState->GetRoleComponent()->GetCurrentLoadout()));
 	TestEqual(
-		TEXT("Legacy snapshot provisions all Assault module unlocks"),
+		TEXT("Legacy known profiles receive all nine current starter module unlocks"),
 		LegacyState->GetRoleComponent()->GetUnlockedModuleIds().Num(),
-		3);
+		9);
 
 	FPRMultiplayerProfileProjection BaselineProjection;
 	BaselineProjection.ProfileId = FGuid::NewGuid();

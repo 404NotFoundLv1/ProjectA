@@ -33,6 +33,7 @@ bool FPRGameplayTagContractTest::RunTest(const FString& Parameters)
 		{ProjectRiftGameplayTags::Ability_Role_Engineer, TEXT("Ability.Role.Engineer")},
 		{ProjectRiftGameplayTags::Ability_Role_Medic, TEXT("Ability.Role.Medic")},
 		{ProjectRiftGameplayTags::Data_Damage, TEXT("Data.Damage")},
+		{ProjectRiftGameplayTags::Data_Healing, TEXT("Data.Healing")},
 		{ProjectRiftGameplayTags::State_Dead, TEXT("State.Dead")},
 		{ProjectRiftGameplayTags::State_Downed, TEXT("State.Downed")},
 		{ProjectRiftGameplayTags::State_Stunned, TEXT("State.Stunned")},
@@ -79,7 +80,7 @@ bool FPRGameplayTagContractTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("ProjectVersion is configured"),
 		GConfig->GetString(TEXT("/Script/EngineSettings.GeneralProjectSettings"), TEXT("ProjectVersion"), ProjectVersion, GGameIni));
-	TestEqual(TEXT("ProjectVersion is v0.6.4"), ProjectVersion, FString(TEXT("0.6.4")));
+	TestEqual(TEXT("ProjectVersion is v0.6.5"), ProjectVersion, FString(TEXT("0.6.5")));
 
 	return true;
 }

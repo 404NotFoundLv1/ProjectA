@@ -48,3 +48,14 @@ public:
 	UPRStunStatusGameplayEffect(const FObjectInitializer& ObjectInitializer);
 	virtual FGameplayTag GetStatusTag() const override;
 };
+
+/** Enemy-side status replicated by Medic recon scans. */
+UCLASS()
+class PROJECTA_API UPRReconRevealGameplayEffect : public UPRStatusGameplayEffect
+{
+	GENERATED_BODY()
+
+public:
+	UPRReconRevealGameplayEffect(const FObjectInitializer& ObjectInitializer);
+	virtual FGameplayTag GetStatusTag() const override;
+};

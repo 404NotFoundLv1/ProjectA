@@ -90,6 +90,15 @@ UPRShieldRepairGameplayEffect::UPRShieldRepairGameplayEffect()
 	ShieldModifier.ModifierMagnitude = MakeSetByCallerMagnitude(ProjectRiftGameplayTags::Data_ShieldRepair);
 }
 
+UPRHealthHealingGameplayEffect::UPRHealthHealingGameplayEffect()
+{
+	DurationPolicy = EGameplayEffectDurationType::Instant;
+	FGameplayModifierInfo& HealthModifier = Modifiers.AddDefaulted_GetRef();
+	HealthModifier.Attribute = UPRAttributeSet::GetHealthAttribute();
+	HealthModifier.ModifierOp = EGameplayModOp::Additive;
+	HealthModifier.ModifierMagnitude = MakeSetByCallerMagnitude(ProjectRiftGameplayTags::Data_Healing);
+}
+
 UPRShieldGeneratorAuraGameplayEffect::UPRShieldGeneratorAuraGameplayEffect()
 {
 	DurationPolicy = EGameplayEffectDurationType::HasDuration;

@@ -90,3 +90,24 @@ FGameplayTag UPRStunStatusGameplayEffect::GetStatusTag() const
 {
 	return ProjectRiftGameplayTags::State_Stunned;
 }
+
+UPRReconRevealGameplayEffect::UPRReconRevealGameplayEffect(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	UTargetTagsGameplayEffectComponent* TargetTagsComponent = ObjectInitializer.CreateDefaultSubobject<UTargetTagsGameplayEffectComponent>(
+		this,
+		TEXT("RevealTargetTags"));
+	FInheritedTagContainer GrantedTags;
+	GrantedTags.Added.AddTag(ProjectRiftGameplayTags::Status_Debuff_Revealed);
+	TargetTagsComponent->SetAndApplyTargetTagChanges(GrantedTags);
+	GEComponents.Add(TargetTagsComponent);
+	GameplayCues.Add(FGameplayEffectCue(
+		ProjectRiftGameplayTags::GameplayCue_Combat_Status_Revealed,
+		0.0f,
+		1.0f));
+}
+
+FGameplayTag UPRReconRevealGameplayEffect::GetStatusTag() const
+{
+	return ProjectRiftGameplayTags::Status_Debuff_Revealed;
+}

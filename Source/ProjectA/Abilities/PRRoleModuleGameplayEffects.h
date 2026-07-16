@@ -72,6 +72,16 @@ public:
 	UPRShieldRepairGameplayEffect();
 };
 
+/** Instant SetByCaller health restoration for Medic support abilities. */
+UCLASS()
+class PROJECTA_API UPRHealthHealingGameplayEffect : public UGameplayEffect
+{
+	GENERATED_BODY()
+
+public:
+	UPRHealthHealingGameplayEffect();
+};
+
 UCLASS()
 class PROJECTA_API UPRShieldGeneratorAuraGameplayEffect : public UGameplayEffect
 {

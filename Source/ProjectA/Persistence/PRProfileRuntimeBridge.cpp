@@ -28,6 +28,27 @@ bool AreRoleLoadoutsEqual(const FPRRoleLoadout& Left, const FPRRoleLoadout& Righ
 	return true;
 }
 
+bool ContainsAllRoleIds(const TArray<FName>& Superset, const TArray<FName>& Required)
+{
+	return Required.ContainsByPredicate([&Superset](const FName Id) { return !Superset.Contains(Id); }) == false;
+}
+
+bool IsStarterUnlockExpansion(
+	const FName RequestedRoleId,
+	const TArray<FName>& RequestedRoleIds,
+	const TArray<FName>& RequestedModuleIds,
+	const FPRRoleLoadout& RequestedLoadout,
+	const FName AppliedRoleId,
+	const TArray<FName>& AppliedRoleIds,
+	const TArray<FName>& AppliedModuleIds,
+	const FPRRoleLoadout& AppliedLoadout)
+{
+	return AppliedRoleId == RequestedRoleId
+		&& AreRoleLoadoutsEqual(AppliedLoadout, RequestedLoadout)
+		&& ContainsAllRoleIds(AppliedRoleIds, RequestedRoleIds)
+		&& ContainsAllRoleIds(AppliedModuleIds, RequestedModuleIds);
+}
+
 bool IsKnownLegacyRole(const FName SelectedRoleId)
 {
 	const FName NormalizedRoleId = SelectedRoleId.IsNone() || SelectedRoleId == TEXT("Role.Assault")
@@ -191,10 +212,20 @@ bool FPRProfileRuntimeBridge::ApplyToPlayerState(
 		AppliedUnlockedRoleIds,
 		AppliedLoadout,
 		AppliedUnlockedModuleIds);
-	if ((!bLegacyKnownRole && (AppliedRoleId != Snapshot.SelectedRoleId
-		|| AppliedUnlockedRoleIds != Snapshot.UnlockedRoleIds
-		|| AppliedUnlockedModuleIds != Snapshot.UnlockedRoleModuleIds
-		|| !AreRoleLoadoutsEqual(AppliedLoadout, RequestedLoadout)))
+	const bool bExactRolePayload = AppliedRoleId == Snapshot.SelectedRoleId
+		&& AppliedUnlockedRoleIds == Snapshot.UnlockedRoleIds
+		&& AppliedUnlockedModuleIds == Snapshot.UnlockedRoleModuleIds
+		&& AreRoleLoadoutsEqual(AppliedLoadout, RequestedLoadout);
+	const bool bStarterUnlocksExpanded = IsStarterUnlockExpansion(
+		Snapshot.SelectedRoleId,
+		Snapshot.UnlockedRoleIds,
+		Snapshot.UnlockedRoleModuleIds,
+		RequestedLoadout,
+		AppliedRoleId,
+		AppliedUnlockedRoleIds,
+		AppliedUnlockedModuleIds,
+		AppliedLoadout);
+	if ((!bLegacyKnownRole && !bExactRolePayload && !bStarterUnlocksExpanded)
 		|| (bLegacyKnownRole && !RoleComponent->IsLoadoutValid(AppliedRoleId, AppliedLoadout)))
 	{
 		RestorePreviousState();
