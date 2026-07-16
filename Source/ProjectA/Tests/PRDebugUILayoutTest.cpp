@@ -2,6 +2,8 @@
 
 #include "Misc/AutomationTest.h"
 
+#include "Abilities/PRAbilitySystemComponent.h"
+#include "UI/PRGASDebugWidget.h"
 #include "UI/PRDebugUILayout.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -74,6 +76,11 @@ bool FPRDebugUILayoutTest::RunTest(const FString& Parameters)
 	UClass* GASDebugWidgetClass = FindObject<UClass>(nullptr, TEXT("/Script/ProjectA.PRGASDebugWidget"));
 	UClass* EnemyClass = FindObject<UClass>(nullptr, TEXT("/Script/ProjectA.PREnemyCharacter"));
 	TestNotNull(TEXT("GAS debug widget exposes debug text for verification"), GASDebugWidgetClass ? GASDebugWidgetClass->FindFunctionByName(TEXT("GetDebugText")) : nullptr);
+	UPRAbilitySystemComponent* UninitializedAbilitySystem = NewObject<UPRAbilitySystemComponent>();
+	const FString CooldownText = UPRGASDebugWidget::GetCooldownDebugText(UninitializedAbilitySystem);
+	TestTrue(TEXT("GAS debug cooldown output includes Q unavailable state"), CooldownText.Contains(TEXT("Q: Unavailable")));
+	TestTrue(TEXT("GAS debug cooldown output includes E unavailable state"), CooldownText.Contains(TEXT("E: Unavailable")));
+	TestTrue(TEXT("GAS debug cooldown output includes R unavailable state"), CooldownText.Contains(TEXT("R: Unavailable")));
 	TestNotNull(TEXT("Enemy exposes active status text for its health bar"), EnemyClass ? EnemyClass->FindFunctionByName(TEXT("GetActiveStatusText")) : nullptr);
 
 	const FVector2D ProfileMin = CalculatePanelMin(

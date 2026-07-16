@@ -2,7 +2,11 @@
 
 #include "AbilitySystemComponent.h"
 #include "Abilities/PRAttributeSet.h"
+#include "Abilities/PRRoleModuleGameplayEffects.h"
 #include "Core/PRGameplayTags.h"
+#include "GameplayAbilitySpec.h"
+#include "GameplayEffect.h"
+#include "Roles/PRRoleModuleDataAsset.h"
 
 namespace
 {
@@ -26,10 +30,6 @@ bool HasAnyBlockedLifeState(const UAbilitySystemComponent* AbilitySystemComponen
 
 UGA_AssaultGameplayAbility::UGA_AssaultGameplayAbility()
 {
-	EnergyCost = 0.0f;
-	CooldownSeconds = 0.0f;
-	LastActivationTime = -1.0;
-
 	const FGameplayTag DeadStateTag = ProjectRiftGameplayTags::State_Dead;
 	if (DeadStateTag.IsValid())
 	{
@@ -61,13 +61,75 @@ bool UGA_AssaultGameplayAbility::CanActivateAbility(
 		return false;
 	}
 
-	const UPRAttributeSet* AttributeSet = AbilitySystemComponent ? AbilitySystemComponent->GetSet<UPRAttributeSet>() : nullptr;
-	if (!AttributeSet || AttributeSet->GetEnergy() < EnergyCost)
+	if (!GetRoleModuleDefinition(Handle, ActorInfo))
 	{
 		return false;
 	}
 
-	return IsCooldownReady(ActorInfo);
+	return CheckCost(Handle, ActorInfo, OptionalRelevantTags) && IsCooldownReady(ActorInfo);
+}
+
+bool UGA_AssaultGameplayAbility::CheckCost(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	FGameplayTagContainer* OptionalRelevantTags) const
+{
+	const UPRRoleModuleDataAsset* Module = GetRoleModuleDefinition(Handle, ActorInfo);
+	const UAbilitySystemComponent* AbilitySystemComponent = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+	const UPRAttributeSet* AttributeSet = AbilitySystemComponent ? AbilitySystemComponent->GetSet<UPRAttributeSet>() : nullptr;
+	if (!Module || !AttributeSet || !FMath::IsFinite(Module->EnergyCost) || Module->EnergyCost < 0.0f || AttributeSet->GetEnergy() < Module->EnergyCost)
+	{
+		return false;
+	}
+	return Super::CheckCost(Handle, ActorInfo, OptionalRelevantTags);
+}
+
+void UGA_AssaultGameplayAbility::ApplyCost(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo) const
+{
+	UAbilitySystemComponent* AbilitySystemComponent = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+	const UPRRoleModuleDataAsset* Module = GetRoleModuleDefinition(Handle, ActorInfo);
+	if (!AbilitySystemComponent || !Module || Module->EnergyCost <= 0.0f)
+	{
+		return;
+	}
+	FGameplayEffectSpecHandle CostSpec = AbilitySystemComponent->MakeOutgoingSpec(
+		UPRRoleModuleCostGameplayEffect::StaticClass(),
+		GetAbilityLevel(Handle, ActorInfo),
+		AbilitySystemComponent->MakeEffectContext());
+	if (CostSpec.IsValid())
+	{
+		CostSpec.Data->SetSetByCallerMagnitude(ProjectRiftGameplayTags::Data_Ability_EnergyDelta, -Module->EnergyCost);
+		AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*CostSpec.Data.Get());
+	}
+}
+
+void UGA_AssaultGameplayAbility::ApplyCooldown(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo) const
+{
+	UAbilitySystemComponent* AbilitySystemComponent = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+	const UPRRoleModuleDataAsset* Module = GetRoleModuleDefinition(Handle, ActorInfo);
+	const TSubclassOf<UGameplayEffect> CooldownEffectClass = GetModuleCooldownEffectClass();
+	if (!AbilitySystemComponent || !Module || !CooldownEffectClass || Module->CooldownSeconds <= 0.0f)
+	{
+		return;
+	}
+	const UPRAttributeSet* Attributes = AbilitySystemComponent->GetSet<UPRAttributeSet>();
+	const float CooldownReduction = Attributes ? FMath::Clamp(Attributes->GetCooldownReduction(), 0.0f, 0.8f) : 0.0f;
+	const float CooldownDuration = Module->CooldownSeconds * (1.0f - CooldownReduction);
+	FGameplayEffectSpecHandle CooldownSpec = AbilitySystemComponent->MakeOutgoingSpec(
+		CooldownEffectClass,
+		GetAbilityLevel(Handle, ActorInfo),
+		AbilitySystemComponent->MakeEffectContext());
+	if (CooldownSpec.IsValid())
+	{
+		CooldownSpec.Data->SetSetByCallerMagnitude(ProjectRiftGameplayTags::Data_Ability_CooldownDuration, CooldownDuration);
+		AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*CooldownSpec.Data.Get());
+	}
 }
 
 bool UGA_AssaultGameplayAbility::TryCommitAssaultAbility(
@@ -85,19 +147,6 @@ bool UGA_AssaultGameplayAbility::TryCommitAssaultAbility(
 		return false;
 	}
 
-	UPRAttributeSet* AttributeSet = GetSourceAttributes(ActorInfo);
-	if (!AttributeSet)
-	{
-		return false;
-	}
-
-	if (EnergyCost > 0.0f)
-	{
-		const float NewEnergy = FMath::Clamp(AttributeSet->GetEnergy() - EnergyCost, 0.0f, AttributeSet->GetMaxEnergy());
-		AttributeSet->SetEnergy(NewEnergy);
-	}
-
-	LastActivationTime = GetWorldTime(ActorInfo);
 	return true;
 }
 
@@ -107,19 +156,19 @@ UPRAttributeSet* UGA_AssaultGameplayAbility::GetSourceAttributes(const FGameplay
 	return AbilitySystemComponent ? const_cast<UPRAttributeSet*>(AbilitySystemComponent->GetSet<UPRAttributeSet>()) : nullptr;
 }
 
-bool UGA_AssaultGameplayAbility::IsCooldownReady(const FGameplayAbilityActorInfo* ActorInfo) const
+const UPRRoleModuleDataAsset* UGA_AssaultGameplayAbility::GetRoleModuleDefinition(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo) const
 {
-	if (CooldownSeconds <= 0.0f || LastActivationTime < 0.0)
-	{
-		return true;
-	}
-
-	return GetWorldTime(ActorInfo) >= LastActivationTime + CooldownSeconds;
+	const UAbilitySystemComponent* AbilitySystemComponent = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+	const FGameplayAbilitySpec* Spec = AbilitySystemComponent ? AbilitySystemComponent->FindAbilitySpecFromHandle(Handle) : nullptr;
+	const UPRRoleModuleDataAsset* Module = Spec ? Cast<UPRRoleModuleDataAsset>(Spec->SourceObject.Get()) : nullptr;
+	return Module && Module->GameplayAbilityClass == GetClass() ? Module : nullptr;
 }
 
-double UGA_AssaultGameplayAbility::GetWorldTime(const FGameplayAbilityActorInfo* ActorInfo) const
+bool UGA_AssaultGameplayAbility::IsCooldownReady(const FGameplayAbilityActorInfo* ActorInfo) const
 {
-	const AActor* AvatarActor = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
-	const UWorld* World = AvatarActor ? AvatarActor->GetWorld() : nullptr;
-	return World ? World->GetTimeSeconds() : 0.0;
+	const UAbilitySystemComponent* AbilitySystemComponent = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+	const FGameplayTag CooldownTag = GetModuleCooldownTag();
+	return AbilitySystemComponent && CooldownTag.IsValid() && !AbilitySystemComponent->HasMatchingGameplayTag(CooldownTag);
 }

@@ -592,6 +592,9 @@ FPRProfileOperationResult UPRSaveSubsystem::BuildMultiplayerProfileProjection(FP
 	OutProjection.Equipment = ActiveProfile->Snapshot.Equipment;
 	OutProjection.ResourceWallet = ActiveProfile->Snapshot.ResourceWallet;
 	OutProjection.SelectedRoleId = ActiveProfile->Snapshot.SelectedRoleId;
+	OutProjection.UnlockedRoleIds = ActiveProfile->Snapshot.UnlockedRoleIds;
+	OutProjection.UnlockedRoleModuleIds = ActiveProfile->Snapshot.UnlockedRoleModuleIds;
+	OutProjection.EquippedRoleModules = ActiveProfile->Snapshot.EquippedRoleModules;
 	OutProjection.Story = ActiveProfile->Snapshot.Story;
 	OutProjection.ShipModules = ActiveProfile->Snapshot.ShipModules;
 	FString Diagnostic;
@@ -665,10 +668,14 @@ FPRProfileOperationResult UPRSaveSubsystem::ApplyMultiplayerSettlementReceipt(co
 	Candidate->Snapshot.BackpackItems = Receipt.SettledBackpackItems;
 	Candidate->Snapshot.Equipment = Receipt.SettledEquipment;
 	Candidate->Snapshot.ResourceWallet = Receipt.SettledResourceWallet;
-	Candidate->Snapshot.SelectedRoleId = Receipt.SettledRoleId;
-	if (!Receipt.SettledRoleId.IsNone())
+	const bool bReceiptCarriesRoleModulePayload = !Receipt.SettledUnlockedRoleModuleIds.IsEmpty()
+		|| !Receipt.SettledEquippedRoleModules.IsEmpty();
+	if (bReceiptCarriesRoleModulePayload)
 	{
-		Candidate->Snapshot.UnlockedRoleIds.AddUnique(Receipt.SettledRoleId);
+		Candidate->Snapshot.SelectedRoleId = Receipt.SettledRoleId;
+		Candidate->Snapshot.UnlockedRoleIds = Receipt.SettledUnlockedRoleIds;
+		Candidate->Snapshot.UnlockedRoleModuleIds = Receipt.SettledUnlockedRoleModuleIds;
+		Candidate->Snapshot.EquippedRoleModules = Receipt.SettledEquippedRoleModules;
 	}
 	if (Receipt.bGrantStoryProgress)
 	{

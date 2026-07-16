@@ -41,7 +41,7 @@ void UPRProfileDebugWidget::RefreshProfiles()
 	RootBox->AddSlot().AutoHeight().Padding(0, 0, 0, 8)
 	[
 		SNew(STextBlock)
-		.Text(LOCTEXT("Title", "ProjectRift v0.6.2 Legacy Profile Verification"))
+		.Text(LOCTEXT("Title", "ProjectRift v0.6.3 Legacy Profile Verification"))
 		.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 18))
 		.ColorAndOpacity(FSlateColor(FLinearColor::White))
 	];

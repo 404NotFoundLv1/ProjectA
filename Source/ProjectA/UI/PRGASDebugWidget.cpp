@@ -3,6 +3,7 @@
 #include "Abilities/PRAttributeSet.h"
 #include "Abilities/PRAbilitySystemComponent.h"
 #include "Abilities/PRCombatEffectLibrary.h"
+#include "AbilitySystemComponent.h"
 #include "Characters/PRCharacter.h"
 #include "Combat/PRCombatFeedbackComponent.h"
 #include "Core/PRGameplayTags.h"
@@ -10,6 +11,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Player/PRPlayerState.h"
 #include "Player/PRPlayerController.h"
+#include "Roles/PRRoleComponent.h"
 #include "Items/PRWeaponDataAsset.h"
 #include "Weapons/PRWeaponComponent.h"
 #include "Styling/CoreStyle.h"
@@ -26,7 +28,7 @@ TSharedRef<SWidget> UPRGASDebugWidget::RebuildWidget()
 			.AutoWrapText(true)
 			.ColorAndOpacity(FSlateColor(FLinearColor::White))
 			.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 14))
-			.Text(FText::FromString(TEXT("ProjectRift v0.6.2 GAS Debug\nWaiting for player state...")))
+			.Text(FText::FromString(TEXT("ProjectRift v0.6.3 GAS Debug\nWaiting for player state...")))
 		];
 }
 
@@ -71,6 +73,15 @@ FString UPRGASDebugWidget::GetDebugText() const
 
 	const FName SelectedRoleModule = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetSelectedRoleModule() : NAME_None;
 	const FString RoleText = SelectedRoleModule.IsNone() ? TEXT("None") : SelectedRoleModule.ToString();
+	const UPRRoleComponent* RoleComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetRoleComponent() : nullptr;
+	FString LoadoutText;
+	if (RoleComponent)
+	{
+		for (const FPRRoleModuleSlotEntry& Entry : RoleComponent->GetCurrentLoadout().Entries)
+		{
+			LoadoutText += FString::Printf(TEXT("%s=%s "), *StaticEnum<EPRRoleModuleSlot>()->GetNameStringByValue(static_cast<int64>(Entry.Slot)), *Entry.ModuleId.ToString());
+		}
+	}
 	const UPRWeaponComponent* Weapon = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetWeaponComponent() : nullptr;
 	const UPRWeaponDataAsset* WeaponData = Weapon ? Weapon->GetEquippedWeaponData() : nullptr;
 	const UPRCombatFeedbackComponent* CombatFeedback = ProjectRiftCharacter
@@ -83,18 +94,21 @@ FString UPRGASDebugWidget::GetDebugText() const
 	const FString WeaponText = WeaponData
 		? (WeaponData->DisplayName.IsEmpty() ? WeaponData->ItemId.ToString() : WeaponData->DisplayName.ToString())
 		: TEXT("None");
+	const FString CooldownText = GetCooldownDebugText(AbilitySystemComponent);
 
 	if (!AttributeSet)
 	{
 		return FString::Printf(
-			TEXT("ProjectRift v0.6.2 GAS Debug\nPawn: %s\nAttributeSet: Missing\nDowned: %s\nRole: %s"),
+			TEXT("ProjectRift v0.6.3 GAS Debug\nPawn: %s\nAttributeSet: Missing\nDowned: %s\nRole: %s\nLoadout: %s\nCooldowns: %s"),
 			*GetNameSafe(ProjectRiftCharacter),
 			ProjectRiftCharacter && ProjectRiftCharacter->IsDowned() ? TEXT("true") : TEXT("false"),
-			*RoleText);
+			*RoleText,
+			*LoadoutText,
+			*CooldownText);
 	}
 
 	return FString::Printf(
-		TEXT("ProjectRift v0.6.2 GAS Debug\nHealth: %.0f / %.0f\nShield: %.0f / %.0f\nEnergy: %.0f / %.0f\nAttackPower: %.0f\nMoveSpeed: %.0f\nPollutionResistance: %.0f%%\nStatuses: %s\nHitStaggered: %s\nLast Cue: %s\nCue Active/Handled: %d / %d\nHit Confirm Sent/Received: %d / %d\nWeapon: %s\nAmmo: %d / %d\nAiming: %s\nReloading: %s\nDowned: %s\nRole: %s\nASC Ready: %s\nDefault GE: %s\nRole Abilities: %s"),
+		TEXT("ProjectRift v0.6.3 GAS Debug\nHealth: %.0f / %.0f\nShield: %.0f / %.0f\nEnergy: %.0f / %.0f\nAttackPower: %.0f\nMoveSpeed: %.0f\nPollutionResistance: %.0f%%\nStatuses: %s\nHitStaggered: %s\nLast Cue: %s\nCue Active/Handled: %d / %d\nHit Confirm Sent/Received: %d / %d\nWeapon: %s\nAmmo: %d / %d\nAiming: %s\nReloading: %s\nDowned: %s\nRole: %s\nLoadout: %s\nCooldowns: %s\nASC Ready: %s\nDefault GE: %s\nRole Abilities: %s"),
 		AttributeSet->GetHealth(),
 		AttributeSet->GetMaxHealth(),
 		AttributeSet->GetShield(),
@@ -118,7 +132,42 @@ FString UPRGASDebugWidget::GetDebugText() const
 		Weapon && Weapon->IsReloading() ? TEXT("true") : TEXT("false"),
 		ProjectRiftCharacter && ProjectRiftCharacter->IsDowned() ? TEXT("true") : TEXT("false"),
 		*RoleText,
+		*LoadoutText,
+		*CooldownText,
 		ProjectRiftCharacter && ProjectRiftCharacter->IsAbilitySystemInitialized() ? TEXT("true") : TEXT("false"),
 		ProjectRiftCharacter && ProjectRiftCharacter->AreDefaultAttributesApplied() ? TEXT("true") : TEXT("false"),
 		ProjectRiftCharacter && ProjectRiftCharacter->AreRoleModuleAbilitiesGranted() ? TEXT("true") : TEXT("false"));
+}
+
+FString UPRGASDebugWidget::GetCooldownDebugText(const UAbilitySystemComponent* AbilitySystemComponent)
+{
+	auto FormatCooldown = [AbilitySystemComponent](const TCHAR* SlotName, const FGameplayTag& CooldownTag)
+	{
+		// GetActiveEffectsTimeRemaining requires a fully initialized ability actor info.
+		if (!AbilitySystemComponent || !AbilitySystemComponent->GetOwnerActor())
+		{
+			return FString::Printf(TEXT("%s: Unavailable"), SlotName);
+		}
+
+		FGameplayTagContainer CooldownTags;
+		CooldownTags.AddTag(CooldownTag);
+		const FGameplayEffectQuery Query = FGameplayEffectQuery::MakeQuery_MatchAllOwningTags(CooldownTags);
+		const TArray<float> RemainingTimes = AbilitySystemComponent->GetActiveEffectsTimeRemaining(Query);
+		if (RemainingTimes.IsEmpty())
+		{
+			return FString::Printf(TEXT("%s: Ready"), SlotName);
+		}
+
+		float MaxRemainingSeconds = 0.0f;
+		for (const float RemainingSeconds : RemainingTimes)
+		{
+			MaxRemainingSeconds = FMath::Max(MaxRemainingSeconds, RemainingSeconds);
+		}
+		return FString::Printf(TEXT("%s: Cooldown %.1fs"), SlotName, static_cast<double>(MaxRemainingSeconds));
+	};
+
+	const FString QCooldownText = FormatCooldown(TEXT("Q"), ProjectRiftGameplayTags::Cooldown_Skill_Q);
+	const FString ECooldownText = FormatCooldown(TEXT("E"), ProjectRiftGameplayTags::Cooldown_Skill_E);
+	const FString RCooldownText = FormatCooldown(TEXT("R"), ProjectRiftGameplayTags::Cooldown_Skill_R);
+	return FString::Printf(TEXT("%s | %s | %s"), *QCooldownText, *ECooldownText, *RCooldownText);
 }

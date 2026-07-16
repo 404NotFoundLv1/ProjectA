@@ -14,6 +14,7 @@
 #include "GameplayAbilitySpec.h"
 #include "GameFramework/PlayerController.h"
 #include "Player/PRPlayerState.h"
+#include "Roles/PRRoleModuleDataAsset.h"
 #include "Tests/AutomationCommon.h"
 #include "UObject/StrongObjectPtr.h"
 #include "Weapons/PRWeaponComponent.h"
@@ -43,6 +44,28 @@ bool PossessTestCharacterForInputBindingTest(UWorld* World, APRPlayerState* Play
 bool SpecHasInputTag(const FGameplayAbilitySpec* Spec, const FGameplayTag InputTag)
 {
 	return Spec && InputTag.IsValid() && Spec->GetDynamicSpecSourceTags().HasTagExact(InputTag);
+}
+
+FGameplayAbilitySpec* FindRoleModuleSpecByInputTag(
+	UPRAbilitySystemComponent* AbilitySystemComponent,
+	const FGameplayTag InputTag,
+	const FName ExpectedModuleId = NAME_None)
+{
+	if (!AbilitySystemComponent || !InputTag.IsValid())
+	{
+		return nullptr;
+	}
+
+	for (FGameplayAbilitySpec& Spec : AbilitySystemComponent->GetActivatableAbilities())
+	{
+		const UPRRoleModuleDataAsset* Module = Cast<UPRRoleModuleDataAsset>(Spec.SourceObject.Get());
+		if (Module && SpecHasInputTag(&Spec, InputTag)
+			&& (ExpectedModuleId.IsNone() || Module->ModuleId == ExpectedModuleId))
+		{
+			return &Spec;
+		}
+	}
+	return nullptr;
 }
 }
 
@@ -108,9 +131,10 @@ bool FPRGASInputBindingTest::RunTest(const FString& Parameters)
 	}
 
 	FGameplayAbilitySpec* PrimarySpec = AttackerASC->FindAbilitySpecFromClass(UGA_PrimaryAttack::StaticClass());
-	FGameplayAbilitySpec* ChargeSpec = AttackerASC->FindAbilitySpecFromClass(UGA_AssaultCharge::StaticClass());
+	FGameplayAbilitySpec* ChargeSpec = FindRoleModuleSpecByInputTag(AttackerASC, QInputTag, TEXT("Ability.Module.Assault.Charge"));
 	TestTrue(TEXT("Primary ability has primary input tag"), SpecHasInputTag(PrimarySpec, PrimaryInputTag));
-	TestTrue(TEXT("Q ability has Q input tag"), SpecHasInputTag(ChargeSpec, QInputTag));
+	TestTrue(TEXT("Data-driven Q module ability has Q input tag"), SpecHasInputTag(ChargeSpec, QInputTag));
+	TestTrue(TEXT("Data-driven Q module spec retains its module definition as source"), ChargeSpec && Cast<UPRRoleModuleDataAsset>(ChargeSpec->SourceObject.Get()) != nullptr);
 
 	TargetAttributes->SetMaxHealth(100.0f);
 	TargetAttributes->SetHealth(100.0f);
@@ -146,14 +170,31 @@ bool FPRGASInputBindingTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
-	if (FGameplayAbilitySpec* ReplacementChargeSpec = ReplacementASC->FindAbilitySpecFromClass(UGA_AssaultCharge::StaticClass()))
+	FGameplayAbilitySpec* ReplacementChargeSpec = FindRoleModuleSpecByInputTag(
+		ReplacementASC,
+		QInputTag,
+		TEXT("Ability.Module.Assault.Charge"));
+	TestNotNull(TEXT("Replacement state has a data-driven Q module spec"), ReplacementChargeSpec);
+	if (ReplacementChargeSpec)
 	{
 		ReplacementASC->ClearAbility(ReplacementChargeSpec->Handle);
 	}
 
-	FGameplayAbilitySpec ReplacementQSpec(UGA_AssaultShield::StaticClass(), 1, INDEX_NONE, ReplacementCharacter.Get());
+	FGameplayAbilitySpec* ReplacementShieldSpec = FindRoleModuleSpecByInputTag(
+		ReplacementASC,
+		RInputTag,
+		TEXT("Ability.Module.Assault.Shield"));
+	UPRRoleModuleDataAsset* ReplacementShieldModuleSource = ReplacementShieldSpec
+		? Cast<UPRRoleModuleDataAsset>(ReplacementShieldSpec->SourceObject.Get())
+		: nullptr;
+	TestNotNull(TEXT("Replacement state has a data-driven shield module spec"), ReplacementShieldSpec);
+	TestNotNull(TEXT("Replacement shield retains its matching module source"), ReplacementShieldModuleSource);
+
+	FGameplayAbilitySpec ReplacementQSpec(ReplacementShieldModuleSource ? ReplacementShieldModuleSource->GameplayAbilityClass : nullptr, 1, INDEX_NONE, ReplacementShieldModuleSource);
 	ReplacementQSpec.GetDynamicSpecSourceTags().AddTag(QInputTag);
 	ReplacementASC->GiveAbility(ReplacementQSpec);
+	TestNotNull(TEXT("Replacement Q ability keeps its matching role-module source object"), ReplacementShieldModuleSource);
+	TestNotNull(TEXT("Replacement Q spec is found by its data-driven source and Q tag"), FindRoleModuleSpecByInputTag(ReplacementASC, QInputTag, TEXT("Ability.Module.Assault.Shield")));
 
 	ReplacementAttributes->SetEnergy(100.0f);
 	ReplacementAttributes->SetShield(10.0f);

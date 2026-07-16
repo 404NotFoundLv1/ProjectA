@@ -7,6 +7,7 @@
 #include "ProjectA.h"
 #include "Progression/PRMissionProgressionDataAsset.h"
 #include "Weapons/PRWeaponComponent.h"
+#include "Roles/PRRoleComponent.h"
 
 APRPlayerState::APRPlayerState()
 	: bIsReady(false)
@@ -19,6 +20,7 @@ APRPlayerState::APRPlayerState()
 	AttributeSet = CreateDefaultSubobject<UPRAttributeSet>(TEXT("AttributeSet"));
 	InventoryComponent = CreateDefaultSubobject<UPRInventoryComponent>(TEXT("InventoryComponent"));
 	WeaponComponent = CreateDefaultSubobject<UPRWeaponComponent>(TEXT("WeaponComponent"));
+	RoleComponent = CreateDefaultSubobject<UPRRoleComponent>(TEXT("RoleComponent"));
 }
 
 void APRPlayerState::BeginPlay()
@@ -82,7 +84,8 @@ void APRPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 
 void APRPlayerState::SetReady(const bool bReady)
 {
-	if (bReady && (!bMultiplayerProfileBound || bRepairPersistencePending))
+	if (bReady && (!bMultiplayerProfileBound || bRepairPersistencePending
+		|| !RoleComponent || !RoleComponent->IsLoadoutValid(SelectedRoleModule, RoleComponent->GetCurrentLoadout())))
 	{
 		UE_LOG(LogProjectA, Warning, TEXT("Ready state rejected because profile binding or repair persistence is incomplete. Player=%s"), *GetPlayerDisplayName());
 		return;
@@ -105,7 +108,7 @@ void APRPlayerState::SetReady(const bool bReady)
 
 bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjection& Projection, FString& OutDiagnostic)
 {
-	if (!Projection.IsValid(&OutDiagnostic) || !InventoryComponent || !WeaponComponent)
+	if (!Projection.IsValid(&OutDiagnostic) || !InventoryComponent || !WeaponComponent || !RoleComponent)
 	{
 		return false;
 	}
@@ -130,25 +133,82 @@ bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjectio
 	}
 	const TArray<FPRProfileEquipmentEntry> PreviousEquipment = WeaponComponent->GetEquipmentEntries();
 	const TArray<FPRShipResourceStack> PreviousResources = ShipResources;
+	FName PreviousRoleId;
+	TArray<FName> PreviousUnlockedRoleIds;
+	TArray<FName> PreviousUnlockedModuleIds;
+	FPRRoleLoadout PreviousLoadout;
+	RoleComponent->CaptureProfileRoleState(
+		PreviousRoleId,
+		PreviousUnlockedRoleIds,
+		PreviousLoadout,
+		PreviousUnlockedModuleIds);
+	auto RestorePreviousRuntimeState = [&]()
+	{
+		InventoryComponent->ReplaceInventoryItems(PreviousBackpack);
+		ReplaceShipResources(PreviousResources);
+		FString RestoreDiagnostic;
+		WeaponComponent->ReplaceEquipmentEntries(PreviousEquipment, RestoreDiagnostic);
+		RoleComponent->ApplyProfileRoleState(
+			PreviousRoleId,
+			PreviousUnlockedRoleIds,
+			PreviousLoadout,
+			PreviousUnlockedModuleIds);
+	};
 	if (!InventoryComponent->ReplaceInventoryItems(Projection.BackpackItems)
 		|| !ReplaceShipResources(RuntimeResources)
 		|| !WeaponComponent->ReplaceEquipmentEntries(Projection.Equipment, OutDiagnostic)
 		|| !WeaponComponent->EnsureStarterWeapon(TEXT("TestRifle"), OutDiagnostic))
 	{
-		InventoryComponent->ReplaceInventoryItems(PreviousBackpack);
-		ReplaceShipResources(PreviousResources);
-		FString RestoreDiagnostic;
-		WeaponComponent->ReplaceEquipmentEntries(PreviousEquipment, RestoreDiagnostic);
+		RestorePreviousRuntimeState();
 		OutDiagnostic = TEXT("PlayerState rejected validated multiplayer profile runtime data.");
 		return false;
 	}
 
-	if (!WeaponComponent->BuildPersistentBackpack(MissionStartBackpackItems, OutDiagnostic))
+	FPRRoleLoadout RequestedLoadout;
+	RequestedLoadout.Entries = Projection.EquippedRoleModules;
+	RoleComponent->ApplyProfileRoleState(
+		Projection.SelectedRoleId,
+		Projection.UnlockedRoleIds,
+		RequestedLoadout,
+		Projection.UnlockedRoleModuleIds);
+	const bool bHasEmptyLegacyRolePayload = Projection.EquippedRoleModules.IsEmpty()
+		&& Projection.UnlockedRoleModuleIds.IsEmpty();
+	const bool bNeedsLegacyDefault = bHasEmptyLegacyRolePayload
+		&& (Projection.SelectedRoleId.IsNone()
+			|| Projection.SelectedRoleId == TEXT("Role.Assault")
+			|| Projection.SelectedRoleId == TEXT("Ability.Role.Assault"));
+	if (bNeedsLegacyDefault)
 	{
-		InventoryComponent->ReplaceInventoryItems(PreviousBackpack);
-		ReplaceShipResources(PreviousResources);
-		FString RestoreDiagnostic;
-		WeaponComponent->ReplaceEquipmentEntries(PreviousEquipment, RestoreDiagnostic);
+		if (!RoleComponent->EnsureDefaultLoadoutForSelectedRole())
+		{
+			RestorePreviousRuntimeState();
+			OutDiagnostic = TEXT("Legacy profile role defaults could not be applied.");
+			return false;
+		}
+	}
+	FName AppliedRoleId;
+	TArray<FName> AppliedUnlockedRoleIds;
+	TArray<FName> AppliedUnlockedModuleIds;
+	FPRRoleLoadout AppliedLoadout;
+	RoleComponent->CaptureProfileRoleState(
+		AppliedRoleId,
+		AppliedUnlockedRoleIds,
+		AppliedLoadout,
+		AppliedUnlockedModuleIds);
+	if ((!bNeedsLegacyDefault && (AppliedRoleId != Projection.SelectedRoleId
+		|| AppliedUnlockedRoleIds != Projection.UnlockedRoleIds
+		|| AppliedUnlockedModuleIds != Projection.UnlockedRoleModuleIds
+		|| AppliedLoadout.Entries != Projection.EquippedRoleModules))
+		|| (bNeedsLegacyDefault && !RoleComponent->IsLoadoutValid(AppliedRoleId, AppliedLoadout)))
+	{
+		RestorePreviousRuntimeState();
+		OutDiagnostic = TEXT("PlayerState rejected multiplayer role state.");
+		return false;
+	}
+	TArray<FPRItemInstance> NewMissionStartBackpackItems;
+	if (!WeaponComponent->BuildPersistentBackpack(NewMissionStartBackpackItems, OutDiagnostic))
+	{
+		RestorePreviousRuntimeState();
 		return false;
 	}
 	BoundProfileId = Projection.ProfileId;
@@ -157,10 +217,13 @@ bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjectio
 	BoundShipModules = Projection.ShipModules;
 	bRepairPersistencePending = false;
 	PendingRepairTransactionId.Invalidate();
+	MissionStartBackpackItems = MoveTemp(NewMissionStartBackpackItems);
 	MissionStartResourceWallet = Projection.ResourceWallet;
-	MissionStartRoleId = Projection.SelectedRoleId;
+	MissionStartRoleId = AppliedRoleId;
+	MissionStartUnlockedRoleIds = AppliedUnlockedRoleIds;
+	MissionStartUnlockedRoleModuleIds = AppliedUnlockedModuleIds;
+	MissionStartRoleLoadout = AppliedLoadout;
 	SetPlayerDisplayName(Projection.DisplayName);
-	SetSelectedRoleModule(Projection.SelectedRoleId);
 	ForceNetUpdate();
 	return true;
 }
@@ -177,6 +240,9 @@ void APRPlayerState::ClearMultiplayerProfileBinding()
 	MissionStartBackpackItems.Reset();
 	MissionStartResourceWallet.Reset();
 	MissionStartRoleId = NAME_None;
+	MissionStartUnlockedRoleIds.Reset();
+	MissionStartUnlockedRoleModuleIds.Reset();
+	MissionStartRoleLoadout = FPRRoleLoadout();
 	ForceNetUpdate();
 }
 
@@ -210,11 +276,18 @@ bool APRPlayerState::BuildBoundShipRepairSnapshot(FPRProfileSnapshot& OutSnapsho
 	OutSnapshot.Equipment = WeaponComponent->GetEquipmentEntries();
 	OutSnapshot.ShipModules = BoundShipModules;
 	OutSnapshot.Story = BoundStoryProgress;
-	OutSnapshot.SelectedRoleId = SelectedRoleModule;
-	if (!SelectedRoleModule.IsNone())
+	if (!RoleComponent)
 	{
-		OutSnapshot.UnlockedRoleIds.Add(SelectedRoleModule);
+		OutDiagnostic = TEXT("Bound role component is unavailable.");
+		return false;
 	}
+	FPRRoleLoadout RuntimeLoadout;
+	RoleComponent->CaptureProfileRoleState(
+		OutSnapshot.SelectedRoleId,
+		OutSnapshot.UnlockedRoleIds,
+		RuntimeLoadout,
+		OutSnapshot.UnlockedRoleModuleIds);
+	OutSnapshot.EquippedRoleModules = RuntimeLoadout.Entries;
 	OutSnapshot.Normalize();
 	return OutSnapshot.IsValid(&OutDiagnostic);
 }
@@ -447,6 +520,9 @@ void APRPlayerState::CopyProjectRiftStateFrom(const APRPlayerState* SourcePlayer
 	MissionStartBackpackItems = SourcePlayerState->MissionStartBackpackItems;
 	MissionStartResourceWallet = SourcePlayerState->MissionStartResourceWallet;
 	MissionStartRoleId = SourcePlayerState->MissionStartRoleId;
+	MissionStartUnlockedRoleIds = SourcePlayerState->MissionStartUnlockedRoleIds;
+	MissionStartUnlockedRoleModuleIds = SourcePlayerState->MissionStartUnlockedRoleModuleIds;
+	MissionStartRoleLoadout = SourcePlayerState->MissionStartRoleLoadout;
 	if (InventoryComponent && SourcePlayerState->InventoryComponent)
 	{
 		if (!InventoryComponent->ReplaceInventoryItems(SourcePlayerState->InventoryComponent->GetInventoryItems()))
@@ -458,6 +534,10 @@ void APRPlayerState::CopyProjectRiftStateFrom(const APRPlayerState* SourcePlayer
 	if (WeaponComponent && SourcePlayerState->WeaponComponent)
 	{
 		WeaponComponent->CopyRuntimeStateFrom(SourcePlayerState->WeaponComponent);
+	}
+	if (RoleComponent && SourcePlayerState->RoleComponent)
+	{
+		RoleComponent->CopyRuntimeStateFrom(SourcePlayerState->RoleComponent);
 	}
 	SelectedRoleModule = SourcePlayerState->SelectedRoleModule;
 	PlayerDisplayName = SourcePlayerState->PlayerDisplayName;

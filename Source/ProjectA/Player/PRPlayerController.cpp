@@ -37,8 +37,10 @@
 #include "UI/PRInventoryWidget.h"
 #include "UI/PRLobbyReadyDebugWidget.h"
 #include "UI/PRRiftSettlementWidget.h"
+#include "UI/PRRoleLoadoutWidget.h"
 #include "UI/PRShipRepairWidget.h"
 #include "UI/PRWeaponHUDWidget.h"
+#include "Roles/PRRoleComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Weapons/PRWeaponComponent.h"
 
@@ -87,6 +89,15 @@ FString GetLobbyReadyLine(const APlayerState* PlayerState)
 	const APRPlayerState* ProjectRiftPlayerState = Cast<APRPlayerState>(PlayerState);
 	const bool bReady = ProjectRiftPlayerState && ProjectRiftPlayerState->IsReady();
 	const FName SelectedRoleModule = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetSelectedRoleModule() : NAME_None;
+	const UPRRoleComponent* RoleComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetRoleComponent() : nullptr;
+	FString LoadoutSummary;
+	if (RoleComponent)
+	{
+		for (const FPRRoleModuleSlotEntry& Entry : RoleComponent->GetCurrentLoadout().Entries)
+		{
+			LoadoutSummary += FString::Printf(TEXT(" %s:%s"), *StaticEnum<EPRRoleModuleSlot>()->GetNameStringByValue(static_cast<int64>(Entry.Slot)), *Entry.ModuleId.ToString());
+		}
+	}
 	const FString ResourceSummary = ProjectRiftPlayerState ? ProjectRiftPlayerState->BuildShipResourceSummary() : FString(TEXT("None"));
 	FString DisplayName = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetPlayerDisplayName() : FString();
 
@@ -102,13 +113,14 @@ FString GetLobbyReadyLine(const APlayerState* PlayerState)
 
 	const int32 PlayerId = PlayerState ? PlayerState->GetPlayerId() : INDEX_NONE;
 	return FString::Printf(
-		TEXT("P%d %s: %s | Profile: %s | Repair save: %s | Role: %s | Resources: %s"),
+		TEXT("P%d %s: %s | Profile: %s | Repair save: %s | Role: %s | QER:%s | Resources: %s"),
 		PlayerId,
 		*DisplayName,
 		bReady ? TEXT("READY") : TEXT("WAITING"),
 		ProjectRiftPlayerState && ProjectRiftPlayerState->IsMultiplayerProfileBound() ? TEXT("BOUND") : TEXT("UNBOUND"),
 		ProjectRiftPlayerState && ProjectRiftPlayerState->IsRepairPersistencePending() ? TEXT("PENDING") : TEXT("CLEAR"),
 		SelectedRoleModule.IsNone() ? TEXT("None") : *SelectedRoleModule.ToString(),
+		*LoadoutSummary,
 		*ResourceSummary);
 }
 }
@@ -137,6 +149,7 @@ APRPlayerController::APRPlayerController()
 	WeaponHUDWidgetClass = UPRWeaponHUDWidget::StaticClass();
 	RiftSettlementWidgetClass = UPRRiftSettlementWidget::StaticClass();
 	ShipRepairWidgetClass = UPRShipRepairWidget::StaticClass();
+	RoleLoadoutWidgetClass = UPRRoleLoadoutWidget::StaticClass();
 	DiagnosticsWidgetClass = UPRDiagnosticsWidget::StaticClass();
 	HealthInjectorEffectClass = UPRHealthConsumableGameplayEffect::StaticClass();
 	ShieldPackEffectClass = UPRShieldConsumableGameplayEffect::StaticClass();
@@ -182,6 +195,7 @@ void APRPlayerController::BeginPlay()
 		CreateWeaponHUD();
 		CreateRiftSettlementUI();
 		CreateShipRepairUI();
+		CreateRoleLoadoutUI();
 		SubmitLocalMultiplayerProfile();
 
 #if !UE_BUILD_SHIPPING
@@ -200,6 +214,7 @@ void APRPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	DestroyRiftSettlementUI();
 	DestroyShipRepairUI();
+	DestroyRoleLoadoutUI();
 	DestroyInventoryUI();
 	DestroyWeaponHUD();
 	DestroyDiagnosticsUI();
@@ -220,6 +235,8 @@ void APRPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APRPlayerController::SelectAssaultRoleModule);
 		InputComponent->BindKey(EKeys::P, IE_Pressed, this, &APRPlayerController::ToggleReady);
 		InputComponent->BindKey(EKeys::O, IE_Pressed, this, &APRPlayerController::StartRiftMission);
+		InputComponent->BindKey(EKeys::C, IE_Pressed, this, &APRPlayerController::ToggleRoleLoadoutPanel);
+		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &APRPlayerController::HideRoleLoadoutPanel);
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &APRPlayerController::HideShipRepairPanel);
 #if !UE_BUILD_SHIPPING
 		InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &APRPlayerController::ToggleDiagnosticsPanel);
@@ -334,6 +351,8 @@ void APRPlayerController::ShowInventory()
 		return;
 	}
 	HideShipRepairPanel();
+	HideRoleLoadoutPanel();
+	HideDiagnosticsPanel();
 
 	const bool bWasInventoryVisible = IsInventoryVisible();
 	CreateInventoryUI();
@@ -403,6 +422,8 @@ void APRPlayerController::ShowShipRepairPanel()
 		return;
 	}
 	HideInventory();
+	HideRoleLoadoutPanel();
+	HideDiagnosticsPanel();
 	CreateShipRepairUI();
 	if (ShipRepairWidget)
 	{
@@ -425,6 +446,46 @@ void APRPlayerController::HideShipRepairPanel()
 bool APRPlayerController::IsShipRepairPanelVisible() const
 {
 	return ShipRepairWidget && ShipRepairWidget->GetVisibility() == ESlateVisibility::Visible;
+}
+
+void APRPlayerController::ToggleRoleLoadoutPanel()
+{
+	if (RoleLoadoutWidget && RoleLoadoutWidget->GetVisibility() == ESlateVisibility::Visible)
+	{
+		HideRoleLoadoutPanel();
+	}
+	else
+	{
+		ShowRoleLoadoutPanel();
+	}
+}
+
+void APRPlayerController::ShowRoleLoadoutPanel()
+{
+	if (!IsLocalPlayerController() || !IsShipLobbyDebugWorld(GetWorld()))
+	{
+		return;
+	}
+	HideInventory();
+	HideShipRepairPanel();
+	HideDiagnosticsPanel();
+	CreateRoleLoadoutUI();
+	if (RoleLoadoutWidget)
+	{
+		bSavedMouseCursorVisibilityForRoleLoadout = bShowMouseCursor;
+		RoleLoadoutWidget->RefreshLoadoutDisplay();
+		RoleLoadoutWidget->SetVisibility(ESlateVisibility::Visible);
+		ApplyRoleLoadoutInputMode();
+	}
+}
+
+void APRPlayerController::HideRoleLoadoutPanel()
+{
+	if (RoleLoadoutWidget)
+	{
+		RoleLoadoutWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	RestoreRoleLoadoutInputMode();
 }
 
 void APRPlayerController::UseInventoryItem(const FName ItemId)
@@ -515,6 +576,7 @@ void APRPlayerController::ShowDiagnosticsPanel(const bool bOpenToolsTab)
 	}
 	HideInventory();
 	HideShipRepairPanel();
+	HideRoleLoadoutPanel();
 	CreateDiagnosticsUI();
 	if (!DiagnosticsWidget)
 	{
@@ -877,6 +939,12 @@ void APRPlayerController::ServerSetSelectedRoleModule_Implementation(const FName
 		return;
 	}
 
+	if (!GetWorld() || !GetWorld()->GetAuthGameMode<APRShipLobbyGameMode>() || ProjectRiftPlayerState->IsReady())
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Role selection was rejected outside the ship lobby or while ready."));
+		return;
+	}
+
 	if (RoleModule.IsNone())
 	{
 		ProjectRiftPlayerState->SetSelectedRoleModule(NAME_None);
@@ -886,10 +954,35 @@ void APRPlayerController::ServerSetSelectedRoleModule_Implementation(const FName
 	if (RoleModule == AssaultRoleModuleName || RoleModule == FName(TEXT("Role.Assault")))
 	{
 		ProjectRiftPlayerState->SetSelectedRoleModule(AssaultRoleModuleName);
+		if (UPRRoleComponent* RoleComponent = ProjectRiftPlayerState->GetRoleComponent())
+		{
+			RoleComponent->EnsureDefaultLoadoutForSelectedRole();
+		}
 		return;
 	}
 
 	UE_LOG(LogProjectA, Warning, TEXT("Unsupported role module requested: %s"), *RoleModule.ToString());
+}
+
+void APRPlayerController::ServerApplyRoleLoadout_Implementation(const FName RoleId, const FPRRoleLoadout& Loadout)
+{
+	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	UPRRoleComponent* RoleComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetRoleComponent() : nullptr;
+	if (!RoleComponent)
+	{
+		ClientRoleLoadoutApplyResult(EPRRoleLoadoutApplyResult::InternalFailure, TEXT("Role component is unavailable."));
+		return;
+	}
+	const EPRRoleLoadoutApplyResult Result = RoleComponent->ApplyLoadout(RoleId, Loadout);
+	ClientRoleLoadoutApplyResult(Result, Result == EPRRoleLoadoutApplyResult::Applied ? TEXT("Loadout applied.") : TEXT("Loadout request was rejected."));
+}
+
+void APRPlayerController::ClientRoleLoadoutApplyResult_Implementation(const EPRRoleLoadoutApplyResult Result, const FString& Diagnostic)
+{
+	if (RoleLoadoutWidget)
+	{
+		RoleLoadoutWidget->HandleApplyResult(Result, Diagnostic);
+	}
 }
 
 void APRPlayerController::ServerStartRiftMission_Implementation()
@@ -1564,7 +1657,7 @@ void APRPlayerController::RefreshLobbyReadyDebugDisplay()
 	}
 
 	FString ReadyList = FString::Printf(
-		TEXT("Lobby Team Status\nMission: %s | Contract: %s | Can start: %s\nProfile: %s | Host eligible: %s\nStart blocked by: %s\n1: Assault | P: Ready | R: Ship Repair | Host O: Start Rift\n"),
+		TEXT("Lobby Team Status\nMission: %s | Contract: %s | Can start: %s\nProfile: %s | Host eligible: %s\nStart blocked by: %s\n1: Assault | C: Role Loadout | P: Ready | R: Ship Repair | Host O: Start Rift\n"),
 		TeamMissionId.IsNone() ? TEXT("None") : *TeamMissionId.ToString(),
 		Mission && Mission->IsContractValid() ? TEXT("VALID") : TEXT("INVALID"),
 		ProjectRiftGameState && ProjectRiftGameState->IsTeamMissionReady() ? TEXT("YES") : TEXT("NO"),
@@ -1798,6 +1891,38 @@ void APRPlayerController::DestroyShipRepairUI()
 	}
 }
 
+void APRPlayerController::CreateRoleLoadoutUI()
+{
+	if (!IsLocalPlayerController() || RoleLoadoutWidget)
+	{
+		return;
+	}
+	if (!RoleLoadoutWidgetClass)
+	{
+		RoleLoadoutWidgetClass = UPRRoleLoadoutWidget::StaticClass();
+	}
+	RoleLoadoutWidget = CreateWidget<UPRRoleLoadoutWidget>(this, RoleLoadoutWidgetClass);
+	if (RoleLoadoutWidget)
+	{
+		RoleLoadoutWidget->SetVisibility(ESlateVisibility::Collapsed);
+		RoleLoadoutWidget->AddToPlayerScreen(41);
+		RoleLoadoutWidget->SetPositionInViewport(FVector2D::ZeroVector, false);
+		RoleLoadoutWidget->SetDesiredSizeInViewport(FVector2D(660.0f, 460.0f));
+		RoleLoadoutWidget->SetAnchorsInViewport(FAnchors(0.5f, 0.5f));
+		RoleLoadoutWidget->SetAlignmentInViewport(FVector2D(0.5f, 0.5f));
+	}
+}
+
+void APRPlayerController::DestroyRoleLoadoutUI()
+{
+	RestoreRoleLoadoutInputMode();
+	if (RoleLoadoutWidget)
+	{
+		RoleLoadoutWidget->RemoveFromParent();
+		RoleLoadoutWidget = nullptr;
+	}
+}
+
 void APRPlayerController::ApplyInventoryInputMode()
 {
 	if (!IsLocalPlayerController() || !InventoryWidget)
@@ -1855,6 +1980,32 @@ void APRPlayerController::RestoreShipRepairInputMode()
 	SetInputMode(InputMode);
 	bShowMouseCursor = bSavedMouseCursorVisibilityForShipRepair;
 	bShipRepairInputModeActive = false;
+}
+
+void APRPlayerController::ApplyRoleLoadoutInputMode()
+{
+	if (!IsLocalPlayerController() || !RoleLoadoutWidget)
+	{
+		return;
+	}
+	bShowMouseCursor = true;
+	FInputModeGameAndUI InputMode;
+	InputMode.SetWidgetToFocus(RoleLoadoutWidget->TakeWidget());
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
+	SetInputMode(InputMode);
+	bRoleLoadoutInputModeActive = true;
+}
+
+void APRPlayerController::RestoreRoleLoadoutInputMode()
+{
+	if (!IsLocalPlayerController() || !bRoleLoadoutInputModeActive)
+	{
+		return;
+	}
+	SetInputMode(FInputModeGameOnly());
+	bShowMouseCursor = bSavedMouseCursorVisibilityForRoleLoadout;
+	bRoleLoadoutInputModeActive = false;
 }
 
 UPRInventoryComponent* APRPlayerController::GetLocalInventoryComponent() const

@@ -1,9 +1,48 @@
 #include "Persistence/PRProfileRuntimeBridge.h"
 
+#include "Core/PRAssetManager.h"
 #include "Items/PRInventoryComponent.h"
 #include "Player/PRPlayerState.h"
+#include "Roles/PRRoleComponent.h"
+#include "Roles/PRRoleDataAsset.h"
+#include "Roles/PRRoleModuleDataAsset.h"
 #include "Weapons/PRWeaponComponent.h"
 #include "Weapons/PRWeaponTypes.h"
+
+namespace
+{
+bool AreRoleLoadoutsEqual(const FPRRoleLoadout& Left, const FPRRoleLoadout& Right)
+{
+	if (Left.Entries.Num() != Right.Entries.Num())
+	{
+		return false;
+	}
+	for (int32 Index = 0; Index < Left.Entries.Num(); ++Index)
+	{
+		if (Left.Entries[Index].Slot != Right.Entries[Index].Slot
+			|| Left.Entries[Index].ModuleId != Right.Entries[Index].ModuleId)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+bool IsKnownLegacyRole(const FName SelectedRoleId)
+{
+	const FName NormalizedRoleId = SelectedRoleId.IsNone() || SelectedRoleId == TEXT("Role.Assault")
+		? FName(TEXT("Ability.Role.Assault"))
+		: SelectedRoleId;
+	UPRAssetManager* AssetManager = UPRAssetManager::Get();
+	TArray<UPRRoleDataAsset*> Roles;
+	TArray<UPRRoleModuleDataAsset*> Modules;
+	return AssetManager && AssetManager->LoadRoleCatalog(Roles, Modules)
+		&& Roles.ContainsByPredicate([NormalizedRoleId](const UPRRoleDataAsset* Role)
+		{
+			return Role && Role->RoleId == NormalizedRoleId;
+		});
+}
+}
 
 bool FPRProfileRuntimeBridge::CaptureFromPlayerState(
 	const APRPlayerState* PlayerState,
@@ -12,9 +51,10 @@ bool FPRProfileRuntimeBridge::CaptureFromPlayerState(
 {
 	const UPRInventoryComponent* Inventory = PlayerState ? PlayerState->GetInventoryComponent() : nullptr;
 	const UPRWeaponComponent* Weapon = PlayerState ? PlayerState->GetWeaponComponent() : nullptr;
-	if (!PlayerState || !Inventory || !Weapon)
+	const UPRRoleComponent* RoleComponent = PlayerState ? PlayerState->GetRoleComponent() : nullptr;
+	if (!PlayerState || !Inventory || !Weapon || !RoleComponent)
 	{
-		OutDiagnostic = TEXT("PlayerState, inventory, or weapon component is unavailable.");
+		OutDiagnostic = TEXT("PlayerState, inventory, weapon, or role component is unavailable.");
 		return false;
 	}
 	if (!Weapon->BuildPersistentBackpack(InOutSnapshot.BackpackItems, OutDiagnostic))
@@ -49,7 +89,13 @@ bool FPRProfileRuntimeBridge::CaptureFromPlayerState(
 			InOutSnapshot.ResourceWallet.Emplace(Resource.ResourceId, Resource.Count);
 		}
 	}
-	InOutSnapshot.SelectedRoleId = PlayerState->GetSelectedRoleModule();
+	FPRRoleLoadout RoleLoadout;
+	RoleComponent->CaptureProfileRoleState(
+		InOutSnapshot.SelectedRoleId,
+		InOutSnapshot.UnlockedRoleIds,
+		RoleLoadout,
+		InOutSnapshot.UnlockedRoleModuleIds);
+	InOutSnapshot.EquippedRoleModules = RoleLoadout.Entries;
 	InOutSnapshot.Normalize();
 	return InOutSnapshot.IsValid(&OutDiagnostic);
 }
@@ -61,9 +107,10 @@ bool FPRProfileRuntimeBridge::ApplyToPlayerState(
 {
 	UPRInventoryComponent* Inventory = PlayerState ? PlayerState->GetInventoryComponent() : nullptr;
 	UPRWeaponComponent* Weapon = PlayerState ? PlayerState->GetWeaponComponent() : nullptr;
-	if (!PlayerState || !Inventory || !Weapon)
+	UPRRoleComponent* RoleComponent = PlayerState ? PlayerState->GetRoleComponent() : nullptr;
+	if (!PlayerState || !Inventory || !Weapon || !RoleComponent)
 	{
-		OutDiagnostic = TEXT("PlayerState, inventory, or weapon component is unavailable.");
+		OutDiagnostic = TEXT("PlayerState, inventory, weapon, or role component is unavailable.");
 		return false;
 	}
 	if (!Snapshot.IsValid(&OutDiagnostic))
@@ -85,24 +132,74 @@ bool FPRProfileRuntimeBridge::ApplyToPlayerState(
 	}
 	const TArray<FPRProfileEquipmentEntry> PreviousEquipment = Weapon->GetEquipmentEntries();
 	const TArray<FPRShipResourceStack> PreviousResources = PlayerState->GetShipResources();
-	const FName PreviousRole = PlayerState->GetSelectedRoleModule();
+	FName PreviousRoleId;
+	TArray<FName> PreviousUnlockedRoleIds;
+	TArray<FName> PreviousUnlockedModuleIds;
+	FPRRoleLoadout PreviousLoadout;
+	RoleComponent->CaptureProfileRoleState(
+		PreviousRoleId,
+		PreviousUnlockedRoleIds,
+		PreviousLoadout,
+		PreviousUnlockedModuleIds);
+	FPRRoleLoadout RequestedLoadout;
+	RequestedLoadout.Entries = Snapshot.EquippedRoleModules;
+	const bool bLegacyRolePayload = Snapshot.EquippedRoleModules.IsEmpty()
+		&& Snapshot.UnlockedRoleModuleIds.IsEmpty();
+	const bool bLegacyKnownRole = bLegacyRolePayload && IsKnownLegacyRole(Snapshot.SelectedRoleId);
+	auto RestorePreviousState = [&]()
+	{
+		Inventory->ReplaceInventoryItems(PreviousBackpack);
+		PlayerState->ReplaceShipResources(PreviousResources);
+		FString RestoreDiagnostic;
+		Weapon->ReplaceEquipmentEntries(PreviousEquipment, RestoreDiagnostic);
+		RoleComponent->ApplyProfileRoleState(
+			PreviousRoleId,
+			PreviousUnlockedRoleIds,
+			PreviousLoadout,
+			PreviousUnlockedModuleIds);
+	};
 
 	if (!Inventory->ReplaceInventoryItems(Snapshot.BackpackItems)
 		|| !PlayerState->ReplaceShipResources(Resources)
 		|| !Weapon->ReplaceEquipmentEntries(Snapshot.Equipment, OutDiagnostic)
 		|| !Weapon->EnsureStarterWeapon(TEXT("TestRifle"), OutDiagnostic))
 	{
-		Inventory->ReplaceInventoryItems(PreviousBackpack);
-		PlayerState->ReplaceShipResources(PreviousResources);
-		FString RestoreDiagnostic;
-		Weapon->ReplaceEquipmentEntries(PreviousEquipment, RestoreDiagnostic);
-		PlayerState->SetSelectedRoleModule(PreviousRole);
+		RestorePreviousState();
 		if (OutDiagnostic.IsEmpty())
 		{
 			OutDiagnostic = TEXT("PlayerState rejected validated profile data.");
 		}
 		return false;
 	}
-	PlayerState->SetSelectedRoleModule(Snapshot.SelectedRoleId);
+	RoleComponent->ApplyProfileRoleState(
+		Snapshot.SelectedRoleId,
+		Snapshot.UnlockedRoleIds,
+		RequestedLoadout,
+		Snapshot.UnlockedRoleModuleIds);
+	if (bLegacyKnownRole && !RoleComponent->EnsureDefaultLoadoutForSelectedRole())
+	{
+		RestorePreviousState();
+		OutDiagnostic = TEXT("Legacy profile role defaults could not be applied.");
+		return false;
+	}
+	FName AppliedRoleId;
+	TArray<FName> AppliedUnlockedRoleIds;
+	TArray<FName> AppliedUnlockedModuleIds;
+	FPRRoleLoadout AppliedLoadout;
+	RoleComponent->CaptureProfileRoleState(
+		AppliedRoleId,
+		AppliedUnlockedRoleIds,
+		AppliedLoadout,
+		AppliedUnlockedModuleIds);
+	if ((!bLegacyKnownRole && (AppliedRoleId != Snapshot.SelectedRoleId
+		|| AppliedUnlockedRoleIds != Snapshot.UnlockedRoleIds
+		|| AppliedUnlockedModuleIds != Snapshot.UnlockedRoleModuleIds
+		|| !AreRoleLoadoutsEqual(AppliedLoadout, RequestedLoadout)))
+		|| (bLegacyKnownRole && !RoleComponent->IsLoadoutValid(AppliedRoleId, AppliedLoadout)))
+	{
+		RestorePreviousState();
+		OutDiagnostic = TEXT("PlayerState rejected profile role state.");
+		return false;
+	}
 	return true;
 }

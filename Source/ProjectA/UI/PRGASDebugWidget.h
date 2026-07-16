@@ -5,6 +5,7 @@
 #include "PRGASDebugWidget.generated.h"
 
 class STextBlock;
+class UAbilitySystemComponent;
 
 /**
  * Lightweight runtime GAS debug HUD for ProjectRift.
@@ -17,6 +18,9 @@ class PROJECTA_API UPRGASDebugWidget : public UUserWidget
 public:
 	UFUNCTION(BlueprintPure, Category = "ProjectRift|GAS|Debug")
 	FString GetDebugText() const;
+
+	/** Formats the live cooldown effects currently granted by the ASC. */
+	static FString GetCooldownDebugText(const UAbilitySystemComponent* AbilitySystemComponent);
 
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;

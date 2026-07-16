@@ -13,6 +13,7 @@ class UAbilitySystemComponent;
 class UPRInventoryComponent;
 class UPRMissionProgressionDataAsset;
 class UPRWeaponComponent;
+class UPRRoleComponent;
 
 USTRUCT(BlueprintType)
 struct PROJECTA_API FPRShipResourceStack
@@ -60,6 +61,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	UPRWeaponComponent* GetWeaponComponent() const { return WeaponComponent.Get(); }
 
+	UFUNCTION(BlueprintPure, Category = "Roles")
+	UPRRoleComponent* GetRoleComponent() const { return RoleComponent.Get(); }
+
 	UFUNCTION(BlueprintPure, Category = "Lobby")
 	bool IsReady() const { return bIsReady; }
 
@@ -74,6 +78,9 @@ public:
 	const TArray<FPRItemInstance>& GetMissionStartBackpackItems() const { return MissionStartBackpackItems; }
 	const TArray<FPRProfileResourceBalance>& GetMissionStartResourceWallet() const { return MissionStartResourceWallet; }
 	FName GetMissionStartRoleId() const { return MissionStartRoleId; }
+	const TArray<FName>& GetMissionStartUnlockedRoleIds() const { return MissionStartUnlockedRoleIds; }
+	const TArray<FName>& GetMissionStartUnlockedRoleModuleIds() const { return MissionStartUnlockedRoleModuleIds; }
+	const FPRRoleLoadout& GetMissionStartRoleLoadout() const { return MissionStartRoleLoadout; }
 
 	UFUNCTION(BlueprintPure, Category = "Lobby|Ship Repair")
 	bool IsRepairPersistencePending() const { return bRepairPersistencePending; }
@@ -150,6 +157,9 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPRWeaponComponent> WeaponComponent;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Roles", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPRRoleComponent> RoleComponent;
+
 	UPROPERTY(ReplicatedUsing = OnRep_IsReady, VisibleInstanceOnly, BlueprintReadOnly, Category = "Lobby", meta = (AllowPrivateAccess = "true"))
 	bool bIsReady;
 
@@ -179,6 +189,15 @@ private:
 
 	UPROPERTY()
 	FName MissionStartRoleId = NAME_None;
+
+	UPROPERTY()
+	TArray<FName> MissionStartUnlockedRoleIds;
+
+	UPROPERTY()
+	TArray<FName> MissionStartUnlockedRoleModuleIds;
+
+	UPROPERTY()
+	FPRRoleLoadout MissionStartRoleLoadout;
 
 	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Lobby", meta = (AllowPrivateAccess = "true"))
 	FName SelectedRoleModule;

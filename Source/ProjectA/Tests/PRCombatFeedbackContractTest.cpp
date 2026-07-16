@@ -385,7 +385,7 @@ bool FPRCombatFeedbackContractTest::RunTest(const FString& Parameters)
 			TEXT("ProjectVersion"),
 			ProjectVersion,
 			GGameIni));
-	TestEqual(TEXT("ProjectVersion is v0.6.2"), ProjectVersion, FString(TEXT("0.6.2")));
+	TestEqual(TEXT("ProjectVersion is v0.6.3"), ProjectVersion, FString(TEXT("0.6.3")));
 
 	return true;
 }

@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.6.3] - 2026-07-16
+
+- Added data-driven Assault role and Q/E/R module assets, replicated loadout ownership, and v4-compatible persistence for unlocked role modules and equipped slots.
+- Added the native ship-lobby Role Loadout panel (`C`), server-authoritative apply/default actions, and role/module debug output.
+- Finalized the Assault module framework while retaining the v4 save schema.
+
 ## [0.6.2] - 2026-07-15
 
 ### Added

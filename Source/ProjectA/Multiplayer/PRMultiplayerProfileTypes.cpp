@@ -8,6 +8,7 @@ constexpr int32 MaxProjectionEquipmentEntries = 64;
 constexpr int32 MaxProjectionResourceEntries = 128;
 constexpr int32 MaxProjectionStoryEntries = 512;
 constexpr int32 MaxProjectionShipModuleEntries = 128;
+constexpr int32 MaxProjectionRoleEntries = 128;
 
 bool AreItemsValid(const TArray<FPRItemInstance>& Items)
 {
@@ -65,6 +66,23 @@ bool IsStoryValid(const FPRProfileStoryProgress& Story)
 		&& (Story.CurrentChapterId.IsNone() || Story.UnlockedChapterIds.Contains(Story.CurrentChapterId));
 }
 
+bool AreRoleModuleEntriesStructurallyValid(const TArray<FPRRoleModuleSlotEntry>& Entries)
+{
+	TSet<EPRRoleModuleSlot> SeenSlots;
+	TSet<FName> SeenModules;
+	for (const FPRRoleModuleSlotEntry& Entry : Entries)
+	{
+		if (Entry.Slot == EPRRoleModuleSlot::None || Entry.ModuleId.IsNone()
+			|| SeenSlots.Contains(Entry.Slot) || SeenModules.Contains(Entry.ModuleId))
+		{
+			return false;
+		}
+		SeenSlots.Add(Entry.Slot);
+		SeenModules.Add(Entry.ModuleId);
+	}
+	return true;
+}
+
 bool AreShipModulesValid(const TArray<FPRProfileShipModuleState>& ShipModules)
 {
 	TSet<FName> Seen;
@@ -92,10 +110,16 @@ bool FPRMultiplayerProfileProjection::IsValid(FString* OutDiagnostic) const
 		|| Equipment.Num() > MaxProjectionEquipmentEntries
 		|| ResourceWallet.Num() > MaxProjectionResourceEntries
 		|| ShipModules.Num() > MaxProjectionShipModuleEntries
+		|| UnlockedRoleIds.Num() > MaxProjectionRoleEntries
+		|| UnlockedRoleModuleIds.Num() > MaxProjectionRoleEntries
+		|| EquippedRoleModules.Num() > MaxProjectionRoleEntries
 		|| !AreItemsValid(BackpackItems)
 		|| !IsEquipmentValid(Equipment)
 		|| !AreResourcesValid(ResourceWallet)
 		|| !AreShipModulesValid(ShipModules)
+		|| !AreUniqueValidNames(UnlockedRoleIds)
+		|| !AreUniqueValidNames(UnlockedRoleModuleIds)
+		|| !AreRoleModuleEntriesStructurallyValid(EquippedRoleModules)
 		|| !IsStoryValid(Story))
 	{
 		if (OutDiagnostic) { *OutDiagnostic = TEXT("Profile projection contains invalid runtime data."); }
@@ -120,9 +144,15 @@ bool FPRPlayerSettlementReceipt::IsValid(FString* OutDiagnostic) const
 	if (SettledBackpackItems.Num() > MaxProjectionBackpackEntries
 		|| SettledEquipment.Num() > MaxProjectionEquipmentEntries
 		|| SettledResourceWallet.Num() > MaxProjectionResourceEntries
+		|| SettledUnlockedRoleIds.Num() > MaxProjectionRoleEntries
+		|| SettledUnlockedRoleModuleIds.Num() > MaxProjectionRoleEntries
+		|| SettledEquippedRoleModules.Num() > MaxProjectionRoleEntries
 		|| !AreItemsValid(SettledBackpackItems)
 		|| !IsEquipmentValid(SettledEquipment)
-		|| !AreResourcesValid(SettledResourceWallet))
+		|| !AreResourcesValid(SettledResourceWallet)
+		|| !AreUniqueValidNames(SettledUnlockedRoleIds)
+		|| !AreUniqueValidNames(SettledUnlockedRoleModuleIds)
+		|| !AreRoleModuleEntriesStructurallyValid(SettledEquippedRoleModules))
 	{
 		if (OutDiagnostic) { *OutDiagnostic = TEXT("Settlement receipt contains invalid runtime data."); }
 		return false;

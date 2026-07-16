@@ -24,6 +24,10 @@ public:
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		const FGameplayEventData* TriggerEventData) override;
 
+protected:
+	virtual FGameplayTag GetModuleCooldownTag() const override;
+	virtual TSubclassOf<UGameplayEffect> GetModuleCooldownEffectClass() const override;
+
 private:
 	bool ExecuteBlast(
 		const FGameplayAbilitySpecHandle Handle,

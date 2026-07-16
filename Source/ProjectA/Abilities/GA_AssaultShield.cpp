@@ -2,14 +2,24 @@
 
 #include "AbilitySystemComponent.h"
 #include "Abilities/PRTemporaryShieldGameplayEffect.h"
+#include "Abilities/PRRoleModuleGameplayEffects.h"
+#include "Core/PRGameplayTags.h"
 #include "GameplayEffect.h"
 #include "ProjectA.h"
 
 UGA_AssaultShield::UGA_AssaultShield()
 {
-	EnergyCost = 30.0f;
-	CooldownSeconds = 3.0f;
 	ShieldEffectClass = UPRTemporaryShieldGameplayEffect::StaticClass();
+}
+
+FGameplayTag UGA_AssaultShield::GetModuleCooldownTag() const
+{
+	return ProjectRiftGameplayTags::Cooldown_Skill_R;
+}
+
+TSubclassOf<UGameplayEffect> UGA_AssaultShield::GetModuleCooldownEffectClass() const
+{
+	return UPRAssaultShieldCooldownGameplayEffect::StaticClass();
 }
 
 void UGA_AssaultShield::ActivateAbility(

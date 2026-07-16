@@ -727,8 +727,18 @@ bool FPRMultiplayerSettlementPersistenceTest::RunTest(const FString& Parameters)
 	FPRProfileSnapshot InitialSnapshot;
 	InitialSnapshot.ResourceWallet = { FPRProfileResourceBalance{ TEXT("EnergyCrystal"), 5 } };
 	InitialSnapshot.BackpackItems = { MakeProfileTestItem(TEXT("HealthInjector"), 2) };
-	InitialSnapshot.UnlockedRoleIds = { TEXT("Ability.Role.Assault") };
-	InitialSnapshot.SelectedRoleId = TEXT("Ability.Role.Assault");
+	InitialSnapshot.UnlockedRoleIds = { TEXT("Ability.Role.Legacy.Unknown") };
+	InitialSnapshot.SelectedRoleId = TEXT("Ability.Role.Legacy.Unknown");
+	InitialSnapshot.UnlockedRoleModuleIds = {
+		TEXT("Ability.Module.Legacy.UnknownQ"),
+		TEXT("Ability.Module.Legacy.UnknownE"),
+		TEXT("Ability.Module.Legacy.UnknownR")
+	};
+	InitialSnapshot.EquippedRoleModules = {
+		FPRRoleModuleSlotEntry(EPRRoleModuleSlot::Q, TEXT("Ability.Module.Legacy.UnknownQ")),
+		FPRRoleModuleSlotEntry(EPRRoleModuleSlot::E, TEXT("Ability.Module.Legacy.UnknownE")),
+		FPRRoleModuleSlotEntry(EPRRoleModuleSlot::R, TEXT("Ability.Module.Legacy.UnknownR"))
+	};
 	TestTrue(TEXT("Initial multiplayer snapshot is installed"), SaveSubsystem->ReplaceActiveProfileSnapshot(InitialSnapshot).IsSuccess());
 	TestTrue(TEXT("Initial multiplayer snapshot is saved"), SaveSubsystem->SaveActiveProfile().IsSuccess());
 
@@ -768,6 +778,9 @@ bool FPRMultiplayerSettlementPersistenceTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Settled primary equipment keeps the rifle"), AppliedSnapshot.Equipment[0].Item.ItemId, FName(TEXT("TestRifle")));
 	TestTrue(TEXT("Settlement id is recorded durably"), AppliedSnapshot.ProcessedSettlementIds.Contains(Receipt.SettlementId));
 	TestTrue(TEXT("Eligible extracted player receives story completion"), AppliedSnapshot.Story.CompletedStoryNodeIds.Contains(TEXT("Story.Prologue.RiftTestHold")));
+	TestEqual(TEXT("Legacy settlement preserves the unknown selected role"), AppliedSnapshot.SelectedRoleId, FName(TEXT("Ability.Role.Legacy.Unknown")));
+	TestEqual(TEXT("Legacy settlement preserves unknown module unlocks"), AppliedSnapshot.UnlockedRoleModuleIds.Num(), 3);
+	TestEqual(TEXT("Legacy settlement preserves unknown Q/E/R layout"), AppliedSnapshot.EquippedRoleModules.Num(), 3);
 
 	const FPRProfileOperationResult DuplicateResult = SaveSubsystem->ApplyMultiplayerSettlementReceipt(Receipt);
 	TestTrue(TEXT("Duplicate settlement is an idempotent success"), DuplicateResult.IsSuccess());

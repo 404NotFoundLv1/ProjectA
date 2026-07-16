@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Items/PRItemTypes.h"
+#include "Roles/PRRoleTypes.h"
 #include "PRProfileTypes.generated.h"
 
 UENUM(BlueprintType)
@@ -182,6 +183,12 @@ struct PROJECTA_API FPRProfileSnapshot
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Profile|Roles")
 	FName SelectedRoleId = NAME_None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Profile|Roles")
+	TArray<FName> UnlockedRoleModuleIds;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Profile|Roles")
+	TArray<FPRRoleModuleSlotEntry> EquippedRoleModules;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Profile|Ship")
 	TArray<FPRProfileShipModuleState> ShipModules;

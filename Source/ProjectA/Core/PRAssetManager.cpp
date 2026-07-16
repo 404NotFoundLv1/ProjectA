@@ -3,6 +3,8 @@
 #include "Items/PRItemDataAsset.h"
 #include "Items/PRLootTableDataAsset.h"
 #include "Progression/PRMissionProgressionDataAsset.h"
+#include "Roles/PRRoleDataAsset.h"
+#include "Roles/PRRoleModuleDataAsset.h"
 #include "Ship/PRShipRepairDataAsset.h"
 #include "Engine/StreamableManager.h"
 #include "ProjectA.h"
@@ -49,6 +51,20 @@ FPrimaryAssetId UPRAssetManager::MakeMissionPrimaryAssetId(const FName MissionId
 		: FPrimaryAssetId(UPRMissionProgressionDataAsset::MissionPrimaryAssetType, MissionId);
 }
 
+FPrimaryAssetId UPRAssetManager::MakeRolePrimaryAssetId(const FName RoleId)
+{
+	return RoleId.IsNone()
+		? FPrimaryAssetId()
+		: FPrimaryAssetId(UPRRoleDataAsset::RolePrimaryAssetType, RoleId);
+}
+
+FPrimaryAssetId UPRAssetManager::MakeRoleModulePrimaryAssetId(const FName ModuleId)
+{
+	return ModuleId.IsNone()
+		? FPrimaryAssetId()
+		: FPrimaryAssetId(UPRRoleModuleDataAsset::RoleModulePrimaryAssetType, ModuleId);
+}
+
 FPrimaryAssetId UPRAssetManager::MakeShipRepairPrimaryAssetId(const FName RepairProjectId)
 {
 	return RepairProjectId.IsNone()
@@ -63,7 +79,16 @@ void UPRAssetManager::StartInitialLoading()
 	ValidatePrimaryAssetType(UPRItemDataAsset::ItemPrimaryAssetType);
 	ValidatePrimaryAssetType(UPRLootTableDataAsset::LootTablePrimaryAssetType);
 	ValidatePrimaryAssetType(UPRMissionProgressionDataAsset::MissionPrimaryAssetType);
+	ValidatePrimaryAssetType(UPRRoleDataAsset::RolePrimaryAssetType);
+	ValidatePrimaryAssetType(UPRRoleModuleDataAsset::RoleModulePrimaryAssetType);
 	ValidatePrimaryAssetType(UPRShipRepairDataAsset::ShipRepairPrimaryAssetType);
+
+	TArray<UPRRoleDataAsset*> Roles;
+	TArray<UPRRoleModuleDataAsset*> RoleModules;
+	if (!LoadRoleCatalog(Roles, RoleModules))
+	{
+		UE_LOG(LogProjectA, Error, TEXT("ProjectRift role/module catalog failed startup validation; role abilities will remain fail-closed."));
+	}
 }
 
 UPRItemDataAsset* UPRAssetManager::GetLoadedItemData(const FName ItemId) const
@@ -95,6 +120,65 @@ UPRMissionProgressionDataAsset* UPRAssetManager::LoadMissionSync(const FName Mis
 	return Cast<UPRMissionProgressionDataAsset>(LoadPrimaryAssetSync(
 		MakeMissionPrimaryAssetId(MissionId),
 		UPRMissionProgressionDataAsset::StaticClass()));
+}
+
+UPRRoleDataAsset* UPRAssetManager::LoadRoleSync(const FName RoleId)
+{
+	return Cast<UPRRoleDataAsset>(LoadPrimaryAssetSync(
+		MakeRolePrimaryAssetId(RoleId),
+		UPRRoleDataAsset::StaticClass()));
+}
+
+UPRRoleModuleDataAsset* UPRAssetManager::LoadRoleModuleSync(const FName ModuleId)
+{
+	return Cast<UPRRoleModuleDataAsset>(LoadPrimaryAssetSync(
+		MakeRoleModulePrimaryAssetId(ModuleId),
+		UPRRoleModuleDataAsset::StaticClass()));
+}
+
+bool UPRAssetManager::LoadRoleCatalog(
+	TArray<UPRRoleDataAsset*>& OutRoles,
+	TArray<UPRRoleModuleDataAsset*>& OutModules)
+{
+	OutRoles.Reset();
+	OutModules.Reset();
+	TArray<FPrimaryAssetId> RoleIds;
+	TArray<FPrimaryAssetId> ModuleIds;
+	GetPrimaryAssetIdList(UPRRoleDataAsset::RolePrimaryAssetType, RoleIds);
+	GetPrimaryAssetIdList(UPRRoleModuleDataAsset::RoleModulePrimaryAssetType, ModuleIds);
+	RoleIds.Sort([](const FPrimaryAssetId& A, const FPrimaryAssetId& B) { return A.PrimaryAssetName.LexicalLess(B.PrimaryAssetName); });
+	ModuleIds.Sort([](const FPrimaryAssetId& A, const FPrimaryAssetId& B) { return A.PrimaryAssetName.LexicalLess(B.PrimaryAssetName); });
+	for (const FPrimaryAssetId& AssetId : RoleIds)
+	{
+		UPRRoleDataAsset* Role = Cast<UPRRoleDataAsset>(LoadPrimaryAssetSync(AssetId, UPRRoleDataAsset::StaticClass()));
+		if (!Role)
+		{
+			OutRoles.Reset();
+			OutModules.Reset();
+			return false;
+		}
+		OutRoles.Add(Role);
+	}
+	for (const FPrimaryAssetId& AssetId : ModuleIds)
+	{
+		UPRRoleModuleDataAsset* Module = Cast<UPRRoleModuleDataAsset>(LoadPrimaryAssetSync(AssetId, UPRRoleModuleDataAsset::StaticClass()));
+		if (!Module)
+		{
+			OutRoles.Reset();
+			OutModules.Reset();
+			return false;
+		}
+		OutModules.Add(Module);
+	}
+	FString Diagnostic;
+	if (!UPRRoleDataAsset::ValidateCatalog(OutRoles, OutModules, &Diagnostic))
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("ProjectRift role catalog is invalid: %s"), *Diagnostic);
+		OutRoles.Reset();
+		OutModules.Reset();
+		return false;
+	}
+	return true;
 }
 
 UPRShipRepairDataAsset* UPRAssetManager::LoadShipRepairSync(const FName RepairProjectId)

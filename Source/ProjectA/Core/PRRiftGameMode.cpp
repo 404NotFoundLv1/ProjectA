@@ -21,6 +21,7 @@
 #include "Player/PRPlayerController.h"
 #include "ProjectA.h"
 #include "Progression/PRMissionProgressionDataAsset.h"
+#include "Roles/PRRoleComponent.h"
 #include "Settings/PRProjectSettings.h"
 #include "Weapons/PRWeaponComponent.h"
 
@@ -534,7 +535,20 @@ FPRPlayerSettlementReceipt APRRiftGameMode::BuildPersonalSettlementReceipt(
 			PlayerState->GetMissionStartResourceWallet(),
 			Receipt.SettledResourceWallet);
 	}
-	Receipt.SettledRoleId = PlayerState->GetSelectedRoleModule();
+	if (const UPRRoleComponent* RoleComponent = PlayerState->GetRoleComponent())
+	{
+		FPRRoleLoadout RuntimeLoadout;
+		RoleComponent->CaptureProfileRoleState(
+			Receipt.SettledRoleId,
+			Receipt.SettledUnlockedRoleIds,
+			RuntimeLoadout,
+			Receipt.SettledUnlockedRoleModuleIds);
+		Receipt.SettledEquippedRoleModules = RuntimeLoadout.Entries;
+	}
+	else
+	{
+		Receipt.SettledRoleId = PlayerState->GetSelectedRoleModule();
+	}
 	return Receipt;
 }
 

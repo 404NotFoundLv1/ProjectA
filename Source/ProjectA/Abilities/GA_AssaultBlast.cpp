@@ -4,6 +4,7 @@
 #include "Abilities/PRCombatEffectLibrary.h"
 #include "Abilities/PRDamageGameplayEffect.h"
 #include "Abilities/PRStatusGameplayEffect.h"
+#include "Abilities/PRRoleModuleGameplayEffects.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Characters/PRCharacter.h"
 #include "Components/PrimitiveComponent.h"
@@ -15,8 +16,6 @@
 
 UGA_AssaultBlast::UGA_AssaultBlast()
 {
-	EnergyCost = 25.0f;
-	CooldownSeconds = 1.25f;
 	BlastRange = 360.0f;
 	BlastRadius = 180.0f;
 	DamageAmount = 25.0f;
@@ -27,6 +26,16 @@ UGA_AssaultBlast::UGA_AssaultBlast()
 		UPRStunStatusGameplayEffect::StaticClass(),
 		0.0f,
 		1.25f));
+}
+
+FGameplayTag UGA_AssaultBlast::GetModuleCooldownTag() const
+{
+	return ProjectRiftGameplayTags::Cooldown_Skill_E;
+}
+
+TSubclassOf<UGameplayEffect> UGA_AssaultBlast::GetModuleCooldownEffectClass() const
+{
+	return UPRAssaultBlastCooldownGameplayEffect::StaticClass();
 }
 
 void UGA_AssaultBlast::ActivateAbility(
@@ -84,16 +93,31 @@ bool UGA_AssaultBlast::ExecuteBlast(
 	}
 
 	bool bDamagedAnyTarget = false;
+	TSet<TWeakObjectPtr<AActor>> ProcessedTargets;
 	for (const FOverlapResult& Overlap : Overlaps)
 	{
 		AActor* TargetActor = Overlap.GetActor();
-		if (!TargetActor || TargetActor == AvatarActor)
+		if (!TargetActor || TargetActor == AvatarActor || ProcessedTargets.Contains(TargetActor))
 		{
 			continue;
 		}
+		ProcessedTargets.Add(TargetActor);
 
 		const FVector ToTarget = TargetActor->GetActorLocation() - AvatarActor->GetActorLocation();
 		if (FVector::DotProduct(Forward, ToTarget.GetSafeNormal()) < 0.1f)
+		{
+			continue;
+		}
+		FCollisionQueryParams VisibilityParams(SCENE_QUERY_STAT(PRAssaultBlastVisibility), false, AvatarActor);
+		VisibilityParams.AddIgnoredActor(AvatarActor);
+		FHitResult VisibilityHit;
+		if (World->LineTraceSingleByChannel(
+			VisibilityHit,
+			AvatarActor->GetActorLocation(),
+			TargetActor->GetActorLocation(),
+			ECC_Visibility,
+			VisibilityParams)
+			&& VisibilityHit.GetActor() != TargetActor)
 		{
 			continue;
 		}

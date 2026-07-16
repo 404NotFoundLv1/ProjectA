@@ -37,6 +37,40 @@ bool AreProfileNamesValid(const TArray<FName>& Names)
 	}
 	return true;
 }
+
+void NormalizeRoleModuleEntries(TArray<FPRRoleModuleSlotEntry>& Entries)
+{
+	TSet<EPRRoleModuleSlot> SeenSlots;
+	TSet<FName> SeenModules;
+	Entries.RemoveAll([&SeenSlots, &SeenModules](const FPRRoleModuleSlotEntry& Entry)
+	{
+		if (Entry.Slot == EPRRoleModuleSlot::None || Entry.ModuleId.IsNone()
+			|| SeenSlots.Contains(Entry.Slot) || SeenModules.Contains(Entry.ModuleId))
+		{
+			return true;
+		}
+		SeenSlots.Add(Entry.Slot);
+		SeenModules.Add(Entry.ModuleId);
+		return false;
+	});
+}
+
+bool AreRoleModuleEntriesStructurallyValid(const TArray<FPRRoleModuleSlotEntry>& Entries)
+{
+	TSet<EPRRoleModuleSlot> SeenSlots;
+	TSet<FName> SeenModules;
+	for (const FPRRoleModuleSlotEntry& Entry : Entries)
+	{
+		if (Entry.Slot == EPRRoleModuleSlot::None || Entry.ModuleId.IsNone()
+			|| SeenSlots.Contains(Entry.Slot) || SeenModules.Contains(Entry.ModuleId))
+		{
+			return false;
+		}
+		SeenSlots.Add(Entry.Slot);
+		SeenModules.Add(Entry.ModuleId);
+	}
+	return true;
+}
 }
 
 FPRProfileOperationResult FPRProfileOperationResult::MakeSuccess(const FGuid& InProfileId)
@@ -117,10 +151,12 @@ void FPRProfileSnapshot::Normalize()
 	});
 
 	NormalizeNames(UnlockedRoleIds);
+	NormalizeNames(UnlockedRoleModuleIds);
 	if (!SelectedRoleId.IsNone() && !UnlockedRoleIds.Contains(SelectedRoleId))
 	{
 		UnlockedRoleIds.Add(SelectedRoleId);
 	}
+	NormalizeRoleModuleEntries(EquippedRoleModules);
 
 	TSet<FName> ModuleIds;
 	ShipModules.RemoveAll([&ModuleIds](FPRProfileShipModuleState& Module)
@@ -200,9 +236,19 @@ bool FPRProfileSnapshot::IsValid(FString* OutDiagnostic) const
 		}
 		EquipmentSlots.Add(Entry.SlotId);
 	}
+	if (!AreProfileNamesValid(UnlockedRoleIds) || !AreProfileNamesValid(UnlockedRoleModuleIds))
+	{
+		if (OutDiagnostic) { *OutDiagnostic = TEXT("Role unlocks contain an invalid or duplicate id."); }
+		return false;
+	}
 	if (!SelectedRoleId.IsNone() && !UnlockedRoleIds.Contains(SelectedRoleId))
 	{
 		if (OutDiagnostic) { *OutDiagnostic = TEXT("Selected role is not unlocked."); }
+		return false;
+	}
+	if (!AreRoleModuleEntriesStructurallyValid(EquippedRoleModules))
+	{
+		if (OutDiagnostic) { *OutDiagnostic = TEXT("Equipped role modules contain an invalid or duplicate slot/module entry."); }
 		return false;
 	}
 	TSet<FName> ModuleIds;

@@ -59,6 +59,28 @@ void TestStatusFloatNear(
 {
 	Test.TestTrue(What, FMath::IsNearlyEqual(Actual, Expected, Tolerance));
 }
+
+int32 CountNegativeStatusEffects(const UPRAbilitySystemComponent* AbilitySystemComponent)
+{
+	if (!AbilitySystemComponent)
+	{
+		return 0;
+	}
+
+	int32 Count = 0;
+	for (const FActiveGameplayEffectHandle Handle : AbilitySystemComponent->GetActiveEffects(FGameplayEffectQuery()))
+	{
+		const FActiveGameplayEffect* ActiveEffect = AbilitySystemComponent->GetActiveGameplayEffect(Handle);
+		const UGameplayEffect* Definition = ActiveEffect ? ActiveEffect->Spec.Def : nullptr;
+		if (Definition && (Definition->IsA(UPRPollutionStatusGameplayEffect::StaticClass())
+			|| Definition->IsA(UPRSlowStatusGameplayEffect::StaticClass())
+			|| Definition->IsA(UPRStunStatusGameplayEffect::StaticClass())))
+		{
+			++Count;
+		}
+	}
+	return Count;
+}
 }
 
 bool FPRGASStatusEffectsRuntimeTest::RunTest(const FString& Parameters)
@@ -197,7 +219,7 @@ bool FPRGASStatusEffectsRuntimeTest::RunTest(const FString& Parameters)
 	UPRCombatEffectLibrary::ApplyStatusEffectToTarget(EnemyASC, TargetASC, FirstSlowDefinition, EnemySource.Get());
 	TickStatusTestWorld(World, 0.5f);
 	UPRCombatEffectLibrary::ApplyStatusEffectToTarget(EnemyASC, TargetASC, ReplacementSlowDefinition, EnemySource.Get());
-	TestEqual(TEXT("Replacing a status keeps exactly one active instance"), TargetASC->GetActiveEffects(FGameplayEffectQuery()).Num(), 1);
+	TestEqual(TEXT("Replacing a status keeps exactly one active negative status instance"), CountNegativeStatusEffects(TargetASC), 1);
 	TestStatusFloatNear(*this, TEXT("Replacement status uses latest magnitude"), TargetAttributes->GetMoveSpeed(), 480.0f);
 	TickStatusTestWorld(World, 0.7f);
 	TestTrue(TEXT("Replacement status restarts its duration"), TargetASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::Status_Debuff_Slowed));
@@ -206,7 +228,7 @@ bool FPRGASStatusEffectsRuntimeTest::RunTest(const FString& Parameters)
 
 	UPRCombatEffectLibrary::ApplyStatusEffectToTarget(EnemyASC, TargetASC, SlowDefinition, EnemySource.Get());
 	UPRCombatEffectLibrary::ApplyStatusEffectToTarget(EnemyASC, TargetASC, StunDefinition, EnemySource.Get());
-	TestTrue(TEXT("Target has negative states before downing"), TargetASC->GetActiveEffects(FGameplayEffectQuery()).Num() >= 2);
+	TestTrue(TEXT("Target has negative states before downing"), CountNegativeStatusEffects(TargetASC) >= 2);
 	TargetAttributes->SetHealth(1.0f);
 	TargetAttributes->SetShield(0.0f);
 	TestTrue(
@@ -221,7 +243,7 @@ bool FPRGASStatusEffectsRuntimeTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Downing clears slow"), TargetASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::Status_Debuff_Slowed));
 	TestFalse(TEXT("Downing clears stun"), TargetASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Stunned));
 	TestFalse(TEXT("Downing clears pollution"), TargetASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::Status_Debuff_Polluted));
-	TestEqual(TEXT("Downing removes active negative status effects"), TargetASC->GetActiveEffects(FGameplayEffectQuery()).Num(), 0);
+	TestEqual(TEXT("Downing removes active negative status effects without removing persistent role energy regeneration"), CountNegativeStatusEffects(TargetASC), 0);
 	TestFalse(
 		TEXT("Downed targets reject damage"),
 		UPRCombatEffectLibrary::ApplyDamageToTarget(

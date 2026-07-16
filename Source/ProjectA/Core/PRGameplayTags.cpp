@@ -18,6 +18,9 @@ namespace ProjectRiftGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_CombatFeedback_Policy, "Data.CombatFeedback.Policy", "Structured combat feedback policy");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_HitReaction_Strength, "Data.HitReaction.Strength", "Structured hit reaction strength");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_HitReaction_Duration, "Data.HitReaction.Duration", "Structured hit reaction duration");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_Ability_EnergyDelta, "Data.Ability.EnergyDelta", "SetByCaller energy delta for a role module");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_Ability_CooldownDuration, "Data.Ability.CooldownDuration", "SetByCaller role module cooldown duration");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_Ability_EnergyRegen, "Data.Ability.EnergyRegen", "SetByCaller role energy regeneration per period");
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Damage_Type_Physical, "Damage.Type.Physical", "Physical damage type");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Damage_Type_Pollution, "Damage.Type.Pollution", "Pollution damage type");

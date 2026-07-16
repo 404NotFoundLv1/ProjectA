@@ -7,6 +7,8 @@
 class UPRItemDataAsset;
 class UPRLootTableDataAsset;
 class UPRMissionProgressionDataAsset;
+class UPRRoleDataAsset;
+class UPRRoleModuleDataAsset;
 class UPRShipRepairDataAsset;
 struct FStreamableHandle;
 
@@ -23,6 +25,8 @@ public:
 	static FPrimaryAssetId MakeItemPrimaryAssetId(FName ItemId);
 	static FPrimaryAssetId MakeLootTablePrimaryAssetId(FName AssetName);
 	static FPrimaryAssetId MakeMissionPrimaryAssetId(FName MissionId);
+	static FPrimaryAssetId MakeRolePrimaryAssetId(FName RoleId);
+	static FPrimaryAssetId MakeRoleModulePrimaryAssetId(FName ModuleId);
 	static FPrimaryAssetId MakeShipRepairPrimaryAssetId(FName RepairProjectId);
 
 	virtual void StartInitialLoading() override;
@@ -32,6 +36,9 @@ public:
 	UPRItemDataAsset* LoadItemDataSync(FName ItemId);
 	UPRLootTableDataAsset* LoadLootTableSync(FName AssetName);
 	UPRMissionProgressionDataAsset* LoadMissionSync(FName MissionId);
+	UPRRoleDataAsset* LoadRoleSync(FName RoleId);
+	UPRRoleModuleDataAsset* LoadRoleModuleSync(FName ModuleId);
+	bool LoadRoleCatalog(TArray<UPRRoleDataAsset*>& OutRoles, TArray<UPRRoleModuleDataAsset*>& OutModules);
 	UPRShipRepairDataAsset* LoadShipRepairSync(FName RepairProjectId);
 	bool LoadShipRepairCatalog(TArray<UPRShipRepairDataAsset*>& OutCatalog);
 	TSharedPtr<FStreamableHandle> LoadItemDataAsync(FName ItemId, FPRItemDataLoadComplete Completion);

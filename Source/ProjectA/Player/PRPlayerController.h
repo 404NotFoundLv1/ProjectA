@@ -4,6 +4,7 @@
 #include "CoreMinimal.h"
 #include "Items/PRItemTypes.h"
 #include "Multiplayer/PRMultiplayerProfileTypes.h"
+#include "Roles/PRRoleTypes.h"
 #include "Ship/PRShipRepairTypes.h"
 #include "ProjectAPlayerController.h"
 #include "TimerManager.h"
@@ -15,6 +16,7 @@ class UPRInventoryWidget;
 class UPRLobbyReadyDebugWidget;
 class UPRRiftSettlementWidget;
 class UPRShipRepairWidget;
+class UPRRoleLoadoutWidget;
 class UPRDiagnosticsWidget;
 class UPRWeaponHUDWidget;
 class UPRLootTableDataAsset;
@@ -126,6 +128,18 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Ship Repair|UI")
 	UPRShipRepairWidget* GetShipRepairWidget() const { return ShipRepairWidget.Get(); }
 
+	UFUNCTION(BlueprintCallable, Category = "Roles|UI")
+	void ToggleRoleLoadoutPanel();
+
+	UFUNCTION(BlueprintCallable, Category = "Roles|UI")
+	void ShowRoleLoadoutPanel();
+
+	UFUNCTION(BlueprintCallable, Category = "Roles|UI")
+	void HideRoleLoadoutPanel();
+
+	UFUNCTION(BlueprintPure, Category = "Roles|UI")
+	UPRRoleLoadoutWidget* GetRoleLoadoutWidget() const { return RoleLoadoutWidget.Get(); }
+
 	UFUNCTION(BlueprintPure, Category = "Rift|Settlement")
 	UPRRiftSettlementWidget* GetRiftSettlementWidget() const { return RiftSettlementWidget.Get(); }
 
@@ -149,6 +163,12 @@ public:
 
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Lobby|Role")
 	void ServerSetSelectedRoleModule(FName RoleModule);
+
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Lobby|Role")
+	void ServerApplyRoleLoadout(FName RoleId, const FPRRoleLoadout& Loadout);
+
+	UFUNCTION(Client, Reliable, Category = "Lobby|Role")
+	void ClientRoleLoadoutApplyResult(EPRRoleLoadoutApplyResult Result, const FString& Diagnostic);
 
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Lobby|Travel")
 	void ServerStartRiftMission();
@@ -253,10 +273,14 @@ private:
 	void DestroyRiftSettlementUI();
 	void CreateShipRepairUI();
 	void DestroyShipRepairUI();
+	void CreateRoleLoadoutUI();
+	void DestroyRoleLoadoutUI();
 	void ApplyInventoryInputMode();
 	void RestoreInventoryInputMode();
 	void ApplyShipRepairInputMode();
 	void RestoreShipRepairInputMode();
+	void ApplyRoleLoadoutInputMode();
+	void RestoreRoleLoadoutInputMode();
 	UPRInventoryComponent* GetLocalInventoryComponent() const;
 	TSubclassOf<UGameplayEffect> ResolveConsumableEffectClass(FName ItemId) const;
 	bool CanUseInventoryItemOnServer(FName ItemId, FString* OutFailureReason = nullptr) const;
@@ -323,10 +347,18 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UPRShipRepairWidget> ShipRepairWidget;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Roles|UI")
+	TSubclassOf<UPRRoleLoadoutWidget> RoleLoadoutWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPRRoleLoadoutWidget> RoleLoadoutWidget;
+
 	bool bInventoryInputModeActive = false;
 	bool bSavedMouseCursorVisibilityForInventory = false;
 	bool bShipRepairInputModeActive = false;
 	bool bSavedMouseCursorVisibilityForShipRepair = false;
+	bool bRoleLoadoutInputModeActive = false;
+	bool bSavedMouseCursorVisibilityForRoleLoadout = false;
 	bool bDiagnosticsInputModeActive = false;
 	bool bSavedMouseCursorVisibilityForDiagnostics = false;
 

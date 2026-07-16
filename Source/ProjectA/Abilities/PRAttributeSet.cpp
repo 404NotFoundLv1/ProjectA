@@ -140,6 +140,26 @@ void UPRAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribute, fl
 	{
 		NewValue = FMath::Clamp(NewValue, 0.0f, GetMaxShield());
 	}
+	else if (Attribute == GetMaxShieldAttribute())
+	{
+		NewValue = FMath::Max(0.0f, NewValue);
+		if (GetShield() > NewValue)
+		{
+			SetShield(NewValue);
+		}
+	}
+	else if (Attribute == GetEnergyAttribute())
+	{
+		NewValue = FMath::Clamp(NewValue, 0.0f, GetMaxEnergy());
+	}
+	else if (Attribute == GetMaxEnergyAttribute())
+	{
+		NewValue = FMath::Max(0.0f, NewValue);
+		if (GetEnergy() > NewValue)
+		{
+			SetEnergy(NewValue);
+		}
+	}
 }
 
 void UPRAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)

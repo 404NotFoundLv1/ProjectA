@@ -22,6 +22,7 @@
 #include "InputAction.h"
 #include "Player/PRPlayerController.h"
 #include "Player/PRPlayerState.h"
+#include "Roles/PRRoleComponent.h"
 #include "ProjectA.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
@@ -401,22 +402,19 @@ bool APRCharacter::GrantSelectedRoleModuleAbilities()
 		return false;
 	}
 
-	const FName SelectedRoleModule = ProjectRiftPlayerState->GetSelectedRoleModule();
-	if (SelectedRoleModule != FName(TEXT("Ability.Role.Assault")) && SelectedRoleModule != FName(TEXT("Role.Assault")))
+	UPRRoleComponent* RoleComponent = ProjectRiftPlayerState->GetRoleComponent();
+	if (!RoleComponent)
 	{
 		return false;
 	}
 
-	const FGameplayTag QInputTag = ProjectRiftGameplayTags::Input_Ability_Skill_Q;
-	const FGameplayTag EInputTag = ProjectRiftGameplayTags::Input_Ability_Skill_E;
-	const FGameplayTag RInputTag = ProjectRiftGameplayTags::Input_Ability_Skill_R;
-
-	bool bGrantedAllAbilities = true;
-	bGrantedAllAbilities &= GrantAbilityIfMissing(AssaultChargeAbilityClass, QInputTag);
-	bGrantedAllAbilities &= GrantAbilityIfMissing(AssaultBlastAbilityClass, EInputTag);
-	bGrantedAllAbilities &= GrantAbilityIfMissing(AssaultShieldAbilityClass, RInputTag);
-
-	bRoleModuleAbilitiesGranted = bGrantedAllAbilities;
+	// A profile can be restored before its pawn exists.  Do not replace a
+	// catalog-valid, already-unlocked selection during possession/respawn.
+	if (!RoleComponent->IsLoadoutValid(ProjectRiftPlayerState->GetSelectedRoleModule(), RoleComponent->GetCurrentLoadout()))
+	{
+		RoleComponent->EnsureDefaultLoadoutForSelectedRole();
+	}
+	bRoleModuleAbilitiesGranted = RoleComponent->RefreshGrantedAbilities();
 	return bRoleModuleAbilitiesGranted;
 }
 

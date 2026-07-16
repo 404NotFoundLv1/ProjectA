@@ -29,6 +29,15 @@ struct PROJECTA_API FPRMultiplayerProfileProjection
 	FName SelectedRoleId = NAME_None;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Profile")
+	TArray<FName> UnlockedRoleIds;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Profile")
+	TArray<FName> UnlockedRoleModuleIds;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Profile")
+	TArray<FPRRoleModuleSlotEntry> EquippedRoleModules;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Profile")
 	FPRProfileStoryProgress Story;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Profile")
@@ -74,6 +83,15 @@ struct PROJECTA_API FPRPlayerSettlementReceipt
 
 	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Settlement")
 	FName SettledRoleId = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Settlement")
+	TArray<FName> SettledUnlockedRoleIds;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Settlement")
+	TArray<FName> SettledUnlockedRoleModuleIds;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Settlement")
+	TArray<FPRRoleModuleSlotEntry> SettledEquippedRoleModules;
 
 	bool IsValid(FString* OutDiagnostic = nullptr) const;
 };
