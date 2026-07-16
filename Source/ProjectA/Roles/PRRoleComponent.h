@@ -29,6 +29,7 @@ public:
 	EPRRoleLoadoutApplyResult ApplyLoadout(FName RoleId, const FPRRoleLoadout& Loadout);
 
 	bool EnsureDefaultLoadoutForSelectedRole();
+	void MergeStarterUnlocks();
 	bool RefreshGrantedAbilities();
 	void ClearGrantedAbilities();
 	void CopyRuntimeStateFrom(const UPRRoleComponent* SourceComponent);

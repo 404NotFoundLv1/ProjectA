@@ -35,6 +35,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Role", meta = (ClampMin = "0.001"))
 	float EnergyRegenPerSecond = 1.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Role")
+	bool bStarterUnlocked = false;
+
 	bool ValidateDefinition(FString* OutDiagnostic = nullptr) const;
 	static bool ValidateCatalog(
 		const TArray<UPRRoleDataAsset*>& Roles,

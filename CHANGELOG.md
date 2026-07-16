@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.4] - 2026-07-16
+
+- Added the starter-unlocked Engineer role, its replicated Q/E/R deployable loadout, and v4-compatible starter unlock merging.
+- Added server-authoritative placement confirmation, cancellation, replacement, timeout, lifecycle cleanup, and dedicated sentry, repair-drone, and shield-generator runtime actors.
+- Added Engineer friendly shield repair scaling, non-stacking temporary generator shields, deployable input blocking, and ProjectRift role asset coverage.
+- Updated the displayed project version to `0.6.4`; player save format remains v4.
+
 ## [0.6.3] - 2026-07-16
 
 - Added data-driven Assault role and Q/E/R module assets, replicated loadout ownership, and v4-compatible persistence for unlocked role modules and equipped slots.

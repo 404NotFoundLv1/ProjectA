@@ -22,6 +22,7 @@
 #include "InputAction.h"
 #include "Player/PRPlayerController.h"
 #include "Player/PRPlayerState.h"
+#include "Deployables/PRDeployableComponent.h"
 #include "Roles/PRRoleComponent.h"
 #include "ProjectA.h"
 #include "TimerManager.h"
@@ -912,6 +913,17 @@ void APRCharacter::DoInteract()
 void APRCharacter::DoPrimaryAttack()
 {
 	ShowInputDebugMessage(this, TEXT("PrimaryAttack"));
+	if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
+	{
+		if (UPRDeployableComponent* Deployables = ProjectRiftPlayerState->GetDeployableComponent(); Deployables && Deployables->GetPlacementState().bPending)
+		{
+			if (APRPlayerController* ProjectRiftController = Cast<APRPlayerController>(GetController()))
+			{
+				ProjectRiftController->ServerConfirmDeployable(BuildLocalDeployablePreviewTransform(), Deployables->GetPlacementState().SessionSequence);
+			}
+			return;
+		}
+	}
 
 	const FGameplayTag PrimaryInputTag = ProjectRiftGameplayTags::Input_Ability_Primary;
 	ActivateAbilityInputTag(PrimaryInputTag, TEXT("PrimaryAttack"));
@@ -928,11 +940,35 @@ void APRCharacter::DoAim()
 	ShowInputDebugMessage(this, TEXT("Aim"));
 	if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
 	{
+		if (UPRDeployableComponent* Deployables = ProjectRiftPlayerState->GetDeployableComponent(); Deployables && Deployables->GetPlacementState().bPending)
+		{
+			if (APRPlayerController* ProjectRiftController = Cast<APRPlayerController>(GetController()))
+			{
+				ProjectRiftController->ServerCancelDeployable();
+			}
+			return;
+		}
 		if (UPRWeaponComponent* WeaponComponent = ProjectRiftPlayerState->GetWeaponComponent())
 		{
 			WeaponComponent->SetAiming(true);
 		}
 	}
+}
+
+FTransform APRCharacter::BuildLocalDeployablePreviewTransform() const
+{
+	const UCameraComponent* Camera = GetFollowCamera();
+	const FVector ViewStart = Camera ? Camera->GetComponentLocation() : GetActorLocation();
+	const FVector Direction = Camera ? Camera->GetComponentRotation().Vector().GetSafeNormal() : GetActorForwardVector().GetSafeNormal();
+	FCollisionObjectQueryParams WorldObjects;
+	WorldObjects.AddObjectTypesToQuery(ECC_WorldStatic);
+	WorldObjects.AddObjectTypesToQuery(ECC_WorldDynamic);
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(PRDeployablePreview), false, this);
+	FHitResult Hit;
+	const FVector ViewEnd = ViewStart + Direction * 1600.0f;
+	const FVector Location = GetWorld() && GetWorld()->LineTraceSingleByObjectType(Hit, ViewStart, ViewEnd, WorldObjects, Query)
+		? Hit.ImpactPoint : ViewEnd;
+	return FTransform(FRotator(0.0f, GetControlRotation().Yaw, 0.0f), Location);
 }
 
 void APRCharacter::DoAimReleased()
@@ -981,6 +1017,10 @@ void APRCharacter::DoDodge()
 void APRCharacter::DoSkillQ()
 {
 	ShowInputDebugMessage(this, TEXT("Skill Q"));
+	if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>(); ProjectRiftPlayerState && ProjectRiftPlayerState->GetDeployableComponent()->GetPlacementState().bPending)
+	{
+		if (APRPlayerController* ProjectRiftController = Cast<APRPlayerController>(GetController())) { ProjectRiftController->ServerCancelDeployable(); }
+	}
 	const FGameplayTag QInputTag = ProjectRiftGameplayTags::Input_Ability_Skill_Q;
 	ActivateAbilityInputTag(QInputTag, TEXT("Skill Q"));
 }
@@ -994,6 +1034,10 @@ void APRCharacter::DoSkillQReleased()
 void APRCharacter::DoSkillE()
 {
 	ShowInputDebugMessage(this, TEXT("Skill E"));
+	if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>(); ProjectRiftPlayerState && ProjectRiftPlayerState->GetDeployableComponent()->GetPlacementState().bPending)
+	{
+		if (APRPlayerController* ProjectRiftController = Cast<APRPlayerController>(GetController())) { ProjectRiftController->ServerCancelDeployable(); }
+	}
 	const FGameplayTag EInputTag = ProjectRiftGameplayTags::Input_Ability_Skill_E;
 	ActivateAbilityInputTag(EInputTag, TEXT("Skill E"));
 }
@@ -1007,6 +1051,10 @@ void APRCharacter::DoSkillEReleased()
 void APRCharacter::DoSkillR()
 {
 	ShowInputDebugMessage(this, TEXT("Skill R"));
+	if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>(); ProjectRiftPlayerState && ProjectRiftPlayerState->GetDeployableComponent()->GetPlacementState().bPending)
+	{
+		if (APRPlayerController* ProjectRiftController = Cast<APRPlayerController>(GetController())) { ProjectRiftController->ServerCancelDeployable(); }
+	}
 	const FGameplayTag RInputTag = ProjectRiftGameplayTags::Input_Ability_Skill_R;
 	ActivateAbilityInputTag(RInputTag, TEXT("Skill R"));
 }

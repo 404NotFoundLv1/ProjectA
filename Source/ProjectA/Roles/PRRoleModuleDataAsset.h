@@ -40,5 +40,5 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Role Module", meta = (MultiLine = "true"))
 	FText Description;
 
-	bool ValidateDefinition(FString* OutDiagnostic = nullptr) const;
+	virtual bool ValidateDefinition(FString* OutDiagnostic = nullptr) const;
 };

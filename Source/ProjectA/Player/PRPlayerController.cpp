@@ -11,6 +11,7 @@
 #include "Core/PRShipLobbyGameMode.h"
 #include "Core/PRRiftGameMode.h"
 #include "Core/PRRiftObjectiveActor.h"
+#include "Deployables/PRDeployableComponent.h"
 #include "Diagnostics/PRDiagnosticsLog.h"
 #include "Engine/Engine.h"
 #include "Engine/OverlapResult.h"
@@ -41,6 +42,8 @@
 #include "UI/PRShipRepairWidget.h"
 #include "UI/PRWeaponHUDWidget.h"
 #include "Roles/PRRoleComponent.h"
+#include "Roles/PRRoleDataAsset.h"
+#include "Roles/PRRoleModuleDataAsset.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Weapons/PRWeaponComponent.h"
 
@@ -236,12 +239,23 @@ void APRPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::P, IE_Pressed, this, &APRPlayerController::ToggleReady);
 		InputComponent->BindKey(EKeys::O, IE_Pressed, this, &APRPlayerController::StartRiftMission);
 		InputComponent->BindKey(EKeys::C, IE_Pressed, this, &APRPlayerController::ToggleRoleLoadoutPanel);
+		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &APRPlayerController::CancelPendingDeployable);
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &APRPlayerController::HideRoleLoadoutPanel);
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &APRPlayerController::HideShipRepairPanel);
 #if !UE_BUILD_SHIPPING
 		InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &APRPlayerController::ToggleDiagnosticsPanel);
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &APRPlayerController::HideDiagnosticsPanel);
 #endif
+	}
+}
+
+void APRPlayerController::CancelPendingDeployable()
+{
+	const APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	const UPRDeployableComponent* Deployables = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetDeployableComponent() : nullptr;
+	if (Deployables && Deployables->GetPlacementState().bPending)
+	{
+		ServerCancelDeployable();
 	}
 }
 
@@ -951,17 +965,27 @@ void APRPlayerController::ServerSetSelectedRoleModule_Implementation(const FName
 		return;
 	}
 
-	if (RoleModule == AssaultRoleModuleName || RoleModule == FName(TEXT("Role.Assault")))
+	const FName RequestedRoleId = RoleModule == FName(TEXT("Role.Assault")) ? AssaultRoleModuleName : RoleModule;
+	UPRRoleComponent* RoleComponent = ProjectRiftPlayerState->GetRoleComponent();
+	TArray<UPRRoleDataAsset*> Roles;
+	TArray<UPRRoleModuleDataAsset*> Modules;
+	if (!RoleComponent || !UPRAssetManager::Get()->LoadRoleCatalog(Roles, Modules))
 	{
-		ProjectRiftPlayerState->SetSelectedRoleModule(AssaultRoleModuleName);
-		if (UPRRoleComponent* RoleComponent = ProjectRiftPlayerState->GetRoleComponent())
-		{
-			RoleComponent->EnsureDefaultLoadoutForSelectedRole();
-		}
+		UE_LOG(LogProjectA, Warning, TEXT("Role catalog is unavailable while selecting %s."), *RoleModule.ToString());
 		return;
 	}
-
-	UE_LOG(LogProjectA, Warning, TEXT("Unsupported role module requested: %s"), *RoleModule.ToString());
+	UPRRoleDataAsset* const* RequestedRoleEntry = Roles.FindByPredicate([RequestedRoleId](const UPRRoleDataAsset* CandidateRole)
+	{
+		return CandidateRole && CandidateRole->RoleId == RequestedRoleId;
+	});
+	if (!RequestedRoleEntry
+		|| !RoleComponent->GetUnlockedRoleIds().Contains(RequestedRoleId))
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Unsupported or locked role requested: %s"), *RoleModule.ToString());
+		return;
+	}
+	ProjectRiftPlayerState->SetSelectedRoleModule(RequestedRoleId);
+	RoleComponent->EnsureDefaultLoadoutForSelectedRole();
 }
 
 void APRPlayerController::ServerApplyRoleLoadout_Implementation(const FName RoleId, const FPRRoleLoadout& Loadout)
@@ -975,6 +999,29 @@ void APRPlayerController::ServerApplyRoleLoadout_Implementation(const FName Role
 	}
 	const EPRRoleLoadoutApplyResult Result = RoleComponent->ApplyLoadout(RoleId, Loadout);
 	ClientRoleLoadoutApplyResult(Result, Result == EPRRoleLoadoutApplyResult::Applied ? TEXT("Loadout applied.") : TEXT("Loadout request was rejected."));
+}
+
+void APRPlayerController::ServerConfirmDeployable_Implementation(const FTransform& ClientTransform, const int32 SessionSequence)
+{
+	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	UPRDeployableComponent* Deployables = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetDeployableComponent() : nullptr;
+	if (!Deployables)
+	{
+		return;
+	}
+	FString Diagnostic;
+	Deployables->ConfirmPlacement(this, ClientTransform, SessionSequence, Diagnostic);
+}
+
+void APRPlayerController::ServerCancelDeployable_Implementation()
+{
+	if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
+	{
+		if (UPRDeployableComponent* Deployables = ProjectRiftPlayerState->GetDeployableComponent())
+		{
+			Deployables->CancelPlacement(TEXT("Deployment cancelled."));
+		}
+	}
 }
 
 void APRPlayerController::ClientRoleLoadoutApplyResult_Implementation(const EPRRoleLoadoutApplyResult Result, const FString& Diagnostic)

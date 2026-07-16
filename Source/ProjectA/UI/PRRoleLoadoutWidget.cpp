@@ -75,6 +75,24 @@ TSharedRef<SWidget> UPRRoleLoadoutWidget::RebuildWidget()
 		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 12.0f, 0.0f, 8.0f)
 		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0.0f, 0.0f, 8.0f, 0.0f)
+			[
+				SNew(SButton).OnClicked_UObject(this, &UPRRoleLoadoutWidget::HandleAssaultClicked)
+				[
+					SNew(STextBlock).Justification(ETextJustify::Center).Font(ProjectRiftRoleLoadoutWidgetPrivate::GetFont(15.0f)).Text(FText::FromString(TEXT("Assault")))
+				]
+			]
+			+ SHorizontalBox::Slot().FillWidth(1.0f)
+			[
+				SNew(SButton).OnClicked_UObject(this, &UPRRoleLoadoutWidget::HandleEngineerClicked)
+				[
+					SNew(STextBlock).Justification(ETextJustify::Center).Font(ProjectRiftRoleLoadoutWidgetPrivate::GetFont(15.0f)).Text(FText::FromString(TEXT("Engineer")))
+				]
+			]
+		]
+		+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)
+		[
 			SAssignNew(StatusTextBlock, STextBlock).AutoWrapText(true)
 			.Font(ProjectRiftRoleLoadoutWidgetPrivate::GetFont(14.0f))
 			.ColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.8f, 0.35f, 1.0f)))
@@ -157,6 +175,20 @@ void UPRRoleLoadoutWidget::RequestRestoreDefaults()
 	}
 }
 
+void UPRRoleLoadoutWidget::RequestSelectRole(const FName RoleId)
+{
+	APRPlayerController* Controller = Cast<APRPlayerController>(GetOwningPlayer());
+	if (!Controller || RoleId.IsNone())
+	{
+		LocalStatus = TEXT("Role selection is unavailable.");
+		RefreshLoadoutDisplay();
+		return;
+	}
+	LocalStatus = FString::Printf(TEXT("Selecting %s..."), *RoleId.ToString());
+	Controller->SelectRoleModule(RoleId);
+	RefreshLoadoutDisplay();
+}
+
 void UPRRoleLoadoutWidget::RequestClose()
 {
 	if (APRPlayerController* Controller = Cast<APRPlayerController>(GetOwningPlayer()))
@@ -174,6 +206,8 @@ void UPRRoleLoadoutWidget::HandleApplyResult(const EPRRoleLoadoutApplyResult Res
 FReply UPRRoleLoadoutWidget::HandleApplyClicked() { RequestApplyLoadout(); return FReply::Handled(); }
 FReply UPRRoleLoadoutWidget::HandleDefaultsClicked() { RequestRestoreDefaults(); return FReply::Handled(); }
 FReply UPRRoleLoadoutWidget::HandleCloseClicked() { RequestClose(); return FReply::Handled(); }
+FReply UPRRoleLoadoutWidget::HandleAssaultClicked() { RequestSelectRole(TEXT("Ability.Role.Assault")); return FReply::Handled(); }
+FReply UPRRoleLoadoutWidget::HandleEngineerClicked() { RequestSelectRole(TEXT("Ability.Role.Engineer")); return FReply::Handled(); }
 
 FText UPRRoleLoadoutWidget::BuildLoadoutSummary() const
 {

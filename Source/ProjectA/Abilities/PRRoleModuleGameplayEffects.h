@@ -62,3 +62,21 @@ class PROJECTA_API UPRAssaultShieldCooldownGameplayEffect : public UPRRoleModule
 public:
 	UPRAssaultShieldCooldownGameplayEffect(const FObjectInitializer& ObjectInitializer);
 };
+
+UCLASS()
+class PROJECTA_API UPRShieldRepairGameplayEffect : public UGameplayEffect
+{
+	GENERATED_BODY()
+
+public:
+	UPRShieldRepairGameplayEffect();
+};
+
+UCLASS()
+class PROJECTA_API UPRShieldGeneratorAuraGameplayEffect : public UGameplayEffect
+{
+	GENERATED_BODY()
+
+public:
+	UPRShieldGeneratorAuraGameplayEffect();
+};

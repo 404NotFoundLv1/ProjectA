@@ -80,3 +80,29 @@ UPRAssaultShieldCooldownGameplayEffect::UPRAssaultShieldCooldownGameplayEffect(c
 {
 	AddCooldownTag(ObjectInitializer, ProjectRiftGameplayTags::Cooldown_Skill_R, TEXT("ShieldCooldownTags"));
 }
+
+UPRShieldRepairGameplayEffect::UPRShieldRepairGameplayEffect()
+{
+	DurationPolicy = EGameplayEffectDurationType::Instant;
+	FGameplayModifierInfo& ShieldModifier = Modifiers.AddDefaulted_GetRef();
+	ShieldModifier.Attribute = UPRAttributeSet::GetShieldAttribute();
+	ShieldModifier.ModifierOp = EGameplayModOp::Additive;
+	ShieldModifier.ModifierMagnitude = MakeSetByCallerMagnitude(ProjectRiftGameplayTags::Data_ShieldRepair);
+}
+
+UPRShieldGeneratorAuraGameplayEffect::UPRShieldGeneratorAuraGameplayEffect()
+{
+	DurationPolicy = EGameplayEffectDurationType::HasDuration;
+	DurationMagnitude = FGameplayEffectModifierMagnitude(FScalableFloat(0.55f));
+	StackingType = EGameplayEffectStackingType::AggregateByTarget;
+	StackLimitCount = 1;
+	StackDurationRefreshPolicy = EGameplayEffectStackingDurationPolicy::RefreshOnSuccessfulApplication;
+	FGameplayModifierInfo& MaxShieldModifier = Modifiers.AddDefaulted_GetRef();
+	MaxShieldModifier.Attribute = UPRAttributeSet::GetMaxShieldAttribute();
+	MaxShieldModifier.ModifierOp = EGameplayModOp::Additive;
+	MaxShieldModifier.ModifierMagnitude = FGameplayEffectModifierMagnitude(FScalableFloat(30.0f));
+	FGameplayModifierInfo& ShieldModifier = Modifiers.AddDefaulted_GetRef();
+	ShieldModifier.Attribute = UPRAttributeSet::GetShieldAttribute();
+	ShieldModifier.ModifierOp = EGameplayModOp::Additive;
+	ShieldModifier.ModifierMagnitude = FGameplayEffectModifierMagnitude(FScalableFloat(30.0f));
+}

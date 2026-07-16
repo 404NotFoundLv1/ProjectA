@@ -2,7 +2,9 @@
 
 #include "Abilities/PRDamageGameplayEffect.h"
 #include "Abilities/PRHitStaggerGameplayEffect.h"
+#include "Abilities/PRRoleModuleGameplayEffects.h"
 #include "Abilities/PRStatusGameplayEffect.h"
+#include "Abilities/PRAttributeSet.h"
 #include "AbilitySystemComponent.h"
 #include "Characters/PRCharacter.h"
 #include "Combat/PRCombatFeedbackComponent.h"
@@ -254,6 +256,73 @@ bool UPRCombatEffectLibrary::IsHostileTarget(
 	}
 
 	return AreOpposingCombatants(SourceAbilitySystem, TargetAbilitySystem);
+}
+
+bool UPRCombatEffectLibrary::IsFriendlyPlayerTarget(
+	const UAbilitySystemComponent* SourceAbilitySystem,
+	const UAbilitySystemComponent* TargetAbilitySystem)
+{
+	if (!SourceAbilitySystem || !TargetAbilitySystem || HasInactiveState(TargetAbilitySystem))
+	{
+		return false;
+	}
+
+	return GetCombatantKind(SourceAbilitySystem) == EPRCombatantKind::Player
+		&& GetCombatantKind(TargetAbilitySystem) == EPRCombatantKind::Player;
+}
+
+bool UPRCombatEffectLibrary::ApplyShieldRepairToTarget(
+	UAbilitySystemComponent* SourceAbilitySystem,
+	UAbilitySystemComponent* TargetAbilitySystem,
+	const float BaseRepair,
+	UObject* SourceObject)
+{
+	if (!HasAuthoritativeActorInfo(SourceAbilitySystem)
+		|| !HasAuthoritativeActorInfo(TargetAbilitySystem)
+		|| !IsFriendlyPlayerTarget(SourceAbilitySystem, TargetAbilitySystem)
+		|| !FMath::IsFinite(BaseRepair) || BaseRepair <= 0.0f)
+	{
+		return false;
+	}
+	const UPRAttributeSet* SourceAttributes = SourceAbilitySystem->GetSet<UPRAttributeSet>();
+	const UPRAttributeSet* TargetAttributes = TargetAbilitySystem->GetSet<UPRAttributeSet>();
+	if (!SourceAttributes || !TargetAttributes || TargetAttributes->GetShield() >= TargetAttributes->GetMaxShield())
+	{
+		return false;
+	}
+	const float RepairAmount = BaseRepair * (1.0f + FMath::Max(0.0f, SourceAttributes->GetHealingPower()) / 100.0f);
+	FGameplayEffectSpecHandle SpecHandle = SourceAbilitySystem->MakeOutgoingSpec(
+		UPRShieldRepairGameplayEffect::StaticClass(), 1.0f,
+		MakeCombatEffectContext(SourceAbilitySystem, TargetAbilitySystem, SourceObject));
+	if (!SpecHandle.IsValid())
+	{
+		return false;
+	}
+	SpecHandle.Data->SetSetByCallerMagnitude(ProjectRiftGameplayTags::Data_ShieldRepair, RepairAmount);
+	SourceAbilitySystem->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetAbilitySystem);
+	return true;
+}
+
+bool UPRCombatEffectLibrary::ApplyShieldGeneratorAuraToTarget(
+	UAbilitySystemComponent* SourceAbilitySystem,
+	UAbilitySystemComponent* TargetAbilitySystem,
+	UObject* SourceObject)
+{
+	if (!HasAuthoritativeActorInfo(SourceAbilitySystem)
+		|| !HasAuthoritativeActorInfo(TargetAbilitySystem)
+		|| !IsFriendlyPlayerTarget(SourceAbilitySystem, TargetAbilitySystem))
+	{
+		return false;
+	}
+	FGameplayEffectSpecHandle SpecHandle = SourceAbilitySystem->MakeOutgoingSpec(
+		UPRShieldGeneratorAuraGameplayEffect::StaticClass(), 1.0f,
+		MakeCombatEffectContext(SourceAbilitySystem, TargetAbilitySystem, SourceObject));
+	if (!SpecHandle.IsValid())
+	{
+		return false;
+	}
+	SourceAbilitySystem->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetAbilitySystem);
+	return true;
 }
 
 bool UPRCombatEffectLibrary::ApplyDamageToTarget(

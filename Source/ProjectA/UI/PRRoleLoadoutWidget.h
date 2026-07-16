@@ -26,6 +26,9 @@ public:
 	void RequestRestoreDefaults();
 
 	UFUNCTION(BlueprintCallable, Category = "Roles|UI")
+	void RequestSelectRole(FName RoleId);
+
+	UFUNCTION(BlueprintCallable, Category = "Roles|UI")
 	void RequestClose();
 
 	void HandleApplyResult(EPRRoleLoadoutApplyResult Result, const FString& Diagnostic);
@@ -38,6 +41,8 @@ private:
 	FReply HandleApplyClicked();
 	FReply HandleDefaultsClicked();
 	FReply HandleCloseClicked();
+	FReply HandleAssaultClicked();
+	FReply HandleEngineerClicked();
 	FText BuildLoadoutSummary() const;
 	bool ResolveCanonicalDefaults(FName& OutRoleId, FPRRoleLoadout& OutLoadout) const;
 

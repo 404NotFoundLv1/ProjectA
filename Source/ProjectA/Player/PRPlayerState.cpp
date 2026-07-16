@@ -2,6 +2,7 @@
 
 #include "Abilities/PRAbilitySystemComponent.h"
 #include "Abilities/PRAttributeSet.h"
+#include "Deployables/PRDeployableComponent.h"
 #include "Items/PRInventoryComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "ProjectA.h"
@@ -21,6 +22,7 @@ APRPlayerState::APRPlayerState()
 	InventoryComponent = CreateDefaultSubobject<UPRInventoryComponent>(TEXT("InventoryComponent"));
 	WeaponComponent = CreateDefaultSubobject<UPRWeaponComponent>(TEXT("WeaponComponent"));
 	RoleComponent = CreateDefaultSubobject<UPRRoleComponent>(TEXT("RoleComponent"));
+	DeployableComponent = CreateDefaultSubobject<UPRDeployableComponent>(TEXT("DeployableComponent"));
 }
 
 void APRPlayerState::BeginPlay()

@@ -118,6 +118,7 @@ protected:
 	bool GrantAbilityIfMissing(TSubclassOf<UGameplayAbility> AbilityClass, FGameplayTag InputTag);
 	bool ActivateAbilityInputTag(FGameplayTag InputTag, const TCHAR* ActionName);
 	bool ReleaseAbilityInputTag(FGameplayTag InputTag, const TCHAR* ActionName);
+	FTransform BuildLocalDeployablePreviewTransform() const;
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "GAS")
 	TObjectPtr<UPRAbilitySystemComponent> AbilitySystemComponent;

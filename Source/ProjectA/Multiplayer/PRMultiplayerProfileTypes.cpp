@@ -66,7 +66,7 @@ bool IsStoryValid(const FPRProfileStoryProgress& Story)
 		&& (Story.CurrentChapterId.IsNone() || Story.UnlockedChapterIds.Contains(Story.CurrentChapterId));
 }
 
-bool AreRoleModuleEntriesStructurallyValid(const TArray<FPRRoleModuleSlotEntry>& Entries)
+bool AreProjectionRoleModuleEntriesStructurallyValid(const TArray<FPRRoleModuleSlotEntry>& Entries)
 {
 	TSet<EPRRoleModuleSlot> SeenSlots;
 	TSet<FName> SeenModules;
@@ -119,7 +119,7 @@ bool FPRMultiplayerProfileProjection::IsValid(FString* OutDiagnostic) const
 		|| !AreShipModulesValid(ShipModules)
 		|| !AreUniqueValidNames(UnlockedRoleIds)
 		|| !AreUniqueValidNames(UnlockedRoleModuleIds)
-		|| !AreRoleModuleEntriesStructurallyValid(EquippedRoleModules)
+		|| !AreProjectionRoleModuleEntriesStructurallyValid(EquippedRoleModules)
 		|| !IsStoryValid(Story))
 	{
 		if (OutDiagnostic) { *OutDiagnostic = TEXT("Profile projection contains invalid runtime data."); }
@@ -152,7 +152,7 @@ bool FPRPlayerSettlementReceipt::IsValid(FString* OutDiagnostic) const
 		|| !AreResourcesValid(SettledResourceWallet)
 		|| !AreUniqueValidNames(SettledUnlockedRoleIds)
 		|| !AreUniqueValidNames(SettledUnlockedRoleModuleIds)
-		|| !AreRoleModuleEntriesStructurallyValid(SettledEquippedRoleModules))
+		|| !AreProjectionRoleModuleEntriesStructurallyValid(SettledEquippedRoleModules))
 	{
 		if (OutDiagnostic) { *OutDiagnostic = TEXT("Settlement receipt contains invalid runtime data."); }
 		return false;

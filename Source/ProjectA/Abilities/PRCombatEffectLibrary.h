@@ -22,6 +22,24 @@ public:
 		const UAbilitySystemComponent* SourceAbilitySystem,
 		const UAbilitySystemComponent* TargetAbilitySystem);
 
+	/** Friendly-only support validation; intentionally rejects enemies and inactive players. */
+	static bool IsFriendlyPlayerTarget(
+		const UAbilitySystemComponent* SourceAbilitySystem,
+		const UAbilitySystemComponent* TargetAbilitySystem);
+
+	/** Applies server-authoritative shield repair using the source HealingPower multiplier. */
+	static bool ApplyShieldRepairToTarget(
+		UAbilitySystemComponent* SourceAbilitySystem,
+		UAbilitySystemComponent* TargetAbilitySystem,
+		float BaseRepair,
+		UObject* SourceObject = nullptr);
+
+	/** Applies the non-stacking shield-generator aura to an eligible friendly player. */
+	static bool ApplyShieldGeneratorAuraToTarget(
+		UAbilitySystemComponent* SourceAbilitySystem,
+		UAbilitySystemComponent* TargetAbilitySystem,
+		UObject* SourceObject = nullptr);
+
 	static bool ApplyDamageToTarget(
 		UAbilitySystemComponent* SourceAbilitySystem,
 		UAbilitySystemComponent* TargetAbilitySystem,

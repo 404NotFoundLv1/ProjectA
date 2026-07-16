@@ -21,6 +21,7 @@ namespace ProjectRiftGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_Ability_EnergyDelta, "Data.Ability.EnergyDelta", "SetByCaller energy delta for a role module");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_Ability_CooldownDuration, "Data.Ability.CooldownDuration", "SetByCaller role module cooldown duration");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_Ability_EnergyRegen, "Data.Ability.EnergyRegen", "SetByCaller role energy regeneration per period");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_ShieldRepair, "Data.ShieldRepair", "SetByCaller friendly shield restoration amount");
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Damage_Type_Physical, "Damage.Type.Physical", "Physical damage type");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Damage_Type_Pollution, "Damage.Type.Pollution", "Pollution damage type");
@@ -36,6 +37,7 @@ namespace ProjectRiftGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_HitStaggered, "State.HitStaggered", "Combatant is reacting to a hit");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Aiming, "State.Aiming", "Player is aiming a weapon");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Reloading, "State.Reloading", "Player is reloading a weapon");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_PlacingDeployable, "State.PlacingDeployable", "Player is confirming a deployable placement");
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Combat_Impact_Shield, "GameplayCue.Combat.Impact.Shield", "Shield damage feedback");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Combat_Impact_ShieldBreak, "GameplayCue.Combat.Impact.ShieldBreak", "Shield break feedback");

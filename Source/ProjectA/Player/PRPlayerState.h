@@ -14,6 +14,7 @@ class UPRInventoryComponent;
 class UPRMissionProgressionDataAsset;
 class UPRWeaponComponent;
 class UPRRoleComponent;
+class UPRDeployableComponent;
 
 USTRUCT(BlueprintType)
 struct PROJECTA_API FPRShipResourceStack
@@ -63,6 +64,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Roles")
 	UPRRoleComponent* GetRoleComponent() const { return RoleComponent.Get(); }
+
+	UFUNCTION(BlueprintPure, Category = "Deployable")
+	UPRDeployableComponent* GetDeployableComponent() const { return DeployableComponent.Get(); }
 
 	UFUNCTION(BlueprintPure, Category = "Lobby")
 	bool IsReady() const { return bIsReady; }
@@ -159,6 +163,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Roles", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPRRoleComponent> RoleComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Deployable", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPRDeployableComponent> DeployableComponent;
 
 	UPROPERTY(ReplicatedUsing = OnRep_IsReady, VisibleInstanceOnly, BlueprintReadOnly, Category = "Lobby", meta = (AllowPrivateAccess = "true"))
 	bool bIsReady;

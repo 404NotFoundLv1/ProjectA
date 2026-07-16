@@ -167,6 +167,12 @@ public:
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Lobby|Role")
 	void ServerApplyRoleLoadout(FName RoleId, const FPRRoleLoadout& Loadout);
 
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Deployable")
+	void ServerConfirmDeployable(const FTransform& ClientTransform, int32 SessionSequence);
+
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Deployable")
+	void ServerCancelDeployable();
+
 	UFUNCTION(Client, Reliable, Category = "Lobby|Role")
 	void ClientRoleLoadoutApplyResult(EPRRoleLoadoutApplyResult Result, const FString& Diagnostic);
 
@@ -281,6 +287,7 @@ private:
 	void RestoreShipRepairInputMode();
 	void ApplyRoleLoadoutInputMode();
 	void RestoreRoleLoadoutInputMode();
+	void CancelPendingDeployable();
 	UPRInventoryComponent* GetLocalInventoryComponent() const;
 	TSubclassOf<UGameplayEffect> ResolveConsumableEffectClass(FName ItemId) const;
 	bool CanUseInventoryItemOnServer(FName ItemId, FString* OutFailureReason = nullptr) const;

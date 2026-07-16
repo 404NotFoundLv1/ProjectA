@@ -302,6 +302,7 @@ void UPRRoleComponent::ApplyProfileRoleState(FName SelectedRoleId, const TArray<
 	ClearGrantedAbilities();
 	UnlockedRoleIds = InUnlockedRoles;
 	UnlockedModuleIds = InUnlockedModules;
+	MergeStarterUnlocks();
 	CurrentLoadout = InLoadout;
 	PlayerState->SetSelectedRoleModule(SelectedRoleId);
 	if (IsLoadoutValid(SelectedRoleId, CurrentLoadout))
@@ -309,6 +310,29 @@ void UPRRoleComponent::ApplyProfileRoleState(FName SelectedRoleId, const TArray<
 		RefreshGrantedAbilities();
 	}
 	PlayerState->ForceNetUpdate();
+}
+
+void UPRRoleComponent::MergeStarterUnlocks()
+{
+	UPRAssetManager* AssetManager = UPRAssetManager::Get();
+	TArray<UPRRoleDataAsset*> Roles;
+	TArray<UPRRoleModuleDataAsset*> Modules;
+	if (!AssetManager || !AssetManager->LoadRoleCatalog(Roles, Modules))
+	{
+		return;
+	}
+	for (const UPRRoleDataAsset* Role : Roles)
+	{
+		if (!Role || !Role->bStarterUnlocked)
+		{
+			continue;
+		}
+		AddUnlockedId(UnlockedRoleIds, Role->RoleId);
+		for (const FName ModuleId : Role->AllowedModuleIds)
+		{
+			AddUnlockedId(UnlockedModuleIds, ModuleId);
+		}
+	}
 }
 
 bool UPRRoleComponent::ResolveValidatedLoadout(
