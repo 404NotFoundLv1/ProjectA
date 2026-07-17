@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.6] - 2026-07-17
+
+- Added replicated server-authoritative downed, bleed-out, teammate rescue, and one-use solo rescue-drone gameplay without changing the v4 profile schema.
+- Replaced automatic full-health respawn with a 30-second bleed-out and a three-second, range/line-of-sight/state-validated revive at 40% health and zero shield.
+- Added frozen mission participant scaling for waves, alive-enemy caps, and enemy health; late disconnects, deaths, and downed states no longer alter a mission's selected difficulty.
+- Added revive/drone status to the native HUD and GAS debug panel, plus focused runtime, mission, settings, and scaling automation coverage.
+- Updated the displayed project version to `0.6.6`; player save format remains v4.
+
 ## [0.6.5] - 2026-07-16
 
 - Added the starter-unlocked Medic role with data-driven Field Heal, Purification Pulse, and Recon Scan Q/E/R modules.

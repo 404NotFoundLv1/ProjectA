@@ -46,6 +46,9 @@ public:
 	int32 GetAlivePlayerCount() const { return AlivePlayerCount; }
 
 	UFUNCTION(BlueprintPure, Category = "Rift|State")
+	int32 GetDifficultyPlayerCount() const { return DifficultyPlayerCount; }
+
+	UFUNCTION(BlueprintPure, Category = "Rift|State")
 	float GetMissionTime() const { return MissionTime; }
 
 	UFUNCTION(BlueprintPure, Category = "Rift|State")
@@ -77,6 +80,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|State")
 	void SetAlivePlayerCount(int32 InAlivePlayerCount);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|State")
+	void SetDifficultyPlayerCount(int32 InDifficultyPlayerCount);
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|State")
 	void SetMissionTime(float InMissionTime);
@@ -118,6 +124,9 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_AlivePlayerCount, BlueprintReadOnly, Category = "Rift|State")
 	int32 AlivePlayerCount = 0;
 
+	UPROPERTY(ReplicatedUsing = OnRep_DifficultyPlayerCount, BlueprintReadOnly, Category = "Rift|State")
+	int32 DifficultyPlayerCount = 1;
+
 	UPROPERTY(ReplicatedUsing = OnRep_MissionTime, BlueprintReadOnly, Category = "Rift|State")
 	float MissionTime = 0.0f;
 
@@ -150,6 +159,9 @@ protected:
 
 	UFUNCTION()
 	void OnRep_AlivePlayerCount();
+
+	UFUNCTION()
+	void OnRep_DifficultyPlayerCount();
 
 	UFUNCTION()
 	void OnRep_MissionTime();

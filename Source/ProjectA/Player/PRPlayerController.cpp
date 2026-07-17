@@ -6,6 +6,8 @@
 #include "Abilities/PRShieldConsumableGameplayEffect.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Characters/PRCharacter.h"
+#include "Revive/PRReviveComponent.h"
+#include "EngineUtils.h"
 #include "Core/PRAssetManager.h"
 #include "Core/PRGameState.h"
 #include "Core/PRShipLobbyGameMode.h"
@@ -299,6 +301,12 @@ void APRPlayerController::TryPickup()
 		return;
 	}
 
+	if (APRCharacter* ReviveCandidate = Cast<APRCharacter>(FocusedTarget))
+	{
+		TryBeginRevive(ReviveCandidate);
+		return;
+	}
+
 	APRPickupActor* PickupCandidate = Cast<APRPickupActor>(FocusedTarget);
 	if (PickupCandidate)
 	{
@@ -324,6 +332,37 @@ void APRPlayerController::TryPickup()
 		{
 			ServerTryActivateRiftObjective(ObjectiveCandidate);
 		}
+	}
+}
+
+void APRPlayerController::TryBeginRevive(APRCharacter* TargetCharacter)
+{
+	if (HasAuthority())
+	{
+		TryBeginReviveOnServer(TargetCharacter);
+	}
+	else
+	{
+		ServerBeginRevive(TargetCharacter);
+	}
+}
+
+void APRPlayerController::CancelActiveRevive()
+{
+	if (HasAuthority())
+	{
+		if (APRCharacter* Target = ActiveReviveTarget.Get())
+		{
+			if (UPRReviveComponent* Revive = Target->GetReviveComponent())
+			{
+				Revive->CancelRevive(Cast<APRCharacter>(GetPawn()));
+			}
+		}
+		ActiveReviveTarget = nullptr;
+	}
+	else
+	{
+		ServerCancelRevive();
 	}
 }
 
@@ -804,6 +843,10 @@ AActor* APRPlayerController::FindFocusedInteractionTarget() const
 		return nullptr;
 	}
 
+	if (APRCharacter* ReviveCandidate = FindBestReviveCandidate())
+	{
+		return ReviveCandidate;
+	}
 	APRPickupActor* PickupCandidate = FindBestPickupCandidate();
 	APRRiftObjectiveActor* ObjectiveCandidate = FindBestRiftObjectiveCandidate();
 	if (!PickupCandidate && !ObjectiveCandidate)
@@ -822,6 +865,34 @@ AActor* APRPlayerController::FindFocusedInteractionTarget() const
 	return PickupDistanceSquared <= ObjectiveDistanceSquared
 		? static_cast<AActor*>(PickupCandidate)
 		: static_cast<AActor*>(ObjectiveCandidate);
+}
+
+APRCharacter* APRPlayerController::FindBestReviveCandidate() const
+{
+	const APRCharacter* Rescuer = Cast<APRCharacter>(GetPawn());
+	UWorld* World = GetWorld();
+	if (!Rescuer || !World)
+	{
+		return nullptr;
+	}
+	APRCharacter* BestCandidate = nullptr;
+	float BestDistanceSquared = TNumericLimits<float>::Max();
+	for (TActorIterator<APRCharacter> It(World); It; ++It)
+	{
+		APRCharacter* Candidate = *It;
+		UPRReviveComponent* Revive = Candidate ? Candidate->GetReviveComponent() : nullptr;
+		if (!Candidate || !Revive || !Revive->CanBeRevivedBy(Rescuer))
+		{
+			continue;
+		}
+		const float DistanceSquared = FVector::DistSquared(Rescuer->GetActorLocation(), Candidate->GetActorLocation());
+		if (DistanceSquared < BestDistanceSquared)
+		{
+			BestDistanceSquared = DistanceSquared;
+			BestCandidate = Candidate;
+		}
+	}
+	return BestCandidate;
 }
 
 bool APRPlayerController::IsFocusedInteractionTarget(const AActor* TargetActor) const
@@ -1048,6 +1119,29 @@ void APRPlayerController::ServerStartRiftMission_Implementation()
 void APRPlayerController::ServerTryPickup_Implementation(APRPickupActor* PickupActor)
 {
 	TryPickupOnServer(PickupActor);
+}
+
+void APRPlayerController::ServerBeginRevive_Implementation(APRCharacter* TargetCharacter)
+{
+	TryBeginReviveOnServer(TargetCharacter);
+}
+
+void APRPlayerController::ServerCancelRevive_Implementation()
+{
+	CancelActiveRevive();
+}
+
+bool APRPlayerController::TryBeginReviveOnServer(APRCharacter* TargetCharacter)
+{
+	APRCharacter* Rescuer = Cast<APRCharacter>(GetPawn());
+	UPRReviveComponent* Revive = TargetCharacter ? TargetCharacter->GetReviveComponent() : nullptr;
+	APRRiftGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<APRRiftGameMode>() : nullptr;
+	if (!HasAuthority() || !GameMode || !GameMode->HasRiftMissionStarted() || !Rescuer || !Revive || !Revive->BeginPlayerRevive(Rescuer))
+	{
+		return false;
+	}
+	ActiveReviveTarget = TargetCharacter;
+	return true;
 }
 
 void APRPlayerController::ServerTryActivateRiftObjective_Implementation(APRRiftObjectiveActor* ObjectiveActor)

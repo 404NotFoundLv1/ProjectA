@@ -17,6 +17,8 @@ class APawn;
 class UPRInventoryComponent;
 class APRPlayerController;
 class UPRMissionProgressionDataAsset;
+class APRRescueDroneActor;
+class APRCharacter;
 
 /**
  * Server-authoritative rule set for rift missions.
@@ -81,6 +83,21 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Mission")
 	void UpdateAlivePlayerCount();
 
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Revive")
+	void HandlePlayerDowned(APRCharacter* DownedCharacter);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Revive")
+	void HandlePlayerRevived(APRCharacter* RevivedCharacter);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Revive")
+	void HandlePlayerBleedOut(APRCharacter* DeadCharacter);
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Scaling")
+	int32 GetMissionDifficultyPlayerCount() const;
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Revive")
+	APRRescueDroneActor* GetRescueDrone() const { return RescueDrone; }
+
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Objective")
 	void HandleObjectiveActivated(APRRiftObjectiveActor* ObjectiveActor);
 
@@ -138,6 +155,7 @@ protected:
 
 	UFUNCTION(BlueprintPure, Category = "Rift|Mission")
 	int32 CountAlivePlayers() const;
+	int32 CountMissionParticipants() const;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Extraction")
 	FString ReturnToLobbyMapPath = TEXT("/Game/ProjectRift/Maps/L_ShipLobby");
@@ -145,6 +163,8 @@ protected:
 private:
 	bool CheckFailureConditions();
 	bool AreAllActivePlayersDefeated() const;
+	void InitializeRescueDroneForMission();
+	void ClearRescueDrone();
 	bool IsPlayerStateAliveForRift(const APlayerState* PlayerState) const;
 	APawn* ResolvePawnForPlayerState(const APlayerState* PlayerState) const;
 	void DrainRiftStability(float DeltaSeconds);
@@ -172,6 +192,9 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<APRSpawnManager>> SpawnManagers;
+
+	UPROPERTY(Transient)
+	TObjectPtr<APRRescueDroneActor> RescueDrone;
 
 	bool bRiftMissionStarted = false;
 	bool bReturnToLobbyTravelPending = false;

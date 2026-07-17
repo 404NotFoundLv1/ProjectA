@@ -13,6 +13,7 @@ class UGameplayEffect;
 class UPRAbilitySystemComponent;
 class UPRAttributeSet;
 class UPRCombatFeedbackComponent;
+class UPRReviveComponent;
 class UTextRenderComponent;
 struct FOnAttributeChangeData;
 
@@ -46,6 +47,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "GAS")
 	UPRAttributeSet* GetAttributeSet() const { return AttributeSet.Get(); }
+
+	UFUNCTION(BlueprintPure, Category = "Revive")
+	UPRReviveComponent* GetReviveComponent() const { return ReviveComponent; }
 
 	UFUNCTION(BlueprintPure, Category = "GAS")
 	bool IsAbilitySystemInitialized() const { return bAbilitySystemInitialized; }
@@ -112,9 +116,6 @@ protected:
 	void HandleStunnedTagChanged(FGameplayTag StatusTag, int32 NewCount);
 	void HandleHitStaggeredTagChanged(FGameplayTag StatusTag, int32 NewCount);
 	void RefreshMovementFromAttributes();
-	void ScheduleAutoRespawn();
-	void HandleAutoRespawnTimer();
-	void ClearAutoRespawnTimer();
 	bool GrantAbilityIfMissing(TSubclassOf<UGameplayAbility> AbilityClass, FGameplayTag InputTag);
 	bool ActivateAbilityInputTag(FGameplayTag InputTag, const TCHAR* ActionName);
 	bool ReleaseAbilityInputTag(FGameplayTag InputTag, const TCHAR* ActionName);
@@ -153,14 +154,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Abilities|Assault")
 	TSubclassOf<UGameplayAbility> AssaultShieldAbilityClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Life State")
-	float AutoRespawnDelay;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Network|Debug")
 	UTextRenderComponent* PlayerDebugLabel;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|Feedback")
 	TObjectPtr<UPRCombatFeedbackComponent> CombatFeedbackComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Revive")
+	TObjectPtr<UPRReviveComponent> ReviveComponent;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Network|Debug")
 	bool bShowPlayerDebugLabel;
@@ -171,8 +172,6 @@ protected:
 	FDelegateHandle MoveSpeedChangedDelegateHandle;
 	FDelegateHandle StunnedTagChangedDelegateHandle;
 	FDelegateHandle HitStaggeredTagChangedDelegateHandle;
-	FTimerHandle AutoRespawnTimerHandle;
-
 	UPROPERTY(EditDefaultsOnly, Category = "Input|Actions")
 	UInputAction* InteractAction;
 
@@ -203,6 +202,9 @@ protected:
 public:
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoInteract();
+
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	void DoInteractReleased();
 
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoPrimaryAttack();
@@ -247,6 +249,7 @@ public:
 	void DoOpenInventory();
 
 private:
+	friend class UPRReviveComponent;
 	float DefaultCameraArmLength = 400.0f;
 	float DefaultCameraFieldOfView = 90.0f;
 	float TargetCameraArmLength = 400.0f;

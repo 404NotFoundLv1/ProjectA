@@ -140,7 +140,7 @@ bool FPRGASDownedRespawnTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Attacker enters downed state"), Attacker->IsDowned());
 	TestFalse(TEXT("Downed attacker is not alive"), Attacker->IsAlive());
 	TestTrue(TEXT("Downed state tag is present"), DownedStateTag.IsValid() && AttackerASC->HasMatchingGameplayTag(DownedStateTag));
-	TestTrue(TEXT("Auto respawn is scheduled"), Attacker->IsAutoRespawnScheduled());
+	TestFalse(TEXT("Auto respawn is removed"), Attacker->IsAutoRespawnScheduled());
 	TestEqual(TEXT("Downed movement is disabled"), Attacker->GetCharacterMovement()->MovementMode, MOVE_None);
 
 	TargetAttributes->SetMaxHealth(100.0f);
@@ -156,8 +156,8 @@ bool FPRGASDownedRespawnTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Respawn restores alive state"), Attacker->IsAlive());
 	TestFalse(TEXT("Respawn clears downed tag"), DownedStateTag.IsValid() && AttackerASC->HasMatchingGameplayTag(DownedStateTag));
 	TestFalse(TEXT("Respawn clears auto timer"), Attacker->IsAutoRespawnScheduled());
-	TestEqual(TEXT("Respawn restores health"), AttackerAttributes->GetHealth(), AttackerAttributes->GetMaxHealth());
-	TestEqual(TEXT("Respawn restores shield"), AttackerAttributes->GetShield(), AttackerAttributes->GetMaxShield());
+	TestTrue(TEXT("Respawn restores forty percent health"), FMath::IsNearlyEqual(AttackerAttributes->GetHealth(), AttackerAttributes->GetMaxHealth() * 0.4f));
+	TestEqual(TEXT("Respawn restores zero shield"), AttackerAttributes->GetShield(), 0.0f);
 	TestEqual(TEXT("Respawn restores walking movement"), Attacker->GetCharacterMovement()->MovementMode, MOVE_Walking);
 
 	Attacker->DoPrimaryAttack();

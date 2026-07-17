@@ -12,12 +12,12 @@
 
 namespace
 {
-bool ContainsAllRoleIds(const TArray<FName>& Superset, const TArray<FName>& Required)
+bool PlayerStateContainsAllRoleIds(const TArray<FName>& Superset, const TArray<FName>& Required)
 {
 	return Required.ContainsByPredicate([&Superset](const FName Id) { return !Superset.Contains(Id); }) == false;
 }
 
-bool IsStarterUnlockExpansion(
+bool IsPlayerStateStarterUnlockExpansion(
 	const FName RequestedRoleId,
 	const TArray<FName>& RequestedRoleIds,
 	const TArray<FName>& RequestedModuleIds,
@@ -29,8 +29,8 @@ bool IsStarterUnlockExpansion(
 {
 	return AppliedRoleId == RequestedRoleId
 		&& AppliedLoadout.Entries == RequestedLoadout.Entries
-		&& ContainsAllRoleIds(AppliedRoleIds, RequestedRoleIds)
-		&& ContainsAllRoleIds(AppliedModuleIds, RequestedModuleIds);
+		&& PlayerStateContainsAllRoleIds(AppliedRoleIds, RequestedRoleIds)
+		&& PlayerStateContainsAllRoleIds(AppliedModuleIds, RequestedModuleIds);
 }
 }
 
@@ -225,7 +225,7 @@ bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjectio
 		&& AppliedUnlockedRoleIds == Projection.UnlockedRoleIds
 		&& AppliedUnlockedModuleIds == Projection.UnlockedRoleModuleIds
 		&& AppliedLoadout.Entries == Projection.EquippedRoleModules;
-	const bool bStarterUnlocksExpanded = IsStarterUnlockExpansion(
+	const bool bStarterUnlocksExpanded = IsPlayerStateStarterUnlockExpansion(
 		Projection.SelectedRoleId,
 		Projection.UnlockedRoleIds,
 		Projection.UnlockedRoleModuleIds,

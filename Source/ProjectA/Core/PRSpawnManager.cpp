@@ -139,9 +139,7 @@ int32 APRSpawnManager::SpawnWave()
 	{
 		UE_LOG(LogProjectA, Error, TEXT("ProjectRift project settings are unavailable while calculating the alive enemy cap; using the code default."));
 	}
-	const int32 MaxAliveEnemies = ProjectSettings
-		? FMath::Max(1, ProjectSettings->MaxAliveEnemies)
-		: 8;
+	const int32 MaxAliveEnemies = GetMaxAliveEnemiesForScaling();
 	const int32 SpawnBudget = FMath::Max(0, MaxAliveEnemies - CurrentAliveCount);
 	const int32 SpawnCount = FMath::Min(GetDesiredEnemiesPerWave(), SpawnBudget);
 	if (SpawnCount <= 0)
@@ -163,11 +161,17 @@ int32 APRSpawnManager::SpawnWave()
 		SpawnParameters.Owner = this;
 		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 
-		AActor* SpawnedActor = World->SpawnActor<AActor>(EnemyClass, ChooseSpawnTransform(), SpawnParameters);
+		const FTransform SpawnTransform = ChooseSpawnTransform();
+		AActor* SpawnedActor = World->SpawnActorDeferred<AActor>(EnemyClass, SpawnTransform, this, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
 		if (!SpawnedActor)
 		{
 			continue;
 		}
+		if (APREnemyCharacter* Enemy = Cast<APREnemyCharacter>(SpawnedActor))
+		{
+			Enemy->SetSpawnHealthMultiplier(GetEnemyHealthMultiplierForScaling());
+		}
+		SpawnedActor->FinishSpawning(SpawnTransform);
 
 		SpawnedActor->SetReplicates(true);
 		SpawnedActor->SetReplicateMovement(true);
@@ -228,7 +232,7 @@ void APRSpawnManager::HandleWaveTimerElapsed()
 
 int32 APRSpawnManager::GetDesiredEnemiesPerWave() const
 {
-	const int32 AlivePlayerCount = FMath::Max(1, GetAlivePlayerCountForScaling());
+	const int32 AlivePlayerCount = FMath::Max(1, GetDifficultyPlayerCountForScaling());
 	const UPRProjectSettings* ProjectSettings = GetDefault<UPRProjectSettings>();
 	if (!ProjectSettings)
 	{
@@ -243,7 +247,7 @@ int32 APRSpawnManager::GetDesiredEnemiesPerWave() const
 	return BaseEnemiesPerWave + FMath::Max(0, AlivePlayerCount - 1) * EnemiesPerAdditionalPlayer;
 }
 
-int32 APRSpawnManager::GetAlivePlayerCountForScaling() const
+int32 APRSpawnManager::GetDifficultyPlayerCountForScaling() const
 {
 	const UWorld* World = GetWorld();
 	const AGameStateBase* GameState = World ? World->GetGameState() : nullptr;
@@ -254,9 +258,9 @@ int32 APRSpawnManager::GetAlivePlayerCountForScaling() const
 
 	if (const APRRiftGameState* RiftGameState = Cast<APRRiftGameState>(GameState))
 	{
-		if (RiftGameState->GetAlivePlayerCount() > 0)
+		if (RiftGameState->GetDifficultyPlayerCount() > 0)
 		{
-			return RiftGameState->GetAlivePlayerCount();
+			return RiftGameState->GetDifficultyPlayerCount();
 		}
 	}
 
@@ -270,6 +274,23 @@ int32 APRSpawnManager::GetAlivePlayerCountForScaling() const
 	}
 
 	return FMath::Max(1, PlayerCount);
+}
+
+int32 APRSpawnManager::GetMaxAliveEnemiesForScaling() const
+{
+	const UPRProjectSettings* Settings = GetDefault<UPRProjectSettings>();
+	const int32 Base = Settings ? FMath::Max(1, Settings->MaxAliveEnemies) : 8;
+	const int32 PerPlayer = Settings ? FMath::Max(0, Settings->MaxAliveEnemiesPerAdditionalPlayer) : 2;
+	return Base + FMath::Max(0, GetDifficultyPlayerCountForScaling() - 1) * PerPlayer;
+}
+
+float APRSpawnManager::GetEnemyHealthMultiplierForScaling() const
+{
+	const UPRProjectSettings* Settings = GetDefault<UPRProjectSettings>();
+	const float PerPlayer = Settings && FMath::IsFinite(Settings->EnemyHealthMultiplierPerAdditionalPlayer)
+		? FMath::Clamp(Settings->EnemyHealthMultiplierPerAdditionalPlayer, 0.0f, 10.0f)
+		: 0.25f;
+	return 1.0f + FMath::Max(0, GetDifficultyPlayerCountForScaling() - 1) * PerPlayer;
 }
 
 void APRSpawnManager::PruneDeadEnemies() const

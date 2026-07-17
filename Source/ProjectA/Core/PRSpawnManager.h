@@ -46,6 +46,18 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Rift|Spawning")
 	bool IsWaveTimerActive() const;
 
+	UFUNCTION(BlueprintPure, Category = "Rift|Spawning")
+	int32 GetDesiredEnemiesPerWave() const;
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Spawning")
+	int32 GetDifficultyPlayerCountForScaling() const;
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Spawning")
+	int32 GetMaxAliveEnemiesForScaling() const;
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Spawning")
+	float GetEnemyHealthMultiplierForScaling() const;
+
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Spawning")
 	TSubclassOf<AActor> SpawnedEnemyClass;
@@ -58,8 +70,6 @@ protected:
 
 private:
 	void HandleWaveTimerElapsed();
-	int32 GetDesiredEnemiesPerWave() const;
-	int32 GetAlivePlayerCountForScaling() const;
 	void PruneDeadEnemies() const;
 	FTransform ChooseSpawnTransform();
 	void EnsureFallbackSpawnPoint();

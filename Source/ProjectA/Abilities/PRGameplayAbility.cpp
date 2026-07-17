@@ -14,6 +14,8 @@ UPRGameplayAbility::UPRGameplayAbility()
 	ActivationBlockedTags.AddTag(ProjectRiftGameplayTags::State_Stunned);
 	ActivationBlockedTags.AddTag(ProjectRiftGameplayTags::State_HitStaggered);
 	ActivationBlockedTags.AddTag(ProjectRiftGameplayTags::State_PlacingDeployable);
+	ActivationBlockedTags.AddTag(ProjectRiftGameplayTags::State_Reviving);
+	ActivationBlockedTags.AddTag(ProjectRiftGameplayTags::State_BeingRevived);
 }
 
 bool UPRGameplayAbility::ApplyConfiguredStatusEffects(

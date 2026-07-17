@@ -25,6 +25,7 @@
 #include "Deployables/PRDeployableComponent.h"
 #include "Roles/PRRoleComponent.h"
 #include "ProjectA.h"
+#include "Revive/PRReviveComponent.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Weapons/PRWeaponComponent.h"
@@ -90,9 +91,9 @@ APRCharacter::APRCharacter()
 	AssaultChargeAbilityClass = UGA_AssaultCharge::StaticClass();
 	AssaultBlastAbilityClass = UGA_AssaultBlast::StaticClass();
 	AssaultShieldAbilityClass = UGA_AssaultShield::StaticClass();
-	AutoRespawnDelay = 5.0f;
 	bShowPlayerDebugLabel = false;
 	CombatFeedbackComponent = CreateDefaultSubobject<UPRCombatFeedbackComponent>(TEXT("CombatFeedbackComponent"));
+	ReviveComponent = CreateDefaultSubobject<UPRReviveComponent>(TEXT("ReviveComponent"));
 
 	PlayerDebugLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("PlayerDebugLabel"));
 	PlayerDebugLabel->SetupAttachment(GetRootComponent());
@@ -454,86 +455,12 @@ bool APRCharacter::GrantAbilityIfMissing(const TSubclassOf<UGameplayAbility> Abi
 
 bool APRCharacter::EnterDownedState()
 {
-	if (!HasAuthority())
-	{
-		return false;
-	}
-
-	if (!AbilitySystemComponent)
-	{
-		return false;
-	}
-
-	if (IsDowned())
-	{
-		ScheduleAutoRespawn();
-		return true;
-	}
-
-	const FGameplayTag DownedStateTag = ProjectRiftGameplayTags::State_Downed;
-	if (DownedStateTag.IsValid())
-	{
-		AbilitySystemComponent->AddLooseGameplayTag(DownedStateTag, 1, EGameplayTagReplicationState::TagOnly);
-	}
-	UPRCombatEffectLibrary::ClearNegativeStatusEffects(AbilitySystemComponent);
-	AbilitySystemComponent->CancelAllAbilities();
-	if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
-	{
-		if (UPRWeaponComponent* WeaponComponent = ProjectRiftPlayerState->GetWeaponComponent())
-		{
-			WeaponComponent->SetAiming(false);
-			WeaponComponent->CancelReload();
-		}
-	}
-
-	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
-	{
-		MovementComponent->StopMovementImmediately();
-		MovementComponent->DisableMovement();
-	}
-
-	ScheduleAutoRespawn();
-
-	UE_LOG(LogProjectA, Log, TEXT("%s entered downed state."), *GetNameSafe(this));
-	return true;
+	return ReviveComponent && ReviveComponent->EnterDownedState();
 }
 
 bool APRCharacter::RespawnFromDowned()
 {
-	if (!HasAuthority())
-	{
-		return false;
-	}
-
-	if (!AbilitySystemComponent || !AttributeSet)
-	{
-		return false;
-	}
-
-	ClearAutoRespawnTimer();
-
-	const FGameplayTag DownedStateTag = ProjectRiftGameplayTags::State_Downed;
-	const FGameplayTag DeadStateTag = ProjectRiftGameplayTags::State_Dead;
-	if (DownedStateTag.IsValid())
-	{
-		AbilitySystemComponent->RemoveLooseGameplayTag(DownedStateTag, 1, EGameplayTagReplicationState::TagOnly);
-	}
-	if (DeadStateTag.IsValid())
-	{
-		AbilitySystemComponent->RemoveLooseGameplayTag(DeadStateTag, 1, EGameplayTagReplicationState::TagOnly);
-	}
-
-	AttributeSet->SetHealth(AttributeSet->GetMaxHealth());
-	AttributeSet->SetShield(AttributeSet->GetMaxShield());
-
-	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
-	{
-		MovementComponent->SetMovementMode(MOVE_Walking);
-	}
-	RefreshMovementFromAttributes();
-
-	UE_LOG(LogProjectA, Log, TEXT("%s respawned from downed state."), *GetNameSafe(this));
-	return true;
+	return ReviveComponent && ReviveComponent->CompleteRevive(EPRReviveSource::System);
 }
 
 bool APRCharacter::IsDowned() const
@@ -554,37 +481,7 @@ bool APRCharacter::IsAlive() const
 
 bool APRCharacter::IsAutoRespawnScheduled() const
 {
-	const UWorld* World = GetWorld();
-	return World && World->GetTimerManager().IsTimerActive(AutoRespawnTimerHandle);
-}
-
-void APRCharacter::ScheduleAutoRespawn()
-{
-	UWorld* World = GetWorld();
-	if (!World || AutoRespawnDelay <= 0.0f)
-	{
-		return;
-	}
-
-	World->GetTimerManager().SetTimer(
-		AutoRespawnTimerHandle,
-		this,
-		&APRCharacter::HandleAutoRespawnTimer,
-		AutoRespawnDelay,
-		false);
-}
-
-void APRCharacter::HandleAutoRespawnTimer()
-{
-	RespawnFromDowned();
-}
-
-void APRCharacter::ClearAutoRespawnTimer()
-{
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().ClearTimer(AutoRespawnTimerHandle);
-	}
+	return false;
 }
 
 bool APRCharacter::ApplyDefaultAttributes()
@@ -820,6 +717,8 @@ void APRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	if (InteractAction)
 	{
 		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &APRCharacter::DoInteract);
+		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Completed, this, &APRCharacter::DoInteractReleased);
+		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Canceled, this, &APRCharacter::DoInteractReleased);
 	}
 
 	if (PrimaryAttackAction)
@@ -907,6 +806,14 @@ void APRCharacter::DoInteract()
 	if (APRPlayerController* ProjectRiftController = Cast<APRPlayerController>(GetController()))
 	{
 		ProjectRiftController->TryPickup();
+	}
+}
+
+void APRCharacter::DoInteractReleased()
+{
+	if (APRPlayerController* ProjectRiftController = Cast<APRPlayerController>(GetController()))
+	{
+		ProjectRiftController->CancelActiveRevive();
 	}
 }
 

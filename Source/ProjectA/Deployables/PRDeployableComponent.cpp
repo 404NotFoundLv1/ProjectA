@@ -71,6 +71,8 @@ bool UPRDeployableComponent::CanBeginPlacement(const UPREngineerModuleDataAsset*
 	}
 	if (ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Dead)
 		|| ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Downed)
+		|| ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Reviving)
+		|| ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_BeingRevived)
 		|| ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Stunned)
 		|| ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_HitStaggered)
 		|| Attributes->GetEnergy() < Module->EnergyCost)

@@ -60,6 +60,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Weapon|UI")
 	int32 GetRevealedEnemyCount() const;
 
+	/** Contextual revive prompt/progress and the local solo rescue-drone status. */
+	UFUNCTION(BlueprintPure, Category = "Revive|UI")
+	FText GetReviveStatusText() const;
+
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "Weapon|UI")
 	TArray<FPRHUDDamageNumber> ActiveDamageNumbers;
 
@@ -84,6 +88,7 @@ private:
 	TSharedPtr<STextBlock> AmmoText;
 	TSharedPtr<STextBlock> HitMarkerText;
 	TSharedPtr<STextBlock> LocalHitDirectionText;
+	TSharedPtr<STextBlock> ReviveStatusText;
 	TSharedPtr<SOverlay> DamageNumberOverlay;
 	TSharedPtr<SOverlay> ReconMarkerOverlay;
 	float HitMarkerRemainingSeconds = 0.0f;

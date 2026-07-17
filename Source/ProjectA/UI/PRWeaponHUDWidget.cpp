@@ -3,9 +3,12 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "Core/PRGameplayTags.h"
+#include "Characters/PRCharacter.h"
 #include "Enemies/PREnemyCharacter.h"
 #include "Items/PRWeaponDataAsset.h"
 #include "Player/PRPlayerState.h"
+#include "Revive/PRRescueDroneActor.h"
+#include "Revive/PRReviveComponent.h"
 #include "Weapons/PRWeaponComponent.h"
 #include "EngineUtils.h"
 #include "GameFramework/Pawn.h"
@@ -35,6 +38,17 @@ FText FormatDamageAmount(const float Amount)
 	return FText::FromString(FMath::IsNearlyEqual(Amount, FMath::RoundToFloat(Amount), KINDA_SMALL_NUMBER)
 		? FString::Printf(TEXT("%.0f"), Amount)
 		: FString::Printf(TEXT("%.1f"), Amount));
+}
+
+const TCHAR* GetDroneStatusLabel(const EPRRescueDroneState State)
+{
+	switch (State)
+	{
+	case EPRRescueDroneState::Ready: return TEXT("READY");
+	case EPRRescueDroneState::Deployed: return TEXT("DEPLOYED");
+	case EPRRescueDroneState::Spent: return TEXT("SPENT");
+	default: return TEXT("UNAVAILABLE");
+	}
 }
 }
 
@@ -140,6 +154,56 @@ int32 UPRWeaponHUDWidget::GetRevealedEnemyCount() const
 	return RevealedEnemyCount;
 }
 
+FText UPRWeaponHUDWidget::GetReviveStatusText() const
+{
+	const APlayerController* Controller = LocalController.Get();
+	const APRCharacter* LocalCharacter = Controller ? Cast<APRCharacter>(Controller->GetPawn()) : nullptr;
+	UWorld* World = Controller ? Controller->GetWorld() : nullptr;
+	if (!LocalCharacter || !World)
+	{
+		return FText::GetEmpty();
+	}
+
+	EPRRescueDroneState DroneState = EPRRescueDroneState::Unavailable;
+	for (TActorIterator<APRRescueDroneActor> It(World); It; ++It)
+	{
+		if (const APRRescueDroneActor* Drone = *It; Drone && Drone->GetAssignedPlayer() == LocalCharacter)
+		{
+			DroneState = Drone->GetDroneState();
+			break;
+		}
+	}
+
+	if (const UPRReviveComponent* LocalRevive = LocalCharacter->GetReviveComponent(); LocalCharacter->IsDowned() && LocalRevive)
+	{
+		return FText::FromString(FString::Printf(TEXT("DOWNED  %.1fs\nDRONE %s"),
+			LocalRevive->GetBleedOutRemainingSeconds(), GetDroneStatusLabel(DroneState)));
+	}
+
+	for (TActorIterator<APRCharacter> It(World); It; ++It)
+	{
+		const APRCharacter* Candidate = *It;
+		const UPRReviveComponent* Revive = Candidate ? Candidate->GetReviveComponent() : nullptr;
+		if (!Revive)
+		{
+			continue;
+		}
+		if (Revive->GetCurrentReviver() == LocalCharacter)
+		{
+			return FText::FromString(FString::Printf(TEXT("REVIVING  %d%%"), FMath::RoundToInt(Revive->GetReviveProgress() * 100.0f)));
+		}
+		if (Revive->CanBeRevivedBy(LocalCharacter))
+		{
+			const int32 DistanceMeters = FMath::RoundToInt(FVector::Distance(LocalCharacter->GetActorLocation(), Candidate->GetActorLocation()) / 100.0f);
+			return FText::FromString(FString::Printf(TEXT("HOLD INTERACT TO REVIVE  %dm"), DistanceMeters));
+		}
+	}
+
+	return DroneState == EPRRescueDroneState::Ready
+		? FText::FromString(TEXT("DRONE READY"))
+		: FText::GetEmpty();
+}
+
 TSharedRef<SWidget> UPRWeaponHUDWidget::RebuildWidget()
 {
 	return SNew(SOverlay)
@@ -177,6 +241,13 @@ TSharedRef<SWidget> UPRWeaponHUDWidget::RebuildWidget()
 			SAssignNew(AmmoText, STextBlock)
 			.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 18))
 			.ColorAndOpacity(FLinearColor::White)
+		]
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(FMargin(0.0f, 0.0f, 0.0f, 104.0f))
+		[
+			SAssignNew(ReviveStatusText, STextBlock)
+			.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 17))
+			.ColorAndOpacity(FLinearColor(0.9f, 0.95f, 1.0f, 0.95f))
+			.Justification(ETextJustify::Center)
 		];
 }
 
@@ -318,17 +389,25 @@ void UPRWeaponHUDWidget::RefreshText()
 		if (!WeaponData)
 		{
 			AmmoText->SetText(FText::GetEmpty());
-			return;
 		}
-		FString Status = Weapon->IsReloading()
-			? TEXT("RELOADING")
-			: Weapon->GetMagazineAmmo() <= 0 ? TEXT("EMPTY / PRESS R") : TEXT("");
-		AmmoText->SetText(FText::FromString(FString::Printf(
-			TEXT("%s\n%d / %d%s%s"),
-			*WeaponData->DisplayName.ToString(),
-			Weapon->GetMagazineAmmo(),
-			Weapon->GetReserveAmmo(),
-			Status.IsEmpty() ? TEXT("") : TEXT("\n"),
-			*Status)));
+		else
+		{
+			FString Status = Weapon->IsReloading()
+				? TEXT("RELOADING")
+				: Weapon->GetMagazineAmmo() <= 0 ? TEXT("EMPTY / PRESS R") : TEXT("");
+			AmmoText->SetText(FText::FromString(FString::Printf(
+				TEXT("%s\n%d / %d%s%s"),
+				*WeaponData->DisplayName.ToString(),
+				Weapon->GetMagazineAmmo(),
+				Weapon->GetReserveAmmo(),
+				Status.IsEmpty() ? TEXT("") : TEXT("\n"),
+				*Status)));
+		}
+	}
+	if (ReviveStatusText)
+	{
+		const FText StatusText = GetReviveStatusText();
+		ReviveStatusText->SetText(StatusText);
+		ReviveStatusText->SetVisibility(StatusText.IsEmpty() ? EVisibility::Collapsed : EVisibility::HitTestInvisible);
 	}
 }

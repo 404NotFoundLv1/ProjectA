@@ -66,6 +66,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Enemy|Combat")
 	float GetAttackDamage() const;
 
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Enemy|Scaling")
+	void SetSpawnHealthMultiplier(float InMultiplier);
+
 protected:
 	void HandleDeath(AController* DeathInstigator);
 	void ApplyDeathState();
@@ -116,6 +119,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Loot")
 	float DeathLootRollOverride = 0.0f;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Enemy|Scaling")
+	float SpawnHealthMultiplier = 1.0f;
 
 private:
 	UPROPERTY(Transient)

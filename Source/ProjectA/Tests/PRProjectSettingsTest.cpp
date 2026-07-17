@@ -101,8 +101,16 @@ bool FPRProjectSettingsTest::RunTest(const FString& Parameters)
 	TestSettingProperty(*this, SettingsClass, GET_MEMBER_NAME_CHECKED(UPRProjectSettings, BaseEnemiesPerWave), TEXT("0"));
 	TestSettingProperty(*this, SettingsClass, GET_MEMBER_NAME_CHECKED(UPRProjectSettings, EnemiesPerAdditionalPlayer), TEXT("0"));
 	TestSettingProperty(*this, SettingsClass, GET_MEMBER_NAME_CHECKED(UPRProjectSettings, MaxAliveEnemies), TEXT("1"));
+	TestSettingProperty(*this, SettingsClass, GET_MEMBER_NAME_CHECKED(UPRProjectSettings, MaxAliveEnemiesPerAdditionalPlayer), TEXT("0"));
+	TestSettingProperty(*this, SettingsClass, GET_MEMBER_NAME_CHECKED(UPRProjectSettings, EnemyHealthMultiplierPerAdditionalPlayer), TEXT("0.0"));
 	TestSettingProperty(*this, SettingsClass, GET_MEMBER_NAME_CHECKED(UPRProjectSettings, WaveInterval), TEXT("0.1"));
 	TestSettingProperty(*this, SettingsClass, GET_MEMBER_NAME_CHECKED(UPRProjectSettings, ExtractionRadius), TEXT("1.0"));
+	TestSettingProperty(*this, SettingsClass, GET_MEMBER_NAME_CHECKED(UPRProjectSettings, ReviveHoldDuration), TEXT("0.1"));
+	TestSettingProperty(*this, SettingsClass, GET_MEMBER_NAME_CHECKED(UPRProjectSettings, ReviveInteractionDistance), TEXT("1.0"));
+	TestSettingProperty(*this, SettingsClass, GET_MEMBER_NAME_CHECKED(UPRProjectSettings, ReviveMovementCancelDistance), TEXT("0.0"));
+	TestSettingProperty(*this, SettingsClass, GET_MEMBER_NAME_CHECKED(UPRProjectSettings, BleedOutDuration), TEXT("0.1"));
+	TestSettingProperty(*this, SettingsClass, GET_MEMBER_NAME_CHECKED(UPRProjectSettings, ReviveHealthFraction), TEXT("0.01"), TEXT("1.0"));
+	TestSettingProperty(*this, SettingsClass, GET_MEMBER_NAME_CHECKED(UPRProjectSettings, DroneReviveDuration), TEXT("0.1"));
 	TestSettingProperty(*this, SettingsClass, TEXT("AttackPowerDivisor"), TEXT("1.0"));
 	TestSettingProperty(*this, SettingsClass, TEXT("MaxPollutionDamageReduction"), TEXT("0.0"), TEXT("1.0"));
 
@@ -115,8 +123,16 @@ bool FPRProjectSettingsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Base enemies default"), Settings->BaseEnemiesPerWave, 2);
 	TestEqual(TEXT("Additional enemies default"), Settings->EnemiesPerAdditionalPlayer, 1);
 	TestEqual(TEXT("Max alive default"), Settings->MaxAliveEnemies, 8);
+	TestEqual(TEXT("Additional max alive enemies default"), Settings->MaxAliveEnemiesPerAdditionalPlayer, 2);
+	TestEqual(TEXT("Enemy health multiplier default"), Settings->EnemyHealthMultiplierPerAdditionalPlayer, 0.25f);
 	TestEqual(TEXT("Wave interval default"), Settings->WaveInterval, 6.0f);
 	TestEqual(TEXT("Extraction radius default"), Settings->ExtractionRadius, 320.0f);
+	TestEqual(TEXT("Revive hold duration default"), Settings->ReviveHoldDuration, 3.0f);
+	TestEqual(TEXT("Revive interaction distance default"), Settings->ReviveInteractionDistance, 250.0f);
+	TestEqual(TEXT("Revive movement cancellation default"), Settings->ReviveMovementCancelDistance, 35.0f);
+	TestEqual(TEXT("Bleed-out duration default"), Settings->BleedOutDuration, 30.0f);
+	TestEqual(TEXT("Revive health fraction default"), Settings->ReviveHealthFraction, 0.4f);
+	TestEqual(TEXT("Rescue drone revive duration default"), Settings->DroneReviveDuration, 3.0f);
 	TestFloatSettingDefault(*this, SettingsClass, Settings, TEXT("AttackPowerDivisor"), 100.0f);
 	TestFloatSettingDefault(*this, SettingsClass, Settings, TEXT("MaxPollutionDamageReduction"), 0.8f);
 
@@ -129,8 +145,16 @@ bool FPRProjectSettingsTest::RunTest(const FString& Parameters)
 	TestConfigValue(*this, TEXT("BaseEnemiesPerWave"), 2);
 	TestConfigValue(*this, TEXT("EnemiesPerAdditionalPlayer"), 1);
 	TestConfigValue(*this, TEXT("MaxAliveEnemies"), 8);
+	TestConfigValue(*this, TEXT("MaxAliveEnemiesPerAdditionalPlayer"), 2);
+	TestConfigValue(*this, TEXT("EnemyHealthMultiplierPerAdditionalPlayer"), 0.25f);
 	TestConfigValue(*this, TEXT("WaveInterval"), 6.0f);
 	TestConfigValue(*this, TEXT("ExtractionRadius"), 320.0f);
+	TestConfigValue(*this, TEXT("ReviveHoldDuration"), 3.0f);
+	TestConfigValue(*this, TEXT("ReviveInteractionDistance"), 250.0f);
+	TestConfigValue(*this, TEXT("ReviveMovementCancelDistance"), 35.0f);
+	TestConfigValue(*this, TEXT("BleedOutDuration"), 30.0f);
+	TestConfigValue(*this, TEXT("ReviveHealthFraction"), 0.4f);
+	TestConfigValue(*this, TEXT("DroneReviveDuration"), 3.0f);
 	TestConfigValue(*this, TEXT("AttackPowerDivisor"), 100.0f);
 	TestConfigValue(*this, TEXT("MaxPollutionDamageReduction"), 0.8f);
 

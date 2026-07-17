@@ -43,11 +43,35 @@ public:
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Spawning", meta=(ClampMin="1", UIMin="1"))
 	int32 MaxAliveEnemies = 8;
 
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Spawning", meta=(ClampMin="0", UIMin="0"))
+	int32 MaxAliveEnemiesPerAdditionalPlayer = 2;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Spawning", meta=(ClampMin="0.0", UIMin="0.0"))
+	float EnemyHealthMultiplierPerAdditionalPlayer = 0.25f;
+
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Spawning", meta=(ClampMin="0.1", UIMin="0.1"))
 	float WaveInterval = 6.0f;
 
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Extraction", meta=(ClampMin="1.0", UIMin="1.0"))
 	float ExtractionRadius = 320.0f;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Revive", meta=(ClampMin="0.1", UIMin="0.1"))
+	float ReviveHoldDuration = 3.0f;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Revive", meta=(ClampMin="1.0", UIMin="1.0"))
+	float ReviveInteractionDistance = 250.0f;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Revive", meta=(ClampMin="0.0", UIMin="0.0"))
+	float ReviveMovementCancelDistance = 35.0f;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Revive", meta=(ClampMin="0.1", UIMin="0.1"))
+	float BleedOutDuration = 30.0f;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Revive", meta=(ClampMin="0.01", ClampMax="1.0", UIMin="0.01", UIMax="1.0"))
+	float ReviveHealthFraction = 0.4f;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Revive", meta=(ClampMin="0.1", UIMin="0.1"))
+	float DroneReviveDuration = 3.0f;
 
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Combat", meta=(ClampMin="1.0", UIMin="1.0"))
 	float AttackPowerDivisor = 100.0f;

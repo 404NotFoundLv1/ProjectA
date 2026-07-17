@@ -23,6 +23,7 @@ class UPRLootTableDataAsset;
 class UGameplayEffect;
 class APRPickupActor;
 class APRRiftObjectiveActor;
+class APRCharacter;
 
 /**
  * Player-owned input and UI entry point for ProjectRift.
@@ -49,6 +50,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Pickup")
 	void TryPickup();
+
+	UFUNCTION(BlueprintCallable, Category = "Revive")
+	void TryBeginRevive(APRCharacter* TargetCharacter);
+
+	UFUNCTION(BlueprintCallable, Category = "Revive")
+	void CancelActiveRevive();
 
 	UFUNCTION(BlueprintCallable, Category = "Rift|Objective")
 	void TryActivateRiftObjective();
@@ -146,6 +153,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Pickup")
 	APRPickupActor* FindBestPickupCandidate() const;
 
+	UFUNCTION(BlueprintCallable, Category = "Revive")
+	APRCharacter* FindBestReviveCandidate() const;
+
 	UFUNCTION(BlueprintCallable, Category = "Rift|Objective")
 	APRRiftObjectiveActor* FindBestRiftObjectiveCandidate() const;
 
@@ -181,6 +191,12 @@ public:
 
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Pickup")
 	void ServerTryPickup(APRPickupActor* PickupActor);
+
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Revive")
+	void ServerBeginRevive(APRCharacter* TargetCharacter);
+
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Revive")
+	void ServerCancelRevive();
 
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Rift|Objective")
 	void ServerTryActivateRiftObjective(APRRiftObjectiveActor* ObjectiveActor);
@@ -307,6 +323,7 @@ private:
 	void HandlePrimaryWeaponUnequipRequested();
 
 	bool CanServerPickup(APRPickupActor* PickupActor, FString* OutFailureReason = nullptr) const;
+	bool TryBeginReviveOnServer(APRCharacter* TargetCharacter);
 	bool CanServerActivateRiftObjective(APRRiftObjectiveActor* ObjectiveActor, FString* OutFailureReason = nullptr) const;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Pickup", meta = (ClampMin = "0.0"))
@@ -367,6 +384,8 @@ private:
 	bool bRoleLoadoutInputModeActive = false;
 	bool bSavedMouseCursorVisibilityForRoleLoadout = false;
 	bool bDiagnosticsInputModeActive = false;
+
+	TWeakObjectPtr<APRCharacter> ActiveReviveTarget;
 	bool bSavedMouseCursorVisibilityForDiagnostics = false;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory|Use")

@@ -84,7 +84,7 @@ void APREnemyCharacter::BeginPlay()
 		AbilitySystemComponent->InitAbilityActorInfo(this, this);
 		if (HasAuthority())
 		{
-			const float InitialMaxHealth = FMath::Max(MaxHealth, 1.0f);
+			const float InitialMaxHealth = FMath::Max(MaxHealth * SpawnHealthMultiplier, 1.0f);
 			AttributeSet->SetMaxHealth(InitialMaxHealth);
 			AttributeSet->SetHealth(InitialMaxHealth);
 			AttributeSet->SetMaxShield(0.0f);
@@ -175,6 +175,14 @@ float APREnemyCharacter::GetAttackDamage() const
 		? EnemyMeleeAbilityClass->GetDefaultObject<UGA_EnemyMeleeAttack>()
 		: nullptr;
 	return MeleeAbility ? MeleeAbility->GetBaseDamage() : AttackDamage;
+}
+
+void APREnemyCharacter::SetSpawnHealthMultiplier(const float InMultiplier)
+{
+	if (HasAuthority())
+	{
+		SpawnHealthMultiplier = FMath::IsFinite(InMultiplier) ? FMath::Clamp(InMultiplier, 0.1f, 20.0f) : 1.0f;
+	}
 }
 
 FString APREnemyCharacter::GetActiveStatusText() const

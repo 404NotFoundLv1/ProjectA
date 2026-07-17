@@ -40,6 +40,8 @@ namespace ProjectRiftGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Aiming, "State.Aiming", "Player is aiming a weapon");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Reloading, "State.Reloading", "Player is reloading a weapon");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_PlacingDeployable, "State.PlacingDeployable", "Player is confirming a deployable placement");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Reviving, "State.Reviving", "Player is reviving a downed ally");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_BeingRevived, "State.BeingRevived", "Player is receiving a revive");
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Combat_Impact_Shield, "GameplayCue.Combat.Impact.Shield", "Shield damage feedback");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Combat_Impact_ShieldBreak, "GameplayCue.Combat.Impact.ShieldBreak", "Shield break feedback");

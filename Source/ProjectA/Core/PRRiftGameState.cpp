@@ -16,6 +16,7 @@ void APRRiftGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(APRRiftGameState, ExtractedPlayerCount);
 	DOREPLIFETIME(APRRiftGameState, bExtractionComplete);
 	DOREPLIFETIME(APRRiftGameState, AlivePlayerCount);
+	DOREPLIFETIME(APRRiftGameState, DifficultyPlayerCount);
 	DOREPLIFETIME(APRRiftGameState, MissionTime);
 	DOREPLIFETIME(APRRiftGameState, ObjectiveProgress);
 	DOREPLIFETIME(APRRiftGameState, KilledEnemyCount);
@@ -51,6 +52,11 @@ void APRRiftGameState::SetExtractionComplete(const bool bInExtractionComplete)
 void APRRiftGameState::SetAlivePlayerCount(const int32 InAlivePlayerCount)
 {
 	AlivePlayerCount = FMath::Max(0, InAlivePlayerCount);
+}
+
+void APRRiftGameState::SetDifficultyPlayerCount(const int32 InDifficultyPlayerCount)
+{
+	DifficultyPlayerCount = FMath::Clamp(InDifficultyPlayerCount, 1, 4);
 }
 
 void APRRiftGameState::SetMissionTime(const float InMissionTime)
@@ -121,6 +127,10 @@ void APRRiftGameState::OnRep_ExtractionComplete()
 }
 
 void APRRiftGameState::OnRep_AlivePlayerCount()
+{
+}
+
+void APRRiftGameState::OnRep_DifficultyPlayerCount()
 {
 }
 

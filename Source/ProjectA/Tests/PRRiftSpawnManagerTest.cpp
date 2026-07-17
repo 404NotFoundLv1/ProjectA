@@ -139,6 +139,8 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 	SettingsOverride->BaseEnemiesPerWave = 1;
 	SettingsOverride->EnemiesPerAdditionalPlayer = 1;
 	SettingsOverride->MaxAliveEnemies = 3;
+	SettingsOverride->MaxAliveEnemiesPerAdditionalPlayer = 0;
+	SettingsOverride->EnemyHealthMultiplierPerAdditionalPlayer = 0.25f;
 	SettingsOverride->WaveInterval = 0.2f;
 
 	UClass* SpawnManagerClass = LoadRiftSpawnRuntimeClass(TEXT("PRSpawnManager"), AActor::StaticClass());
@@ -237,7 +239,7 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Rift spawn manager test world owns APRRiftGameState"), RiftGameState);
 	if (RiftGameState)
 	{
-		RiftGameState->SetAlivePlayerCount(3);
+		RiftGameState->SetDifficultyPlayerCount(3);
 	}
 
 	AActor* SpawnPointA = World->SpawnActor<AActor>(SpawnPointClass, FVector(500.0f, 0.0f, 50.0f), FRotator::ZeroRotator);
@@ -250,6 +252,23 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 	{
 		return false;
 	}
+	APRSpawnManager* TypedSpawnManager = Cast<APRSpawnManager>(SpawnManager);
+	TestNotNull(TEXT("Spawn manager can provide typed scaling queries"), TypedSpawnManager);
+	if (!TypedSpawnManager)
+	{
+		return false;
+	}
+	RiftGameState->SetDifficultyPlayerCount(1);
+	TestEqual(TEXT("Solo wave uses the base enemy count"), TypedSpawnManager->GetDesiredEnemiesPerWave(), 1);
+	TestEqual(TEXT("Solo alive cap uses its base value"), TypedSpawnManager->GetMaxAliveEnemiesForScaling(), 3);
+	TestEqual(TEXT("Solo enemy health multiplier is one"), TypedSpawnManager->GetEnemyHealthMultiplierForScaling(), 1.0f);
+	RiftGameState->SetDifficultyPlayerCount(3);
+	TestEqual(TEXT("Frozen three-player wave includes two additional players"), TypedSpawnManager->GetDesiredEnemiesPerWave(), 3);
+	TestEqual(TEXT("Frozen player count leaves cap unchanged when cap scaling is zero"), TypedSpawnManager->GetMaxAliveEnemiesForScaling(), 3);
+	TestEqual(TEXT("Frozen three-player health multiplier scales by 25 percent per additional player"), TypedSpawnManager->GetEnemyHealthMultiplierForScaling(), 1.5f);
+	SettingsOverride->MaxAliveEnemiesPerAdditionalPlayer = 2;
+	TestEqual(TEXT("Alive cap scales by two per additional frozen player"), TypedSpawnManager->GetMaxAliveEnemiesForScaling(), 7);
+	SettingsOverride->MaxAliveEnemiesPerAdditionalPlayer = 0;
 
 	bool bActiveBeforeObjective = true;
 	TestTrue(TEXT("Can query inactive spawn manager state"), CallBoolFunctionNoParams(SpawnManager, TEXT("IsSpawningActive"), bActiveBeforeObjective));
@@ -281,7 +300,7 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 
 	int32 AliveEnemyCount = 0;
 	CallIntFunctionNoParams(SpawnManager, TEXT("GetAliveEnemyCount"), *this, TEXT("Can query alive enemy count"), AliveEnemyCount);
-	TestEqual(TEXT("First wave scales from alive player count and respects max alive cap"), AliveEnemyCount, 3);
+	TestEqual(TEXT("First wave scales from frozen player count and respects max alive cap"), AliveEnemyCount, 3);
 
 	int32 ReplicatedSpawnedActors = 0;
 	for (TActorIterator<AActor> ActorIt(World); ActorIt; ++ActorIt)
@@ -311,6 +330,8 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 	SettingsOverride->BaseEnemiesPerWave = -4;
 	SettingsOverride->EnemiesPerAdditionalPlayer = -3;
 	SettingsOverride->MaxAliveEnemies = 8;
+	SettingsOverride->MaxAliveEnemiesPerAdditionalPlayer = -2;
+	SettingsOverride->EnemyHealthMultiplierPerAdditionalPlayer = -1.0f;
 	SettingsOverride->WaveInterval = -1.0f;
 	APRSpawnManager* ClampedSpawnManager = World->SpawnActor<APRSpawnManager>(FVector(1200.0f, 0.0f, 0.0f), FRotator::ZeroRotator);
 	TestNotNull(TEXT("Can spawn manager for invalid settings clamp coverage"), ClampedSpawnManager);
@@ -328,11 +349,14 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("A manual wave can run after invalid settings are clamped"), ClampedSpawnManager->SpawnWave(), 1);
 	TestEqual(TEXT("First clamped manual wave increments the wave count"), ClampedSpawnManager->GetSpawnedWaveCount(), 1);
 	TestEqual(TEXT("Negative additional enemy scaling clamps to zero"), ClampedSpawnManager->GetAliveEnemyCount(), 1);
+	TestEqual(TEXT("Negative alive-cap scaling clamps to zero while retaining the current base cap"), ClampedSpawnManager->GetMaxAliveEnemiesForScaling(), 2);
+	TestEqual(TEXT("Negative health scaling clamps to one"), ClampedSpawnManager->GetEnemyHealthMultiplierForScaling(), 1.0f);
 	ClampedSpawnManager->StopSpawning();
 
 	SettingsOverride->BaseEnemiesPerWave = 5;
 	SettingsOverride->EnemiesPerAdditionalPlayer = 5;
 	SettingsOverride->MaxAliveEnemies = 0;
+	SettingsOverride->MaxAliveEnemiesPerAdditionalPlayer = 0;
 	SettingsOverride->WaveInterval = 0.2f;
 	TestTrue(TEXT("Spawn manager restarts for alive-cap clamp coverage"), ClampedSpawnManager->StartSpawningForObjective(nullptr));
 	TestEqual(TEXT("Invalid max alive enemy setting clamps to one"), ClampedSpawnManager->GetAliveEnemyCount(), 1);

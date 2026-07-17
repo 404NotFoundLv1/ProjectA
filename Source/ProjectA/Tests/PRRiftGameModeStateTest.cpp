@@ -18,6 +18,8 @@
 #include "GameFramework/WorldSettings.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Player/PRPlayerState.h"
+#include "Revive/PRRescueDroneActor.h"
+#include "Revive/PRReviveTypes.h"
 #include "Tests/PRProjectSettingsTestUtils.h"
 #include "Tests/AutomationCommon.h"
 #include "UObject/UnrealType.h"
@@ -99,6 +101,9 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("APRRiftGameMode exposes CompleteCurrentObjective"), RiftGameModeClass->FindFunctionByName(TEXT("CompleteCurrentObjective")));
 	TestNotNull(TEXT("APRRiftGameMode exposes OpenExtraction"), RiftGameModeClass->FindFunctionByName(TEXT("OpenExtraction")));
 	TestNotNull(TEXT("APRRiftGameMode exposes UpdateAlivePlayerCount"), RiftGameModeClass->FindFunctionByName(TEXT("UpdateAlivePlayerCount")));
+	TestNotNull(TEXT("APRRiftGameMode exposes downed notification"), RiftGameModeClass->FindFunctionByName(TEXT("HandlePlayerDowned")));
+	TestNotNull(TEXT("APRRiftGameMode exposes frozen difficulty player count"), RiftGameModeClass->FindFunctionByName(TEXT("GetMissionDifficultyPlayerCount")));
+	TestNotNull(TEXT("APRRiftGameMode exposes rescue drone query"), RiftGameModeClass->FindFunctionByName(TEXT("GetRescueDrone")));
 	TestNotNull(TEXT("APRRiftGameMode exposes RequestRiftFailure"), RiftGameModeClass->FindFunctionByName(TEXT("RequestRiftFailure")));
 	TestNotNull(TEXT("APRRiftGameMode exposes RegisterEnemyKilled"), RiftGameModeClass->FindFunctionByName(TEXT("RegisterEnemyKilled")));
 	TestNotNull(TEXT("APRRiftGameMode exposes GetCurrentRunId"), RiftGameModeClass->FindFunctionByName(TEXT("GetCurrentRunId")));
@@ -114,6 +119,7 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	TestReplicatedProperty(*this, RiftGameStateClass, TEXT("RiftStability"));
 	TestReplicatedProperty(*this, RiftGameStateClass, TEXT("bExtractionAvailable"));
 	TestReplicatedProperty(*this, RiftGameStateClass, TEXT("AlivePlayerCount"));
+	TestReplicatedProperty(*this, RiftGameStateClass, TEXT("DifficultyPlayerCount"));
 	TestReplicatedProperty(*this, RiftGameStateClass, TEXT("MissionTime"));
 	TestReplicatedProperty(*this, RiftGameStateClass, TEXT("KilledEnemyCount"));
 
@@ -121,6 +127,7 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("APRRiftGameState exposes SetRiftStability"), RiftGameStateClass->FindFunctionByName(TEXT("SetRiftStability")));
 	TestNotNull(TEXT("APRRiftGameState exposes SetExtractionAvailable"), RiftGameStateClass->FindFunctionByName(TEXT("SetExtractionAvailable")));
 	TestNotNull(TEXT("APRRiftGameState exposes SetAlivePlayerCount"), RiftGameStateClass->FindFunctionByName(TEXT("SetAlivePlayerCount")));
+	TestNotNull(TEXT("APRRiftGameState exposes SetDifficultyPlayerCount"), RiftGameStateClass->FindFunctionByName(TEXT("SetDifficultyPlayerCount")));
 	TestNotNull(TEXT("APRRiftGameState exposes SetMissionTime"), RiftGameStateClass->FindFunctionByName(TEXT("SetMissionTime")));
 	TestNotNull(TEXT("APRRiftGameState exposes SetKilledEnemyCount"), RiftGameStateClass->FindFunctionByName(TEXT("SetKilledEnemyCount")));
 	TestNotNull(TEXT("APRRiftGameState exposes IncrementKilledEnemyCount"), RiftGameStateClass->FindFunctionByName(TEXT("IncrementKilledEnemyCount")));
@@ -133,6 +140,7 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Default rift stability starts full"), GetFloatPropertyValue(RiftGameState, TEXT("RiftStability")), 100.0f);
 		TestFalse(TEXT("Extraction starts unavailable"), GetBoolPropertyValue(RiftGameState, TEXT("bExtractionAvailable")));
 		TestEqual(TEXT("Alive player count starts at zero"), GetIntPropertyValue(RiftGameState, TEXT("AlivePlayerCount")), 0);
+		TestEqual(TEXT("Difficulty player count starts at one"), GetIntPropertyValue(RiftGameState, TEXT("DifficultyPlayerCount")), 1);
 		TestEqual(TEXT("Mission time starts at zero"), GetFloatPropertyValue(RiftGameState, TEXT("MissionTime")), 0.0f);
 		TestEqual(TEXT("Killed enemy count starts at zero"), GetIntPropertyValue(RiftGameState, TEXT("KilledEnemyCount")), 0);
 
@@ -144,6 +152,8 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 
 		RiftGameState->SetAlivePlayerCount(2);
 		TestEqual(TEXT("Alive player count updates"), GetIntPropertyValue(RiftGameState, TEXT("AlivePlayerCount")), 2);
+		RiftGameState->SetDifficultyPlayerCount(8);
+		TestEqual(TEXT("Difficulty player count clamps to four"), RiftGameState->GetDifficultyPlayerCount(), 4);
 
 		RiftGameState->SetMissionTime(18.0f);
 		TestEqual(TEXT("Mission time updates"), GetFloatPropertyValue(RiftGameState, TEXT("MissionTime")), 18.0f);
@@ -186,7 +196,7 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	{
 		TestEqual(TEXT("Game default map is ship lobby"), Maps->GetGameDefaultMap(), FString(TEXT("/Game/ProjectRift/Maps/L_ShipLobby")));
 		TestEqual(TEXT("Project name is ProjectRift"), Project->ProjectName, FString(TEXT("ProjectRift")));
-		TestEqual(TEXT("Project version is v0.6.5"), Project->ProjectVersion, FString(TEXT("0.6.5")));
+		TestEqual(TEXT("Project version is v0.6.6"), Project->ProjectVersion, FString(TEXT("0.6.6")));
 	}
 
 	TArray<FString> MapsToCook;
@@ -338,11 +348,26 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 
 	DownedGameMode->UpdateAlivePlayerCount();
 	TestEqual(TEXT("Living possessed players count as alive before downed state"), DownedGameState->GetAlivePlayerCount(), 1);
+	TestTrue(TEXT("Restarting after player registration freezes a solo mission"), DownedGameMode->StartRiftMission());
+	TestEqual(TEXT("Solo mission freezes one difficulty player"), DownedGameMode->GetMissionDifficultyPlayerCount(), 1);
+	APRRescueDroneActor* RescueDrone = DownedGameMode->GetRescueDrone();
+	TestNotNull(TEXT("Solo mission spawns one rescue drone"), RescueDrone);
 	TestTrue(TEXT("Can put the only rift player into downed state"), PlayerCharacter->EnterDownedState());
 	DownedGameMode->UpdateAlivePlayerCount();
 	TestEqual(TEXT("Downed players no longer count as alive"), DownedGameState->GetAlivePlayerCount(), 0);
-	TestTrue(TEXT("All players down produces a settlement"), DownedGameState->IsSettlementReady());
-	TestEqual(TEXT("All players down fails the mission"), DownedGameState->GetSettlementData().Result, EPRRiftMissionResult::Failed);
+	TestFalse(TEXT("Ready solo drone prevents immediate mission failure"), DownedGameState->IsSettlementReady());
+	TestEqual(TEXT("Solo drone deploys for the first down"), RescueDrone ? RescueDrone->GetDroneState() : EPRRescueDroneState::Unavailable, EPRRescueDroneState::Deployed);
+	for (int32 TickIndex = 0; TickIndex < 36; ++TickIndex)
+	{
+		++GFrameCounter;
+		DownedWorld->Tick(ELevelTick::LEVELTICK_All, 0.1f);
+	}
+	TestTrue(TEXT("Solo drone completes the first rescue"), PlayerCharacter->IsAlive());
+	TestEqual(TEXT("Solo drone spends its only rescue"), RescueDrone ? RescueDrone->GetDroneState() : EPRRescueDroneState::Unavailable, EPRRescueDroneState::Spent);
+	TestTrue(TEXT("Second solo down is accepted"), PlayerCharacter->EnterDownedState());
+	DownedGameMode->UpdateAlivePlayerCount();
+	TestTrue(TEXT("Spent solo drone allows second down to fail the mission"), DownedGameState->IsSettlementReady());
+	TestEqual(TEXT("Second solo down produces a failed settlement"), DownedGameState->GetSettlementData().Result, EPRRiftMissionResult::Failed);
 
 	return true;
 }

@@ -7,6 +7,8 @@
 #include "Core/PRRiftObjectiveActor.h"
 #include "Core/PRAssetManager.h"
 #include "Enemies/PREnemyCharacter.h"
+#include "Revive/PRRescueDroneActor.h"
+#include "Revive/PRReviveComponent.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
@@ -47,6 +49,7 @@ void APRRiftGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	LogFlowPhase(TEXT("EndPlay"));
 	GetWorldTimerManager().ClearTimer(ReturnToLobbyTravelTimerHandle);
 	StopSpawnManagers();
+	ClearRescueDrone();
 	SpawnManagers.Reset();
 	ActiveObjective = nullptr;
 	ExtractedPlayerStates.Reset();
@@ -106,6 +109,13 @@ void APRRiftGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
 
+	// Difficulty is frozen at mission start.  A pawn can become available after
+	// BeginPlay/PostLogin, so only finish provisioning the already-authorized solo
+	// safety net; never recalculate the frozen participant count here.
+	if (bRiftMissionStarted && !RescueDrone && GetMissionDifficultyPlayerCount() == 1)
+	{
+		InitializeRescueDroneForMission();
+	}
 	UpdateAlivePlayerCount();
 }
 
@@ -151,6 +161,7 @@ bool APRRiftGameMode::StartRiftMission()
 	ActiveObjective = nullptr;
 	ResetExtractionState();
 	StopSpawnManagers();
+	ClearRescueDrone();
 	RiftGameState->SetCurrentObjectiveState(EPRRiftObjectiveState::NotStarted);
 	RiftGameState->SetObjectiveProgress(0.0f);
 	const UPRProjectSettings* ProjectSettings = GetDefault<UPRProjectSettings>();
@@ -165,6 +176,8 @@ bool APRRiftGameMode::StartRiftMission()
 	RiftGameState->SetExtractionAvailable(false);
 	RiftGameState->SetMissionTime(0.0f);
 	RiftGameState->SetKilledEnemyCount(0);
+	RiftGameState->SetDifficultyPlayerCount(CountMissionParticipants());
+	InitializeRescueDroneForMission();
 	UpdateAlivePlayerCount();
 
 	UE_LOG(LogProjectA, Log, TEXT("Rift mission started. Stability=%.1f AlivePlayers=%d"),
@@ -306,6 +319,7 @@ bool APRRiftGameMode::RequestRiftFailure()
 	RiftGameState->SetExtractionAvailable(false);
 	RiftGameState->SetExtractionComplete(false);
 	StopSpawnManagers();
+	ClearRescueDrone();
 	LogFlowPhase(TEXT("MissionFailed"));
 	RequestReturnToLobbyTravel(EPRRiftMissionResult::Failed);
 
@@ -391,6 +405,7 @@ void APRRiftGameMode::FinalizeRiftSettlement(const EPRRiftMissionResult Result)
 		}
 
 		bSettlementFinalizationInProgress = true;
+		ClearRescueDrone();
 		FPRRiftSettlementData Settlement = GenerateSettlementData(Result);
 		ApplyExtractedResourceRules(Result, Settlement);
 		FinalizePersonalSettlements(Result);
@@ -639,6 +654,41 @@ void APRRiftGameMode::UpdateAlivePlayerCount()
 	}
 }
 
+void APRRiftGameMode::HandlePlayerDowned(APRCharacter* DownedCharacter)
+{
+	if (!HasAuthority() || !DownedCharacter)
+	{
+		return;
+	}
+	if (GetMissionDifficultyPlayerCount() == 1 && RescueDrone && RescueDrone->GetAssignedPlayer() == DownedCharacter)
+	{
+		RescueDrone->RequestRescue(DownedCharacter);
+	}
+	UpdateAlivePlayerCount();
+}
+
+void APRRiftGameMode::HandlePlayerRevived(APRCharacter* RevivedCharacter)
+{
+	if (HasAuthority())
+	{
+		UpdateAlivePlayerCount();
+	}
+}
+
+void APRRiftGameMode::HandlePlayerBleedOut(APRCharacter* DeadCharacter)
+{
+	if (HasAuthority())
+	{
+		UpdateAlivePlayerCount();
+	}
+}
+
+int32 APRRiftGameMode::GetMissionDifficultyPlayerCount() const
+{
+	const APRRiftGameState* RiftGameState = GetRiftGameState();
+	return RiftGameState ? FMath::Clamp(RiftGameState->GetDifficultyPlayerCount(), 1, 4) : 1;
+}
+
 void APRRiftGameMode::HandleObjectiveActivated(APRRiftObjectiveActor* ObjectiveActor)
 {
 	if (!HasAuthority() || !ObjectiveActor)
@@ -791,6 +841,70 @@ int32 APRRiftGameMode::CountAlivePlayers() const
 	return AliveCount;
 }
 
+int32 APRRiftGameMode::CountMissionParticipants() const
+{
+	const AGameStateBase* CurrentGameState = GameState;
+	if (!CurrentGameState)
+	{
+		return 1;
+	}
+	int32 PlayerCount = 0;
+	for (const TObjectPtr<APlayerState>& PlayerState : CurrentGameState->PlayerArray)
+	{
+		if (PlayerState && !PlayerState->IsOnlyASpectator())
+		{
+			++PlayerCount;
+		}
+	}
+	return FMath::Clamp(PlayerCount, 1, 4);
+}
+
+void APRRiftGameMode::InitializeRescueDroneForMission()
+{
+	ClearRescueDrone();
+	if (!HasAuthority() || GetMissionDifficultyPlayerCount() != 1)
+	{
+		return;
+	}
+	const AGameStateBase* CurrentGameState = GameState;
+	if (!CurrentGameState || !GetWorld())
+	{
+		return;
+	}
+	for (const TObjectPtr<APlayerState>& PlayerState : CurrentGameState->PlayerArray)
+	{
+		if (!PlayerState || PlayerState->IsOnlyASpectator())
+		{
+			continue;
+		}
+		APRCharacter* Character = Cast<APRCharacter>(ResolvePawnForPlayerState(PlayerState.Get()));
+		if (!Character)
+		{
+			continue;
+		}
+		FActorSpawnParameters Params;
+		Params.Owner = Character;
+		Params.Instigator = Character;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		RescueDrone = GetWorld()->SpawnActor<APRRescueDroneActor>(APRRescueDroneActor::StaticClass(), Character->GetActorLocation(), FRotator::ZeroRotator, Params);
+		if (RescueDrone && !RescueDrone->InitializeForPlayer(Character))
+		{
+			RescueDrone->Destroy();
+			RescueDrone = nullptr;
+		}
+		return;
+	}
+}
+
+void APRRiftGameMode::ClearRescueDrone()
+{
+	if (RescueDrone)
+	{
+		RescueDrone->ShutdownDrone();
+		RescueDrone = nullptr;
+	}
+}
+
 bool APRRiftGameMode::CheckFailureConditions()
 {
 	if (!HasAuthority() || !bRiftMissionStarted || bReturnToLobbyTravelPending)
@@ -839,6 +953,11 @@ bool APRRiftGameMode::AreAllActivePlayersDefeated() const
 		{
 			return false;
 		}
+	}
+
+	if (bFoundEligiblePlayer && GetMissionDifficultyPlayerCount() == 1 && RescueDrone && RescueDrone->CanProvideRecovery())
+	{
+		return false;
 	}
 
 	return bFoundEligiblePlayer;
