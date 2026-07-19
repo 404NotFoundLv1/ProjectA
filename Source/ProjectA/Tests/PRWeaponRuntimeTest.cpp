@@ -128,7 +128,16 @@ bool FPRWeaponRuntimeTest::RunTest(const FString& Parameters)
 	Ammo.Count = 60;
 	TestTrue(TEXT("Test rifle enters backpack"), Inventory->AddItem(Rifle));
 	TestTrue(TEXT("Test ammo enters backpack"), Inventory->AddItem(Ammo));
+	const TArray<FPRItemInstance> InventoryBeforeEquip = Inventory->GetInventoryItems();
+	const FPRItemInstance RifleBeforeEquip = InventoryBeforeEquip.FindByPredicate([](const FPRItemInstance& Item)
+	{
+		return Item.ItemId == TEXT("TestRifle");
+	}) ? *InventoryBeforeEquip.FindByPredicate([](const FPRItemInstance& Item)
+	{
+		return Item.ItemId == TEXT("TestRifle");
+	}) : FPRItemInstance();
 	TestTrue(TEXT("Rifle equips atomically"), Weapon->EquipWeaponFromInventory(TEXT("TestRifle")));
+	TestEqual(TEXT("Whole weapon transfer preserves its instance identity"), Weapon->GetEquippedWeapon().InstanceGuid, RifleBeforeEquip.InstanceGuid);
 	TestEqual(TEXT("Equipping fills a 12-round magazine"), Weapon->GetMagazineAmmo(), 12);
 	TestEqual(TEXT("Equipping leaves 48 reserve rounds"), Weapon->GetReserveAmmo(), 48);
 	TestEqual(TEXT("Equipped rifle leaves the backpack"), Inventory->GetItemCount(TEXT("TestRifle")), 0);

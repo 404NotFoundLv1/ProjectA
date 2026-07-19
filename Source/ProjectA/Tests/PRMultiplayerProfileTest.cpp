@@ -17,6 +17,7 @@ FPRItemInstance MakeMultiplayerItem(const FName ItemId, const int32 Count)
 	FPRItemInstance Item;
 	Item.ItemId = ItemId;
 	Item.Count = Count;
+	Item.InstanceGuid = FGuid::NewGuid();
 	return Item;
 }
 }

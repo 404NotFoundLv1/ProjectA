@@ -105,9 +105,19 @@ bool UPRInventoryComponent::AddItem(const FPRItemInstance& Item)
 			MaxSlots);
 		return false;
 	}
+	if (Item.HasValidIdentity() && InventoryList.Entries.ContainsByPredicate([&Item](const FPRInventoryEntry& Entry)
+	{
+		return Entry.Item.InstanceGuid == Item.InstanceGuid;
+	}))
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Inventory add rejected duplicate item identity. Owner=%s InstanceGuid=%s"),
+			*GetNameSafe(GetOwner()), *Item.InstanceGuid.ToString(EGuidFormats::DigitsWithHyphens));
+		return false;
+	}
 
 	const int32 MaxStackCount = GetMaxStackCount(Item.ItemId);
 	int32 RemainingCount = Item.Count;
+	bool bCanPreserveIncomingIdentity = Item.HasValidIdentity();
 	while (RemainingCount > 0)
 	{
 		const int32 ExistingIndex = FindStackableEntryIndex(Item);
@@ -124,6 +134,11 @@ bool UPRInventoryComponent::AddItem(const FPRItemInstance& Item)
 
 		FPRInventoryEntry& NewEntry = InventoryList.Entries.AddDefaulted_GetRef();
 		NewEntry.Item = Item;
+		if (!bCanPreserveIncomingIdentity)
+		{
+			NewEntry.Item.InstanceGuid = FGuid::NewGuid();
+		}
+		bCanPreserveIncomingIdentity = false;
 		NewEntry.Item.Count = FMath::Min(RemainingCount, MaxStackCount);
 		RemainingCount -= NewEntry.Item.Count;
 		InventoryList.MarkItemDirty(NewEntry);

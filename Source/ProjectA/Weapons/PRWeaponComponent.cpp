@@ -9,6 +9,7 @@
 #include "Core/PRGameplayTags.h"
 #include "GameFramework/PlayerState.h"
 #include "Items/PRInventoryComponent.h"
+#include "Items/PRItemTransactionComponent.h"
 #include "Items/PRWeaponDataAsset.h"
 #include "Net/UnrealNetwork.h"
 #include "Player/PRPlayerState.h"
@@ -43,6 +44,10 @@ bool AddItemToSnapshot(TArray<FPRItemInstance>& Items, const FPRItemInstance& It
 	while (Remaining > 0)
 	{
 		FPRItemInstance& NewStack = Items.Add_GetRef(Item);
+		if (!NewStack.HasValidIdentity())
+		{
+			NewStack.InstanceGuid = FGuid::NewGuid();
+		}
 		NewStack.Count = FMath::Min(Remaining, MaxStack);
 		Remaining -= NewStack.Count;
 	}
@@ -240,13 +245,25 @@ void UPRWeaponComponent::ServerStartReload_Implementation()
 bool UPRWeaponComponent::BeginReloadAuthoritative()
 {
 	const UPRWeaponDataAsset* WeaponData = GetEquippedWeaponData();
+	APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
+	UPRItemTransactionComponent* Transactions = PlayerState ? PlayerState->GetItemTransactionComponent() : nullptr;
 	UWorld* World = GetWorld();
-	if (!World || !WeaponData || !FMath::IsFinite(WeaponData->ReloadDuration) || WeaponData->ReloadDuration < 0.0f
+	if (!World || !Transactions || !WeaponData || !FMath::IsFinite(WeaponData->ReloadDuration) || WeaponData->ReloadDuration < 0.0f
 		|| bReloading || !CanUseWeapon()
 		|| MagazineAmmo >= WeaponData->MagazineCapacity || GetReserveAmmo() <= 0)
 	{
 		return false;
 	}
+	FPRItemTransactionRequest Request;
+	Request.Header.TransactionId = FGuid::NewGuid();
+	Request.Header.ExpectedRevision = Transactions->GetRevision();
+	Request.Intent = EPRItemTransactionIntent::BeginReload;
+	const FPRItemTransactionResult ReloadRequestResult = Transactions->ExecuteAuthoritativeTransaction(Request);
+	if (ReloadRequestResult.Status != EPRItemTransactionStatus::Pending)
+	{
+		return false;
+	}
+	ActiveReloadTransactionId = Request.Header.TransactionId;
 	SetAimingAuthoritative(false);
 	SetReloadingAuthoritative(true);
 	if (WeaponData->ReloadDuration <= 0.0f)
@@ -264,17 +281,27 @@ void UPRWeaponComponent::FinishReload()
 {
 	APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
 	UPRInventoryComponent* Inventory = PlayerState ? PlayerState->GetInventoryComponent() : nullptr;
+	UPRItemTransactionComponent* Transactions = PlayerState ? PlayerState->GetItemTransactionComponent() : nullptr;
 	const UPRWeaponDataAsset* WeaponData = GetEquippedWeaponData();
-	if (Inventory && WeaponData && CanUseWeapon())
+	if (Transactions && ActiveReloadTransactionId.IsValid() && Inventory && WeaponData && CanUseWeapon())
 	{
 		const int32 Count = FMath::Min(
 			FMath::Max(0, WeaponData->MagazineCapacity - MagazineAmmo),
 			Inventory->GetItemCount(WeaponData->AmmoItemId));
-		if (Count > 0 && Inventory->RemoveItem(WeaponData->AmmoItemId, Count))
+		const FPRItemTransactionResult CompletionResult = Transactions->CompletePendingReload(
+			ActiveReloadTransactionId,
+			WeaponData->AmmoItemId,
+			Count);
+		if (CompletionResult.Status == EPRItemTransactionStatus::Success)
 		{
-			MagazineAmmo += Count;
+			MagazineAmmo += CompletionResult.AppliedCount;
 		}
 	}
+	else if (Transactions && ActiveReloadTransactionId.IsValid())
+	{
+		Transactions->CancelPendingReload(ActiveReloadTransactionId, TEXT("Reload completion lost a valid weapon, pawn, or combat state."));
+	}
+	ActiveReloadTransactionId.Invalidate();
 	SetReloadingAuthoritative(false);
 }
 
@@ -301,6 +328,14 @@ void UPRWeaponComponent::CancelReloadAuthoritative()
 	{
 		World->GetTimerManager().ClearTimer(ReloadTimerHandle);
 	}
+	if (APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner()))
+	{
+		if (UPRItemTransactionComponent* Transactions = PlayerState->GetItemTransactionComponent(); Transactions && ActiveReloadTransactionId.IsValid())
+		{
+			Transactions->CancelPendingReload(ActiveReloadTransactionId, TEXT("Reload was cancelled before authoritative completion."));
+		}
+	}
+	ActiveReloadTransactionId.Invalidate();
 	SetReloadingAuthoritative(false);
 }
 
@@ -508,6 +543,15 @@ bool UPRWeaponComponent::EquipWeaponFromInventory(const FName ItemId)
 	{
 		return false;
 	}
+	const FPRItemInstance* SourceWeapon = Inventory->GetItems().FindByPredicate([ItemId](const FPRItemInstance& Item)
+	{
+		return Item.ItemId == ItemId && Item.HasValidIdentity();
+	});
+	if (!SourceWeapon)
+	{
+		return false;
+	}
+	const FPRItemInstance SourceWeaponCopy = *SourceWeapon;
 
 	const TArray<FPRItemInstance> OldInventory = Inventory->GetInventoryItems();
 	const TArray<FPRProfileEquipmentEntry> OldEquipment = EquipmentEntries;
@@ -527,9 +571,12 @@ bool UPRWeaponComponent::EquipWeaponFromInventory(const FName ItemId)
 		return false;
 	}
 
-	FPRItemInstance NewWeapon;
-	NewWeapon.ItemId = ItemId;
+	FPRItemInstance NewWeapon = SourceWeaponCopy;
 	NewWeapon.Count = 1;
+	if (SourceWeaponCopy.Count > 1)
+	{
+		NewWeapon.InstanceGuid = FGuid::NewGuid();
+	}
 	EquippedWeapon = NewWeapon;
 	SetPrimaryEquipment(NewWeapon);
 	MagazineAmmo = 0;
@@ -664,6 +711,7 @@ bool UPRWeaponComponent::EnsureStarterWeapon(const FName StarterWeaponItemId, FS
 	FPRItemInstance Weapon;
 	Weapon.ItemId = StarterWeaponItemId;
 	Weapon.Count = 1;
+	Weapon.InstanceGuid = FGuid::NewGuid();
 	if (!Inventory->AddItem(Ammo))
 	{
 		OutDiagnostic = TEXT("Starter ammo does not fit in the inventory.");

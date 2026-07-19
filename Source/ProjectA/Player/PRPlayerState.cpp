@@ -4,6 +4,7 @@
 #include "Abilities/PRAttributeSet.h"
 #include "Deployables/PRDeployableComponent.h"
 #include "Items/PRInventoryComponent.h"
+#include "Items/PRItemTransactionComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "ProjectA.h"
 #include "Progression/PRMissionProgressionDataAsset.h"
@@ -44,6 +45,7 @@ APRPlayerState::APRPlayerState()
 	AbilitySystemComponent = CreateDefaultSubobject<UPRAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
 	AttributeSet = CreateDefaultSubobject<UPRAttributeSet>(TEXT("AttributeSet"));
 	InventoryComponent = CreateDefaultSubobject<UPRInventoryComponent>(TEXT("InventoryComponent"));
+	ItemTransactionComponent = CreateDefaultSubobject<UPRItemTransactionComponent>(TEXT("ItemTransactionComponent"));
 	WeaponComponent = CreateDefaultSubobject<UPRWeaponComponent>(TEXT("WeaponComponent"));
 	RoleComponent = CreateDefaultSubobject<UPRRoleComponent>(TEXT("RoleComponent"));
 	DeployableComponent = CreateDefaultSubobject<UPRDeployableComponent>(TEXT("DeployableComponent"));
@@ -247,6 +249,10 @@ bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjectio
 		RestorePreviousRuntimeState();
 		return false;
 	}
+	if (ItemTransactionComponent)
+	{
+		ItemTransactionComponent->ResetForNewProfileBinding();
+	}
 	BoundProfileId = Projection.ProfileId;
 	bMultiplayerProfileBound = true;
 	BoundStoryProgress = Projection.Story;
@@ -269,6 +275,10 @@ void APRPlayerState::ClearMultiplayerProfileBinding()
 	bIsReady = false;
 	bMultiplayerProfileBound = false;
 	BoundProfileId.Invalidate();
+	if (ItemTransactionComponent)
+	{
+		ItemTransactionComponent->ResetForNewProfileBinding();
+	}
 	BoundStoryProgress = FPRProfileStoryProgress();
 	BoundShipModules.Reset();
 	bRepairPersistencePending = false;
@@ -566,6 +576,10 @@ void APRPlayerState::CopyProjectRiftStateFrom(const APRPlayerState* SourcePlayer
 			UE_LOG(LogProjectA, Error, TEXT("Inventory state failed to copy during seamless PlayerState replacement. Source=%s Target=%s"),
 				*GetNameSafe(SourcePlayerState), *GetNameSafe(this));
 		}
+	}
+	if (ItemTransactionComponent && SourcePlayerState->ItemTransactionComponent)
+	{
+		ItemTransactionComponent->CopyRuntimeStateFrom(SourcePlayerState->ItemTransactionComponent);
 	}
 	if (WeaponComponent && SourcePlayerState->WeaponComponent)
 	{

@@ -308,3 +308,52 @@ bool FPRProfileSnapshot::IsValid(FString* OutDiagnostic) const
 	}
 	return true;
 }
+
+bool FPRProfileSnapshot::HasValidItemIdentities(FString* OutDiagnostic) const
+{
+	TSet<FGuid> SeenInstanceGuids;
+	auto ValidateItem = [&SeenInstanceGuids, OutDiagnostic](const FPRItemInstance& Item, const TCHAR* ContainerName)
+	{
+		if (!Item.IsValid() || !Item.HasValidIdentity())
+		{
+			if (OutDiagnostic)
+			{
+				*OutDiagnostic = FString::Printf(TEXT("%s contains an item with an invalid instance identity."), ContainerName);
+			}
+			return false;
+		}
+		if (SeenInstanceGuids.Contains(Item.InstanceGuid))
+		{
+			if (OutDiagnostic)
+			{
+				*OutDiagnostic = FString::Printf(TEXT("%s contains a duplicate item instance identity."), ContainerName);
+			}
+			return false;
+		}
+		SeenInstanceGuids.Add(Item.InstanceGuid);
+		return true;
+	};
+
+	for (const FPRItemInstance& Item : BackpackItems)
+	{
+		if (!ValidateItem(Item, TEXT("Backpack")))
+		{
+			return false;
+		}
+	}
+	for (const FPRItemInstance& Item : WarehouseItems)
+	{
+		if (!ValidateItem(Item, TEXT("Warehouse")))
+		{
+			return false;
+		}
+	}
+	for (const FPRProfileEquipmentEntry& Entry : Equipment)
+	{
+		if (!ValidateItem(Entry.Item, TEXT("Equipment")))
+		{
+			return false;
+		}
+	}
+	return true;
+}

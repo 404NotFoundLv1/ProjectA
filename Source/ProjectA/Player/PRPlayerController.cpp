@@ -25,6 +25,7 @@
 #include "InputMappingContext.h"
 #include "Items/PRInventoryComponent.h"
 #include "Items/PRItemDataAsset.h"
+#include "Items/PRItemTransactionComponent.h"
 #include "Items/PRLootTableDataAsset.h"
 #include "Items/PRLootTableLibrary.h"
 #include "Items/PRPickupActor.h"
@@ -572,11 +573,19 @@ void APRPlayerController::EquipInventoryWeapon(const FName ItemId)
 	}
 
 	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
-	UPRWeaponComponent* Weapon = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetWeaponComponent() : nullptr;
-	if (Weapon)
+	UPRInventoryComponent* Inventory = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetInventoryComponent() : nullptr;
+	UPRItemTransactionComponent* Transactions = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetItemTransactionComponent() : nullptr;
+	FPRItemInstance Item;
+	if (!Inventory || !Transactions || !FindInventoryItemById(Inventory, ItemId, Item) || !Item.HasValidIdentity())
 	{
-		Weapon->EquipWeaponFromInventory(ItemId);
+		return;
 	}
+	FPRItemTransactionRequest Request;
+	Request.Header.TransactionId = FGuid::NewGuid();
+	Request.Header.ExpectedRevision = Transactions->GetRevision();
+	Request.Intent = EPRItemTransactionIntent::EquipPrimary;
+	Request.InstanceGuid = Item.InstanceGuid;
+	Transactions->ExecuteAuthoritativeTransaction(Request);
 }
 
 void APRPlayerController::UnequipPrimaryWeapon()
@@ -588,11 +597,16 @@ void APRPlayerController::UnequipPrimaryWeapon()
 	}
 
 	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
-	UPRWeaponComponent* Weapon = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetWeaponComponent() : nullptr;
-	if (Weapon)
+	UPRItemTransactionComponent* Transactions = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetItemTransactionComponent() : nullptr;
+	if (!Transactions)
 	{
-		Weapon->UnequipWeapon();
+		return;
 	}
+	FPRItemTransactionRequest Request;
+	Request.Header.TransactionId = FGuid::NewGuid();
+	Request.Header.ExpectedRevision = Transactions->GetRevision();
+	Request.Intent = EPRItemTransactionIntent::UnequipPrimary;
+	Transactions->ExecuteAuthoritativeTransaction(Request);
 }
 
 void APRPlayerController::SpawnTestLoot()
@@ -922,28 +936,33 @@ bool APRPlayerController::TryPickupOnServer(APRPickupActor* PickupActor)
 	}
 
 	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
-	UPRInventoryComponent* InventoryComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetInventoryComponent() : nullptr;
-	if (!InventoryComponent)
+	UPRItemTransactionComponent* Transactions = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetItemTransactionComponent() : nullptr;
+	if (!Transactions)
 	{
-		UE_LOG(LogProjectA, Warning, TEXT("Server pickup failed because inventory disappeared for %s."), *GetNameSafe(this));
+		UE_LOG(LogProjectA, Warning, TEXT("Server pickup failed because item transactions are unavailable for %s."), *GetNameSafe(this));
 		return false;
 	}
 
 	const FPRItemInstance PickedItem = PickupActor->GetItemInstance();
-	if (!InventoryComponent->AddItem(PickedItem))
+	FPRItemTransactionRequest Request;
+	Request.Header.TransactionId = FGuid::NewGuid();
+	Request.Header.ExpectedRevision = Transactions->GetRevision();
+	Request.Intent = EPRItemTransactionIntent::Pickup;
+	Request.TargetActor = PickupActor;
+	const FPRItemTransactionResult TransactionResult = Transactions->ExecuteAuthoritativeTransaction(Request);
+	if (TransactionResult.Status != EPRItemTransactionStatus::Success)
 	{
 		UE_LOG(
 			LogProjectA,
 			Log,
-			TEXT("Server pickup rejected during inventory add. Controller=%s Pickup=%s ItemId=%s"),
+			TEXT("Server pickup rejected by authoritative item transaction. Controller=%s Pickup=%s ItemId=%s Status=%d Diagnostic=%s"),
 			*GetNameSafe(this),
 			*GetNameSafe(PickupActor),
-			*PickedItem.ItemId.ToString());
+			*PickedItem.ItemId.ToString(),
+			static_cast<int32>(TransactionResult.Status),
+			*TransactionResult.Diagnostic);
 		return false;
 	}
-
-	PickupActor->SetPickedUp(true);
-	PickupActor->Destroy();
 
 	UE_LOG(
 		LogProjectA,
@@ -1567,10 +1586,32 @@ bool APRPlayerController::TryUseInventoryItemOnServer(const FName ItemId)
 	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
 	UPRAbilitySystemComponent* AbilitySystemComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetProjectRiftAbilitySystemComponent() : nullptr;
 	UPRInventoryComponent* InventoryComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetInventoryComponent() : nullptr;
+	UPRItemTransactionComponent* Transactions = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetItemTransactionComponent() : nullptr;
 	const TSubclassOf<UGameplayEffect> ConsumableEffectClass = ResolveConsumableEffectClass(ItemId);
-	if (!AbilitySystemComponent || !InventoryComponent || !ConsumableEffectClass)
+	FPRItemInstance ConsumedItem;
+	if (!AbilitySystemComponent || !InventoryComponent || !Transactions || !ConsumableEffectClass
+		|| !FindInventoryItemById(InventoryComponent, ItemId, ConsumedItem) || !ConsumedItem.HasValidIdentity())
 	{
 		UE_LOG(LogProjectA, Warning, TEXT("Inventory item use failed after validation for %s."), *ItemId.ToString());
+		return false;
+	}
+	FPRItemTransactionRequest Request;
+	Request.Header.TransactionId = FGuid::NewGuid();
+	Request.Header.ExpectedRevision = Transactions->GetRevision();
+	Request.Intent = EPRItemTransactionIntent::Use;
+	Request.InstanceGuid = ConsumedItem.InstanceGuid;
+	Request.Count = 1;
+	const FPRItemTransactionResult TransactionResult = Transactions->ExecuteAuthoritativeTransaction(Request);
+	if (TransactionResult.Status != EPRItemTransactionStatus::Success)
+	{
+		UE_LOG(
+			LogProjectA,
+			Log,
+			TEXT("Inventory item use transaction rejected. Controller=%s ItemId=%s Status=%d Diagnostic=%s"),
+			*GetNameSafe(this),
+			*ItemId.ToString(),
+			static_cast<int32>(TransactionResult.Status),
+			*TransactionResult.Diagnostic);
 		return false;
 	}
 
@@ -1578,13 +1619,6 @@ bool APRPlayerController::TryUseInventoryItemOnServer(const FName ItemId)
 	FGameplayEffectContextHandle EffectContext = AbilitySystemComponent->MakeEffectContext();
 	EffectContext.AddSourceObject(this);
 	AbilitySystemComponent->ApplyGameplayEffectToSelf(ConsumableEffect, 1.0f, EffectContext);
-
-	const bool bConsumed = InventoryComponent->UseItem(ItemId);
-	if (!bConsumed)
-	{
-		UE_LOG(LogProjectA, Warning, TEXT("Inventory item effect applied but item removal failed. ItemId=%s"), *ItemId.ToString());
-		return false;
-	}
 
 	UE_LOG(
 		LogProjectA,
@@ -1622,25 +1656,49 @@ bool APRPlayerController::TryDropInventoryItemOnServer(const FName ItemId, const
 
 	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
 	UPRInventoryComponent* InventoryComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetInventoryComponent() : nullptr;
+	UPRItemTransactionComponent* Transactions = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetItemTransactionComponent() : nullptr;
 	FPRItemInstance DroppedItem;
-	if (!InventoryComponent || !FindInventoryItemById(InventoryComponent, ItemId, DroppedItem))
+	if (!InventoryComponent || !Transactions || !FindInventoryItemById(InventoryComponent, ItemId, DroppedItem) || !DroppedItem.HasValidIdentity())
 	{
 		UE_LOG(LogProjectA, Warning, TEXT("Inventory drop failed after validation for %s."), *ItemId.ToString());
 		return false;
 	}
 
+	const FGuid SourceInstanceGuid = DroppedItem.InstanceGuid;
+	const int32 SourceStackCount = DroppedItem.Count;
 	DroppedItem.Count = Count;
-	if (!InventoryComponent->RemoveItem(ItemId, Count))
+	if (Count < SourceStackCount)
 	{
-		UE_LOG(LogProjectA, Warning, TEXT("Inventory drop failed during item removal. ItemId=%s Count=%d"), *ItemId.ToString(), Count);
-		return false;
+		DroppedItem.InstanceGuid = FGuid::NewGuid();
 	}
 
 	APRPickupActor* DroppedPickup = SpawnDroppedPickupOnServer(DroppedItem);
 	if (!DroppedPickup)
 	{
-		InventoryComponent->AddItem(DroppedItem);
-		UE_LOG(LogProjectA, Warning, TEXT("Inventory drop failed during pickup spawn; item restored. ItemId=%s Count=%d"), *ItemId.ToString(), Count);
+		UE_LOG(LogProjectA, Warning, TEXT("Inventory drop failed during pickup preparation. ItemId=%s Count=%d"), *ItemId.ToString(), Count);
+		return false;
+	}
+
+	FPRItemTransactionRequest Request;
+	Request.Header.TransactionId = FGuid::NewGuid();
+	Request.Header.ExpectedRevision = Transactions->GetRevision();
+	Request.Intent = EPRItemTransactionIntent::Drop;
+	Request.InstanceGuid = SourceInstanceGuid;
+	Request.Count = Count;
+	Request.TargetActor = DroppedPickup;
+	const FPRItemTransactionResult TransactionResult = Transactions->ExecuteAuthoritativeTransaction(Request);
+	if (TransactionResult.Status != EPRItemTransactionStatus::Success)
+	{
+		DroppedPickup->Destroy();
+		UE_LOG(
+			LogProjectA,
+			Log,
+			TEXT("Inventory drop transaction rejected. Controller=%s ItemId=%s Count=%d Status=%d Diagnostic=%s"),
+			*GetNameSafe(this),
+			*ItemId.ToString(),
+			Count,
+			static_cast<int32>(TransactionResult.Status),
+			*TransactionResult.Diagnostic);
 		return false;
 	}
 

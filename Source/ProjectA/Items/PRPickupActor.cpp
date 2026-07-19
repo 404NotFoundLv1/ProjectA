@@ -73,6 +73,10 @@ void APRPickupActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 void APRPickupActor::SetItemInstance(const FPRItemInstance& InItemInstance)
 {
 	ItemInstance = InItemInstance;
+	if (HasAuthority() && ItemInstance.IsValid() && !ItemInstance.HasValidIdentity())
+	{
+		ItemInstance.InstanceGuid = FGuid::NewGuid();
+	}
 	ForceNetUpdate();
 
 	UE_LOG(

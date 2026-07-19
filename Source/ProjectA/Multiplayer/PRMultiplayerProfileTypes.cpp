@@ -125,6 +125,13 @@ bool FPRMultiplayerProfileProjection::IsValid(FString* OutDiagnostic) const
 		if (OutDiagnostic) { *OutDiagnostic = TEXT("Profile projection contains invalid runtime data."); }
 		return false;
 	}
+	FPRProfileSnapshot IdentitySnapshot;
+	IdentitySnapshot.BackpackItems = BackpackItems;
+	IdentitySnapshot.Equipment = Equipment;
+	if (!IdentitySnapshot.HasValidItemIdentities(OutDiagnostic))
+	{
+		return false;
+	}
 	return true;
 }
 
@@ -155,6 +162,13 @@ bool FPRPlayerSettlementReceipt::IsValid(FString* OutDiagnostic) const
 		|| !AreProjectionRoleModuleEntriesStructurallyValid(SettledEquippedRoleModules))
 	{
 		if (OutDiagnostic) { *OutDiagnostic = TEXT("Settlement receipt contains invalid runtime data."); }
+		return false;
+	}
+	FPRProfileSnapshot IdentitySnapshot;
+	IdentitySnapshot.BackpackItems = SettledBackpackItems;
+	IdentitySnapshot.Equipment = SettledEquipment;
+	if (!IdentitySnapshot.HasValidItemIdentities(OutDiagnostic))
+	{
 		return false;
 	}
 	return true;

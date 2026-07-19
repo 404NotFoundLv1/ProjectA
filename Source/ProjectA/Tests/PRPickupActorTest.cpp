@@ -155,6 +155,7 @@ bool FPRPickupActorTest::RunTest(const FString& Parameters)
 	Pickup->SetItemInstance(TestItem);
 	TestEqual(TEXT("Pickup stores assigned item id"), Pickup->GetItemInstance().ItemId, FName(TEXT("EnergyCrystal")));
 	TestEqual(TEXT("Pickup stores assigned item count"), Pickup->GetItemInstance().Count, 3);
+	TestTrue(TEXT("Server pickup assignment gives a template item an instance GUID"), Pickup->GetItemInstance().HasValidIdentity());
 	TestTrue(TEXT("Pickup with valid item is pickable"), Pickup->CanBePickedUp());
 	TestTrue(
 		TEXT("Pickup prompt uses the F interact key and readable pickup text"),

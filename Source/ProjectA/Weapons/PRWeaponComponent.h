@@ -139,5 +139,6 @@ private:
 	TObjectPtr<APRWeaponActor> SpawnedWeaponActor;
 
 	FTimerHandle ReloadTimerHandle;
+	FGuid ActiveReloadTransactionId;
 	double LastFireTime = -TNumericLimits<double>::Max();
 };

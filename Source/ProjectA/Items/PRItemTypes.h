@@ -28,6 +28,10 @@ struct PROJECTA_API FPRItemInstance
 {
 	GENERATED_BODY()
 
+	/** Stable server-assigned identity for one concrete stack or equipped item. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Item|Identity")
+	FGuid InstanceGuid;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item")
 	FName ItemId = NAME_None;
 
@@ -49,5 +53,10 @@ struct PROJECTA_API FPRItemInstance
 	bool IsValid() const
 	{
 		return !ItemId.IsNone() && Count > 0;
+	}
+
+	bool HasValidIdentity() const
+	{
+		return InstanceGuid.IsValid();
 	}
 };

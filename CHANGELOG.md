@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.0] - 2026-07-19
+
+- Added stable GUID identity to every runtime inventory, equipped, and world-pickup item instance; split stacks mint a new identity while stack merges retain their target identity.
+- Added v5 profile migration with deterministic v4 identity generation scoped by profile ID, and fail-closed validation for invalid or duplicate current identities.
+- Added the replicated, PlayerState-owned authoritative item transaction component with owner-only revision replication, semantic request/result types, retry replay cache, pickup/drop/use handling, and two-phase reload settlement.
+- Routed pickup, consumable use, drop, and reload inventory mutations through the transaction authority; reload start is pending and cancellation never consumes reserve ammunition.
+- Updated the displayed project version to `0.7.0`; the player profile save schema is now v5.
+
 ## [0.6.6] - 2026-07-17
 
 - Added replicated server-authoritative downed, bleed-out, teammate rescue, and one-use solo rescue-drone gameplay without changing the v4 profile schema.

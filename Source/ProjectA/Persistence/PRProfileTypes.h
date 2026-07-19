@@ -208,6 +208,7 @@ struct PROJECTA_API FPRProfileSnapshot
 	int32 GetResourceCount(FName ResourceId) const;
 	void Normalize();
 	bool IsValid(FString* OutDiagnostic = nullptr) const;
+	bool HasValidItemIdentities(FString* OutDiagnostic = nullptr) const;
 };
 
 USTRUCT(BlueprintType)

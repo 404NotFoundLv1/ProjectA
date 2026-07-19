@@ -38,6 +38,7 @@ FPRItemInstance MakeProfileTestItem(const FName ItemId, const int32 Count)
 	Item.Rarity = EPRItemRarity::Rare;
 	Item.Durability = 0.75f;
 	Item.Affixes = { TEXT("Affix.ProfileTest") };
+	Item.InstanceGuid = FGuid::NewGuid();
 	return Item;
 }
 
@@ -145,7 +146,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FPRProfileContractTest::RunTest(const FString& Parameters)
 {
-	TestEqual(TEXT("Current player profile schema is version 4"), UPRProfileSave::LatestSaveVersion, 4);
+	TestEqual(TEXT("Current player profile schema is version 5"), UPRProfileSave::LatestSaveVersion, 5);
 	TestNotNull(
 		TEXT("Profile snapshot exposes a durable repair transaction ledger"),
 		FindFProperty<FArrayProperty>(FPRProfileSnapshot::StaticStruct(), TEXT("ProcessedRepairTransactionIds")));
@@ -169,8 +170,8 @@ bool FPRProfileContractTest::RunTest(const FString& Parameters)
 	FPRProfileOperationResult MigrationResult = LegacyProfile->MigrateToLatest();
 	TestTrue(TEXT("v1 profile migrates successfully"), MigrationResult.IsSuccess());
 	TestTrue(TEXT("Migration result is marked"), MigrationResult.bMigrated);
-	TestEqual(TEXT("Migrated profile reaches v4"), LegacyProfile->SaveVersion, 4);
-	TestTrue(TEXT("v1 to v4 migration preserves existing story progress"), LegacyProfile->Snapshot.Story.CompletedStoryNodeIds.Contains(TEXT("Story.Prologue.Intro")));
+	TestEqual(TEXT("Migrated profile reaches v5"), LegacyProfile->SaveVersion, 5);
+	TestTrue(TEXT("v1 to v5 migration preserves existing story progress"), LegacyProfile->Snapshot.Story.CompletedStoryNodeIds.Contains(TEXT("Story.Prologue.Intro")));
 	TestTrue(
 		TEXT("Selected role is added to unlocked roles"),
 		LegacyProfile->Snapshot.UnlockedRoleIds.Contains(TEXT("Ability.Role.Assault")));
@@ -185,7 +186,7 @@ bool FPRProfileContractTest::RunTest(const FString& Parameters)
 		TEXT("Future profile is rejected explicitly"),
 		FutureResult.Status,
 		EPRProfileOperationStatus::UnsupportedFutureVersion);
-	TestEqual(TEXT("Future profile remains untouched"), FutureProfile->SaveVersion, 5);
+	TestEqual(TEXT("Future profile remains untouched"), FutureProfile->SaveVersion, 6);
 
 	UPRProfileSave* VersionTwoProfile = MakeProfile(TEXT("Version Two"));
 	VersionTwoProfile->SaveVersion = 2;
@@ -193,7 +194,7 @@ bool FPRProfileContractTest::RunTest(const FString& Parameters)
 	const FPRProfileOperationResult V2MigrationResult = VersionTwoProfile->MigrateToLatest();
 	TestTrue(TEXT("v2 profile migrates successfully"), V2MigrationResult.IsSuccess());
 	TestTrue(TEXT("v2 migration result is marked"), V2MigrationResult.bMigrated);
-	TestEqual(TEXT("v2 profile reaches v4"), VersionTwoProfile->SaveVersion, 4);
+	TestEqual(TEXT("v2 profile reaches v5"), VersionTwoProfile->SaveVersion, 5);
 	TestTrue(TEXT("v2 profile starts with an empty settlement ledger"), VersionTwoProfile->Snapshot.ProcessedSettlementIds.IsEmpty());
 
 	UPRProfileSave* VersionThreeProfile = MakeProfile(TEXT("Version Three"));
@@ -202,9 +203,9 @@ bool FPRProfileContractTest::RunTest(const FString& Parameters)
 	const FPRProfileOperationResult V3MigrationResult = VersionThreeProfile->MigrateToLatest();
 	TestTrue(TEXT("v3 profile migrates successfully"), V3MigrationResult.IsSuccess());
 	TestTrue(TEXT("v3 migration result is marked"), V3MigrationResult.bMigrated);
-	TestEqual(TEXT("v3 profile reaches v4"), VersionThreeProfile->SaveVersion, 4);
+	TestEqual(TEXT("v3 profile reaches v5"), VersionThreeProfile->SaveVersion, 5);
 	TestTrue(TEXT("v3 profile starts with an empty repair transaction ledger"), VersionThreeProfile->Snapshot.ProcessedRepairTransactionIds.IsEmpty());
-	TestTrue(TEXT("v3 to v4 migration preserves story progress"), VersionThreeProfile->Snapshot.Story.CompletedStoryNodeIds.Contains(TEXT("Story.Prologue.Intro")));
+	TestTrue(TEXT("v3 to v5 migration preserves story progress"), VersionThreeProfile->Snapshot.Story.CompletedStoryNodeIds.Contains(TEXT("Story.Prologue.Intro")));
 
 	FGuid OldestSettlementId;
 	for (int32 Index = 0; Index < 132; ++Index)
@@ -437,12 +438,14 @@ bool FPRProfileRuntimeBridgeTest::RunTest(const FString& Parameters)
 		SourcePlayerState->GetInventoryComponent()->AddItem(MakeProfileTestItem(TEXT("HealthInjector"), 2)));
 	FString Diagnostic;
 	TestTrue(TEXT("Source receives equipped starter rifle"), SourcePlayerState->GetWeaponComponent()->EnsureStarterWeapon(TEXT("TestRifle"), Diagnostic));
+	TestTrue(TEXT("Starter rifle receives an authoritative item identity"), SourcePlayerState->GetWeaponComponent()->GetEquippedWeapon().HasValidIdentity());
 
 	FPRProfileSnapshot Snapshot;
 	Snapshot.Equipment.Emplace(TEXT("Slot.Utility"), MakeProfileTestItem(TEXT("LegacyScanner"), 1));
 	TestTrue(
 		TEXT("Runtime bridge captures current player data"),
 		FPRProfileRuntimeBridge::CaptureFromPlayerState(SourcePlayerState, Snapshot, Diagnostic));
+	TestTrue(TEXT("Captured v5 snapshot has valid unique item identities"), Snapshot.HasValidItemIdentities(&Diagnostic));
 	TestEqual(TEXT("Captured selected role"), Snapshot.SelectedRoleId, FName(TEXT("Ability.Role.Assault")));
 	TestEqual(TEXT("Captured resource wallet"), Snapshot.GetResourceCount(TEXT("EnergyCrystal")), 7);
 	TestEqual(TEXT("Captured backpack includes item and normalized ammo"), Snapshot.BackpackItems.Num(), 2);
@@ -477,7 +480,7 @@ bool FPRProfileRuntimeBridgeTest::RunTest(const FString& Parameters)
 	EmptyProfilePlayerState->GetInventoryComponent()->SetItemDataAssets({ WeaponData.Get(), AmmoData.Get() });
 	FPRProfileSnapshot EmptySnapshot;
 	TestTrue(
-		TEXT("Applying an empty v4 profile grants the starter weapon atomically"),
+		TEXT("Applying an empty v5 profile grants the starter weapon atomically"),
 		FPRProfileRuntimeBridge::ApplyToPlayerState(EmptySnapshot, EmptyProfilePlayerState, Diagnostic));
 	TestEqual(TEXT("Empty profile equips the starter rifle"), EmptyProfilePlayerState->GetWeaponComponent()->GetEquippedWeapon().ItemId, FName(TEXT("TestRifle")));
 	TestEqual(TEXT("Empty profile begins with a full magazine"), EmptyProfilePlayerState->GetWeaponComponent()->GetMagazineAmmo(), 12);

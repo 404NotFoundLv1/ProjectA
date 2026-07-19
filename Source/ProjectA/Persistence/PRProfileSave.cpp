@@ -1,5 +1,82 @@
 #include "Persistence/PRProfileSave.h"
 
+#include "Misc/Crc.h"
+
+namespace
+{
+FString BuildItemIdentitySeed(
+	const FGuid& ProfileId,
+	const TCHAR* Container,
+	const int32 Index,
+	const FName SlotId,
+	const FPRItemInstance& Item,
+	const int32 Salt)
+{
+	FString AffixSeed;
+	for (const FName Affix : Item.Affixes)
+	{
+		AffixSeed += Affix.ToString();
+		AffixSeed += TEXT("|");
+	}
+	return FString::Printf(
+		TEXT("ProjectRift.ItemIdentity.v5|%s|%s|%d|%s|%s|%d|%d|%d|%.9g|%s|%d"),
+		*ProfileId.ToString(EGuidFormats::Digits),
+		Container,
+		Index,
+		*SlotId.ToString(),
+		*Item.ItemId.ToString(),
+		Item.Count,
+		Item.Level,
+		static_cast<int32>(Item.Rarity),
+		Item.Durability,
+		*AffixSeed,
+		Salt);
+}
+
+FGuid MakeDeterministicItemGuid(const FString& Seed)
+{
+	const uint32 A = FCrc::StrCrc32(*Seed, 0x11A91D5Bu);
+	const uint32 B = FCrc::StrCrc32(*Seed, 0x5C7139E1u);
+	const uint32 C = FCrc::StrCrc32(*Seed, 0x9E3779B9u);
+	uint32 D = FCrc::StrCrc32(*Seed, 0xC2B2AE35u);
+	if (A == 0 && B == 0 && C == 0 && D == 0)
+	{
+		D = 1;
+	}
+	return FGuid(A, B, C, D);
+}
+
+void AssignMigratedItemIdentities(const FGuid& ProfileId, FPRProfileSnapshot& Snapshot)
+{
+	TSet<FGuid> UsedGuids;
+	auto AssignItem = [&ProfileId, &UsedGuids](FPRItemInstance& Item, const TCHAR* Container, const int32 Index, const FName SlotId)
+	{
+		int32 Salt = 0;
+		do
+		{
+			Item.InstanceGuid = MakeDeterministicItemGuid(BuildItemIdentitySeed(ProfileId, Container, Index, SlotId, Item, Salt));
+			++Salt;
+		}
+		while (UsedGuids.Contains(Item.InstanceGuid));
+		UsedGuids.Add(Item.InstanceGuid);
+	};
+
+	for (int32 Index = 0; Index < Snapshot.BackpackItems.Num(); ++Index)
+	{
+		AssignItem(Snapshot.BackpackItems[Index], TEXT("Backpack"), Index, NAME_None);
+	}
+	for (int32 Index = 0; Index < Snapshot.WarehouseItems.Num(); ++Index)
+	{
+		AssignItem(Snapshot.WarehouseItems[Index], TEXT("Warehouse"), Index, NAME_None);
+	}
+	for (int32 Index = 0; Index < Snapshot.Equipment.Num(); ++Index)
+	{
+		FPRProfileEquipmentEntry& Entry = Snapshot.Equipment[Index];
+		AssignItem(Entry.Item, TEXT("Equipment"), Index, Entry.SlotId);
+	}
+}
+}
+
 FPRProfileOperationResult UPRProfileSave::MigrateToLatest()
 {
 	if (SaveVersion > LatestSaveVersion)
@@ -20,6 +97,14 @@ FPRProfileOperationResult UPRProfileSave::MigrateToLatest()
 	}
 
 	const int32 OriginalVersion = SaveVersion;
+	if (SaveVersion == LatestSaveVersion)
+	{
+		FString IdentityDiagnostic;
+		if (!Snapshot.HasValidItemIdentities(&IdentityDiagnostic))
+		{
+			return FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::MigrationFailed, IdentityDiagnostic, ProfileId);
+		}
+	}
 	while (SaveVersion < LatestSaveVersion)
 	{
 		switch (SaveVersion)
@@ -37,6 +122,11 @@ FPRProfileOperationResult UPRProfileSave::MigrateToLatest()
 			Snapshot.ProcessedRepairTransactionIds.Reset();
 			Snapshot.Normalize();
 			SaveVersion = 4;
+			break;
+		case 4:
+			Snapshot.Normalize();
+			AssignMigratedItemIdentities(ProfileId, Snapshot);
+			SaveVersion = 5;
 			break;
 		default:
 			return FPRProfileOperationResult::MakeFailure(
@@ -76,7 +166,15 @@ bool UPRProfileSave::IsValid(FString* OutDiagnostic) const
 		if (OutDiagnostic) { *OutDiagnostic = TEXT("Profile display name is empty."); }
 		return false;
 	}
-	return Snapshot.IsValid(OutDiagnostic);
+	if (!Snapshot.IsValid(OutDiagnostic))
+	{
+		return false;
+	}
+	if (SaveVersion >= 5 && !Snapshot.HasValidItemIdentities(OutDiagnostic))
+	{
+		return false;
+	}
+	return true;
 }
 
 FPRProfileSummary UPRProfileSave::MakeSummary(const bool bIsActive) const
