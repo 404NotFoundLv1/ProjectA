@@ -10,6 +10,7 @@ UPRWeaponDataAsset::UPRWeaponDataAsset()
 	bCanUse = false;
 	bCanEquip = true;
 	bCanDrop = false;
+	EquipmentSlot = EPREquipmentSlot::Weapon;
 	DamageType = ProjectRiftGameplayTags::Damage_Type_Physical;
 	HitReaction.Strength = EPRHitReactionStrength::Light;
 	HitReaction.DurationSeconds = 0.12f;

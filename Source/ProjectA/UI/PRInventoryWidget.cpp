@@ -4,6 +4,7 @@
 #include "Fonts/SlateFontInfo.h"
 #include "Items/PRInventoryComponent.h"
 #include "Items/PRItemDataAsset.h"
+#include "Items/PREquipmentComponent.h"
 #include "Items/PRWeaponDataAsset.h"
 #include "Misc/Paths.h"
 #include "Player/PRPlayerState.h"
@@ -36,6 +37,10 @@ void UPRInventoryWidget::BindInventory(UPRInventoryComponent* InInventoryCompone
 	{
 		CurrentWeapon->OnWeaponStateChanged.RemoveDynamic(this, &UPRInventoryWidget::HandleWeaponStateChanged);
 	}
+	if (UPREquipmentComponent* CurrentEquipment = GetBoundEquipmentComponent())
+	{
+		CurrentEquipment->OnEquipmentChanged.RemoveDynamic(this, &UPRInventoryWidget::HandleEquipmentChanged);
+	}
 	if (UPRInventoryComponent* CurrentInventory = BoundInventory.Get())
 	{
 		CurrentInventory->OnInventoryChanged.RemoveDynamic(this, &UPRInventoryWidget::HandleInventoryChanged);
@@ -50,6 +55,10 @@ void UPRInventoryWidget::BindInventory(UPRInventoryComponent* InInventoryCompone
 		if (UPRWeaponComponent* Weapon = GetBoundWeaponComponent())
 		{
 			Weapon->OnWeaponStateChanged.AddUniqueDynamic(this, &UPRInventoryWidget::HandleWeaponStateChanged);
+		}
+		if (UPREquipmentComponent* Equipment = GetBoundEquipmentComponent())
+		{
+			Equipment->OnEquipmentChanged.AddUniqueDynamic(this, &UPRInventoryWidget::HandleEquipmentChanged);
 		}
 	}
 
@@ -212,6 +221,26 @@ FText UPRInventoryWidget::GetPrimaryWeaponSummaryText() const
 		Weapon->GetReserveAmmo()));
 }
 
+FText UPRInventoryWidget::GetEquipmentSummaryText() const
+{
+	const UPRInventoryComponent* InventoryComponent = BoundInventory.Get();
+	const APRPlayerState* PlayerState = InventoryComponent ? Cast<APRPlayerState>(InventoryComponent->GetOwner()) : nullptr;
+	const UPREquipmentComponent* EquipmentComponent = PlayerState ? PlayerState->GetEquipmentComponent() : nullptr;
+	if (!EquipmentComponent)
+	{
+		return FText::FromString(TEXT("Armor: Empty    Chip: Empty    Tool: Empty"));
+	}
+	auto GetSlotName = [EquipmentComponent](const FName SlotId)
+	{
+		const FPRItemInstance Item = EquipmentComponent->GetEquippedItem(SlotId);
+		return Item.IsValid() ? Item.ItemId.ToString() : FString(TEXT("Empty"));
+	};
+	return FText::FromString(FString::Printf(TEXT("Armor: %s    Chip: %s    Tool: %s"),
+		*GetSlotName(ProjectRiftEquipmentSlots::Armor),
+		*GetSlotName(ProjectRiftEquipmentSlots::Chip),
+		*GetSlotName(ProjectRiftEquipmentSlots::Tool)));
+}
+
 void UPRInventoryWidget::RequestUseSelectedItem()
 {
 	if (HasSelectedItem())
@@ -274,6 +303,17 @@ void UPRInventoryWidget::RequestUnequipPrimaryWeapon()
 	}
 }
 
+void UPRInventoryWidget::RequestUnequipEquipmentSlot(const FName SlotId)
+{
+	const UPRInventoryComponent* InventoryComponent = BoundInventory.Get();
+	const APRPlayerState* PlayerState = InventoryComponent ? Cast<APRPlayerState>(InventoryComponent->GetOwner()) : nullptr;
+	const UPREquipmentComponent* EquipmentComponent = PlayerState ? PlayerState->GetEquipmentComponent() : nullptr;
+	if (EquipmentComponent && EquipmentComponent->GetEquippedItem(SlotId).IsValid())
+	{
+		OnUnequipEquipmentRequested.Broadcast(SlotId);
+	}
+}
+
 TSharedRef<SWidget> UPRInventoryWidget::RebuildWidget()
 {
 	TSharedRef<SWidget> Widget = SNew(SBorder)
@@ -289,6 +329,33 @@ TSharedRef<SWidget> UPRInventoryWidget::RebuildWidget()
 				.ColorAndOpacity(FSlateColor(FLinearColor(0.95f, 0.96f, 0.92f, 1.0f)))
 				.Font(GetProjectRiftInventoryFont(18.0f))
 				.Text(FText::FromString(TEXT("Inventory")))
+			]
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.0f, 6.0f, 0.0f, 0.0f)
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0.0f, 0.0f, 3.0f, 0.0f)
+				[
+					SNew(SButton).OnClicked(FOnClicked::CreateUObject(this, &UPRInventoryWidget::HandleUnequipEquipmentSlotClicked, ProjectRiftEquipmentSlots::Armor))
+					[
+						SNew(STextBlock).Justification(ETextJustify::Center).Font(GetProjectRiftInventoryFont(11.0f)).Text(FText::FromString(TEXT("Unequip Armor")))
+					]
+				]
+				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(3.0f, 0.0f, 3.0f, 0.0f)
+				[
+					SNew(SButton).OnClicked(FOnClicked::CreateUObject(this, &UPRInventoryWidget::HandleUnequipEquipmentSlotClicked, ProjectRiftEquipmentSlots::Chip))
+					[
+						SNew(STextBlock).Justification(ETextJustify::Center).Font(GetProjectRiftInventoryFont(11.0f)).Text(FText::FromString(TEXT("Unequip Chip")))
+					]
+				]
+				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(3.0f, 0.0f, 0.0f, 0.0f)
+				[
+					SNew(SButton).OnClicked(FOnClicked::CreateUObject(this, &UPRInventoryWidget::HandleUnequipEquipmentSlotClicked, ProjectRiftEquipmentSlots::Tool))
+					[
+						SNew(STextBlock).Justification(ETextJustify::Center).Font(GetProjectRiftInventoryFont(11.0f)).Text(FText::FromString(TEXT("Unequip Tool")))
+					]
+				]
 			]
 			+ SVerticalBox::Slot()
 			.AutoHeight()
@@ -309,6 +376,16 @@ TSharedRef<SWidget> UPRInventoryWidget::RebuildWidget()
 				.ColorAndOpacity(FSlateColor(FLinearColor(0.95f, 0.78f, 0.35f, 1.0f)))
 				.Font(GetProjectRiftInventoryFont(13.0f))
 				.Text(GetPrimaryWeaponSummaryText())
+			]
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.0f, 0.0f, 0.0f, 8.0f)
+			[
+				SAssignNew(EquipmentSummaryTextBlock, STextBlock)
+				.AutoWrapText(true)
+				.ColorAndOpacity(FSlateColor(FLinearColor(0.52f, 0.86f, 0.92f, 1.0f)))
+				.Font(GetProjectRiftInventoryFont(12.0f))
+				.Text(GetEquipmentSummaryText())
 			]
 			+ SVerticalBox::Slot()
 			.FillHeight(1.0f)
@@ -402,6 +479,7 @@ TSharedRef<SWidget> UPRInventoryWidget::RebuildWidget()
 	RefreshSelectedItemDetails();
 	RefreshShipResourceSummary();
 	RefreshPrimaryWeaponSummary();
+	RefreshEquipmentSummary();
 
 	return Widget;
 }
@@ -414,6 +492,7 @@ void UPRInventoryWidget::ReleaseSlateResources(const bool bReleaseChildren)
 	DetailTextBlock.Reset();
 	ShipResourceSummaryTextBlock.Reset();
 	PrimaryWeaponSummaryTextBlock.Reset();
+	EquipmentSummaryTextBlock.Reset();
 }
 
 void UPRInventoryWidget::NativeDestruct()
@@ -421,6 +500,10 @@ void UPRInventoryWidget::NativeDestruct()
 	if (UPRWeaponComponent* Weapon = GetBoundWeaponComponent())
 	{
 		Weapon->OnWeaponStateChanged.RemoveDynamic(this, &UPRInventoryWidget::HandleWeaponStateChanged);
+	}
+	if (UPREquipmentComponent* Equipment = GetBoundEquipmentComponent())
+	{
+		Equipment->OnEquipmentChanged.RemoveDynamic(this, &UPRInventoryWidget::HandleEquipmentChanged);
 	}
 	if (UPRInventoryComponent* InventoryComponent = BoundInventory.Get())
 	{
@@ -439,7 +522,13 @@ void UPRInventoryWidget::HandleInventoryChanged()
 void UPRInventoryWidget::HandleWeaponStateChanged()
 {
 	RefreshPrimaryWeaponSummary();
+	RefreshEquipmentSummary();
 	RefreshInventory();
+}
+
+void UPRInventoryWidget::HandleEquipmentChanged()
+{
+	RefreshEquipmentSummary();
 }
 
 FReply UPRInventoryWidget::HandleItemClicked(const int32 ItemIndex)
@@ -469,6 +558,12 @@ FReply UPRInventoryWidget::HandleEquipSelectedClicked()
 FReply UPRInventoryWidget::HandleUnequipPrimaryClicked()
 {
 	RequestUnequipPrimaryWeapon();
+	return FReply::Handled();
+}
+
+FReply UPRInventoryWidget::HandleUnequipEquipmentSlotClicked(const FName SlotId)
+{
+	RequestUnequipEquipmentSlot(SlotId);
 	return FReply::Handled();
 }
 
@@ -531,11 +626,26 @@ void UPRInventoryWidget::RefreshPrimaryWeaponSummary()
 	}
 }
 
+void UPRInventoryWidget::RefreshEquipmentSummary()
+{
+	if (EquipmentSummaryTextBlock.IsValid())
+	{
+		EquipmentSummaryTextBlock->SetText(GetEquipmentSummaryText());
+	}
+}
+
 UPRWeaponComponent* UPRInventoryWidget::GetBoundWeaponComponent() const
 {
 	const UPRInventoryComponent* InventoryComponent = BoundInventory.Get();
 	const APRPlayerState* PlayerState = InventoryComponent ? Cast<APRPlayerState>(InventoryComponent->GetOwner()) : nullptr;
 	return PlayerState ? PlayerState->GetWeaponComponent() : nullptr;
+}
+
+UPREquipmentComponent* UPRInventoryWidget::GetBoundEquipmentComponent() const
+{
+	const UPRInventoryComponent* InventoryComponent = BoundInventory.Get();
+	const APRPlayerState* PlayerState = InventoryComponent ? Cast<APRPlayerState>(InventoryComponent->GetOwner()) : nullptr;
+	return PlayerState ? PlayerState->GetEquipmentComponent() : nullptr;
 }
 
 void UPRInventoryWidget::RefreshShipResourceSummary()

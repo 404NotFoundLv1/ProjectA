@@ -2,6 +2,7 @@
 
 #include "Core/PRAssetManager.h"
 #include "Items/PRInventoryComponent.h"
+#include "Items/PREquipmentTypes.h"
 #include "Player/PRPlayerState.h"
 #include "Roles/PRRoleComponent.h"
 #include "Roles/PRRoleDataAsset.h"
@@ -85,7 +86,10 @@ bool FPRProfileRuntimeBridge::CaptureFromPlayerState(
 
 	InOutSnapshot.Equipment.RemoveAll([](const FPRProfileEquipmentEntry& Entry)
 	{
-		return Entry.SlotId == ProjectRiftWeaponSlots::Primary;
+		return Entry.SlotId == ProjectRiftEquipmentSlots::Weapon
+			|| Entry.SlotId == ProjectRiftEquipmentSlots::Armor
+			|| Entry.SlotId == ProjectRiftEquipmentSlots::Chip
+			|| Entry.SlotId == ProjectRiftEquipmentSlots::Tool;
 	});
 	for (const FPRProfileEquipmentEntry& RuntimeEntry : Weapon->GetEquipmentEntries())
 	{

@@ -23,7 +23,7 @@ Import-Module -Force -Name $modulePath
 
 $summary = [ordered]@{
     SchemaVersion = 1
-    ProjectVersion = '0.7.0'
+    ProjectVersion = '0.7.1'
     RunId = $runId
     Mode = $Mode
     Target = $Target

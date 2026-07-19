@@ -442,6 +442,7 @@ bool FPRProfileRuntimeBridgeTest::RunTest(const FString& Parameters)
 
 	FPRProfileSnapshot Snapshot;
 	Snapshot.Equipment.Emplace(TEXT("Slot.Utility"), MakeProfileTestItem(TEXT("LegacyScanner"), 1));
+	Snapshot.Equipment.Emplace(TEXT("Slot.Armor"), MakeProfileTestItem(TEXT("StaleArmor"), 1));
 	TestTrue(
 		TEXT("Runtime bridge captures current player data"),
 		FPRProfileRuntimeBridge::CaptureFromPlayerState(SourcePlayerState, Snapshot, Diagnostic));
@@ -458,6 +459,10 @@ bool FPRProfileRuntimeBridgeTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Capture preserves unknown legacy equipment"), Snapshot.Equipment.ContainsByPredicate([](const FPRProfileEquipmentEntry& Entry)
 	{
 		return Entry.SlotId == TEXT("Slot.Utility") && Entry.Item.ItemId == TEXT("LegacyScanner");
+	}));
+	TestFalse(TEXT("Capture removes an unequipped known Armor slot"), Snapshot.Equipment.ContainsByPredicate([](const FPRProfileEquipmentEntry& Entry)
+	{
+		return Entry.SlotId == TEXT("Slot.Armor");
 	}));
 
 	APRPlayerState* TargetPlayerState = NewObject<APRPlayerState>(GetTransientPackage());

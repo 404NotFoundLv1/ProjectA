@@ -12,6 +12,7 @@ class UPRAttributeSet;
 class UAbilitySystemComponent;
 class UPRInventoryComponent;
 class UPRItemTransactionComponent;
+class UPREquipmentComponent;
 class UPRMissionProgressionDataAsset;
 class UPRWeaponComponent;
 class UPRRoleComponent;
@@ -62,6 +63,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Item Transaction")
 	UPRItemTransactionComponent* GetItemTransactionComponent() const { return ItemTransactionComponent.Get(); }
+
+	UFUNCTION(BlueprintPure, Category = "Equipment")
+	UPREquipmentComponent* GetEquipmentComponent() const { return EquipmentComponent.Get(); }
 
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	UPRWeaponComponent* GetWeaponComponent() const { return WeaponComponent.Get(); }
@@ -164,6 +168,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Item Transaction", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPRItemTransactionComponent> ItemTransactionComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Equipment", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPREquipmentComponent> EquipmentComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPRWeaponComponent> WeaponComponent;

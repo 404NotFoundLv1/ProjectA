@@ -29,6 +29,7 @@
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Weapons/PRWeaponComponent.h"
+#include "Items/PREquipmentComponent.h"
 #include "Items/PRWeaponDataAsset.h"
 
 namespace
@@ -310,6 +311,10 @@ bool APRCharacter::InitializeAbilitySystemFromPlayerState(APRPlayerState* InPlay
 	AbilitySystemComponent = NewAbilitySystemComponent;
 	AttributeSet = NewAttributeSet;
 	AbilitySystemComponent->InitAbilityActorInfo(InPlayerState, this);
+	if (UPREquipmentComponent* EquipmentComponent = InPlayerState->GetEquipmentComponent())
+	{
+		EquipmentComponent->HandleAvatarChanged();
+	}
 	if (UPRWeaponComponent* WeaponComponent = InPlayerState->GetWeaponComponent())
 	{
 		WeaponComponent->HandleAvatarChanged(this);

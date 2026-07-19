@@ -24,9 +24,9 @@ bool FPRSmokeContentTest::RunTest(const FString& Parameters)
 	const UGeneralProjectSettings* ProjectSettings = GetDefault<UGeneralProjectSettings>();
 	TestNotNull(TEXT("General project settings exist"), ProjectSettings);
 	TestEqual(
-		TEXT("Smoke suite is bound to ProjectRift v0.7.0"),
+		TEXT("Smoke suite is bound to ProjectRift v0.7.1"),
 		ProjectSettings ? ProjectSettings->ProjectVersion : FString(),
-		FString(TEXT("0.7.0")));
+		FString(TEXT("0.7.1")));
 
 	const TCHAR* RequiredMaps[] = {
 		TEXT("/Game/ProjectRift/Maps/L_MainMenu.L_MainMenu"),

@@ -13,7 +13,9 @@ enum class EPRItemTransactionIntent : uint8
 	Drop,
 	EquipPrimary,
 	UnequipPrimary,
-	BeginReload
+	BeginReload,
+	Equip,
+	Unequip
 };
 
 UENUM(BlueprintType)
@@ -60,6 +62,9 @@ struct PROJECTA_API FPRItemTransactionRequest
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Transaction")
 	FGuid InstanceGuid;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Transaction")
+	FName SlotId = NAME_None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Transaction", meta = (ClampMin = "0"))
 	int32 Count = 0;

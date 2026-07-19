@@ -33,7 +33,7 @@ TSharedRef<SWidget> UPRGASDebugWidget::RebuildWidget()
 			.AutoWrapText(true)
 			.ColorAndOpacity(FSlateColor(FLinearColor::White))
 			.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 14))
-		.Text(FText::FromString(TEXT("ProjectRift v0.7.0 GAS Debug\nWaiting for player state...")))
+		.Text(FText::FromString(TEXT("ProjectRift v0.7.1 GAS Debug\nWaiting for player state...")))
 		];
 }
 
@@ -123,7 +123,7 @@ FString UPRGASDebugWidget::GetDebugText() const
 	if (!AttributeSet)
 	{
 		return FString::Printf(
-		TEXT("ProjectRift v0.7.0 GAS Debug\nPawn: %s\nAttributeSet: Missing\nDowned: %s\nBleed-out: %.1fs\nRevive: %s\nDrone: %s\nDifficulty Players: %d\nRole: %s\nLoadout: %s\nCooldowns: %s"),
+		TEXT("ProjectRift v0.7.1 GAS Debug\nPawn: %s\nAttributeSet: Missing\nDowned: %s\nBleed-out: %.1fs\nRevive: %s\nDrone: %s\nDifficulty Players: %d\nRole: %s\nLoadout: %s\nCooldowns: %s"),
 			*GetNameSafe(ProjectRiftCharacter),
 			ProjectRiftCharacter && ProjectRiftCharacter->IsDowned() ? TEXT("true") : TEXT("false"),
 			Revive ? Revive->GetBleedOutRemainingSeconds() : 0.0f,
@@ -136,7 +136,7 @@ FString UPRGASDebugWidget::GetDebugText() const
 	}
 
 	return FString::Printf(
-		TEXT("ProjectRift v0.7.0 GAS Debug\nHealth: %.0f / %.0f\nShield: %.0f / %.0f\nEnergy: %.0f / %.0f\nAttackPower: %.0f\nMoveSpeed: %.0f\nPollutionResistance: %.0f%%\nStatuses: %s\nHitStaggered: %s\nLast Cue: %s\nCue Active/Handled: %d / %d\nHit Confirm Sent/Received: %d / %d\nWeapon: %s\nAmmo: %d / %d\nAiming: %s\nReloading: %s\nItem Revision: %d\nDowned: %s\nBleed-out: %.1fs\nRevive: %s\nDrone: %s\nDifficulty Players: %d\nRole: %s\nLoadout: %s\nCooldowns: %s\nASC Ready: %s\nDefault GE: %s\nRole Abilities: %s"),
+		TEXT("ProjectRift v0.7.1 GAS Debug\nHealth: %.0f / %.0f\nShield: %.0f / %.0f\nEnergy: %.0f / %.0f\nAttackPower: %.0f\nMoveSpeed: %.0f\nPollutionResistance: %.0f%%\nStatuses: %s\nHitStaggered: %s\nLast Cue: %s\nCue Active/Handled: %d / %d\nHit Confirm Sent/Received: %d / %d\nWeapon: %s\nAmmo: %d / %d\nAiming: %s\nReloading: %s\nItem Revision: %d\nDowned: %s\nBleed-out: %.1fs\nRevive: %s\nDrone: %s\nDifficulty Players: %d\nRole: %s\nLoadout: %s\nCooldowns: %s\nASC Ready: %s\nDefault GE: %s\nRole Abilities: %s"),
 		AttributeSet->GetHealth(),
 		AttributeSet->GetMaxHealth(),
 		AttributeSet->GetShield(),

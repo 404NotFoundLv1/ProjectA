@@ -65,7 +65,7 @@ public:
 	void CancelReload();
 
 	bool ReplaceEquipmentEntries(const TArray<FPRProfileEquipmentEntry>& InEntries, FString& OutDiagnostic);
-	TArray<FPRProfileEquipmentEntry> GetEquipmentEntries() const { return EquipmentEntries; }
+	TArray<FPRProfileEquipmentEntry> GetEquipmentEntries() const;
 	bool BuildPersistentBackpack(TArray<FPRItemInstance>& OutBackpack, FString& OutDiagnostic) const;
 	bool EnsureStarterWeapon(FName StarterWeaponItemId, FString& OutDiagnostic);
 	void CopyRuntimeStateFrom(const UPRWeaponComponent* SourceComponent);
@@ -107,8 +107,9 @@ private:
 	void DestroyWeaponActor();
 	void NotifyStateChanged();
 	int32 FindPrimaryEquipmentIndex() const;
-	void SetPrimaryEquipment(const FPRItemInstance& Item);
-	void ClearPrimaryEquipment();
+	bool SetPrimaryEquipment(const FPRItemInstance& Item);
+	bool ClearPrimaryEquipment();
+	class UPREquipmentComponent* GetEquipmentComponent() const;
 	bool AddMagazineToInventory(const UPRWeaponDataAsset* WeaponData);
 	bool LoadMagazineFromInventory(const UPRWeaponDataAsset* WeaponData);
 	bool RestoreTransaction(
@@ -128,9 +129,6 @@ private:
 
 	UPROPERTY(ReplicatedUsing = OnRep_Reloading, VisibleInstanceOnly, Category = "Weapon")
 	bool bReloading = false;
-
-	UPROPERTY()
-	TArray<FPRProfileEquipmentEntry> EquipmentEntries;
 
 	UPROPERTY(Transient)
 	TObjectPtr<APRCharacter> CurrentAvatar;

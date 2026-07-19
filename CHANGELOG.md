@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.7.1] - 2026-07-19
+
+- Added replicated Weapon, Armor, Chip and Tool equipment slots backed by the authoritative item transaction layer.
+- Added owner-only equipment details, public appearance summaries, placeholder visual actors, and exact GAS effect/ability handle cleanup.
+- Added Test Armor, Test Chip and Field Toolkit data assets for attribute and passive-grant validation; profile schema remains v5.
+
 ## [0.7.0] - 2026-07-19
 
 - Added stable GUID identity to every runtime inventory, equipped, and world-pickup item instance; split stacks mint a new identity while stack merges retain their target identity.

@@ -6,6 +6,7 @@
 #include "Engine/Engine.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
+#include "Items/PREquipmentComponent.h"
 #include "Items/PRInventoryComponent.h"
 #include "Items/PRItemDataAsset.h"
 #include "Items/PRItemTypes.h"
@@ -80,8 +81,10 @@ bool FPRInventoryUITest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Inventory widget exposes primary weapon summary text"), InventoryWidgetClass->FindFunctionByName(TEXT("GetPrimaryWeaponSummaryText")));
 	TestNotNull(TEXT("Inventory widget exposes RequestEquipSelectedItem"), InventoryWidgetClass->FindFunctionByName(TEXT("RequestEquipSelectedItem")));
 	TestNotNull(TEXT("Inventory widget exposes RequestUnequipPrimaryWeapon"), InventoryWidgetClass->FindFunctionByName(TEXT("RequestUnequipPrimaryWeapon")));
+	TestNotNull(TEXT("Inventory widget exposes RequestUnequipEquipmentSlot"), InventoryWidgetClass->FindFunctionByName(TEXT("RequestUnequipEquipmentSlot")));
 	TestNotNull(TEXT("Inventory widget exposes OnEquipItemRequested delegate"), FindFProperty<FMulticastDelegateProperty>(InventoryWidgetClass, TEXT("OnEquipItemRequested")));
 	TestNotNull(TEXT("Inventory widget exposes OnUnequipPrimaryRequested delegate"), FindFProperty<FMulticastDelegateProperty>(InventoryWidgetClass, TEXT("OnUnequipPrimaryRequested")));
+	TestNotNull(TEXT("Inventory widget exposes OnUnequipEquipmentRequested delegate"), FindFProperty<FMulticastDelegateProperty>(InventoryWidgetClass, TEXT("OnUnequipEquipmentRequested")));
 
 	UClass* PlayerControllerClass = APRPlayerController::StaticClass();
 	TestNotNull(TEXT("APRPlayerController class exists for inventory UI"), PlayerControllerClass);
@@ -95,6 +98,7 @@ bool FPRInventoryUITest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Player controller exposes GetWeaponHUDWidget"), PlayerControllerClass->FindFunctionByName(TEXT("GetWeaponHUDWidget")));
 	TestNotNull(TEXT("Player controller exposes EquipInventoryWeapon"), PlayerControllerClass->FindFunctionByName(TEXT("EquipInventoryWeapon")));
 	TestNotNull(TEXT("Player controller exposes UnequipPrimaryWeapon"), PlayerControllerClass->FindFunctionByName(TEXT("UnequipPrimaryWeapon")));
+	TestNotNull(TEXT("Player controller exposes UnequipEquipmentSlot"), PlayerControllerClass->FindFunctionByName(TEXT("UnequipEquipmentSlot")));
 
 	FTestWorldWrapper WorldWrapper;
 	TestTrue(TEXT("Inventory UI test world is created"), WorldWrapper.CreateTestWorld(EWorldType::Game));
@@ -191,6 +195,9 @@ bool FPRInventoryUITest::RunTest(const FString& Parameters)
 			TEXT("Inventory UI shows extracted ship resources even when the carried bag is empty"),
 			ResourceWidget->GetShipResourceSummaryText().ToString().Contains(TEXT("EnergyCrystal x5")));
 		TestTrue(TEXT("Ship resource display does not create carried inventory slots"), ResourceWidget->IsInventoryEmpty());
+		TestTrue(
+			TEXT("Inventory UI observes direct equipment changes for fixed-slot summaries"),
+			ResourcePlayerState->GetEquipmentComponent()->OnEquipmentChanged.IsBound());
 	}
 
 	UPRInventoryComponent* DataInventory = NewObject<UPRInventoryComponent>(GetTransientPackage());

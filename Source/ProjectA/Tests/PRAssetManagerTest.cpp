@@ -7,6 +7,7 @@
 #include "Engine/StreamableManager.h"
 #include "GeneralProjectSettings.h"
 #include "Items/PRItemDataAsset.h"
+#include "Items/PREquipmentDataAsset.h"
 #include "Items/PRLootTableDataAsset.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Progression/PRMissionProgressionDataAsset.h"
@@ -119,9 +120,9 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 	const UGeneralProjectSettings* ProjectSettings = GetDefault<UGeneralProjectSettings>();
 	TestNotNull(TEXT("General project settings exist"), ProjectSettings);
 	TestEqual(
-		TEXT("Project version is v0.7.0"),
+		TEXT("Project version is v0.7.1"),
 		ProjectSettings ? ProjectSettings->ProjectVersion : FString(),
-		FString(TEXT("0.7.0")));
+		FString(TEXT("0.7.1")));
 
 	TestTrue(TEXT("Global manager is UPRAssetManager"), UAssetManager::Get().IsA<UPRAssetManager>());
 	TestEqual(
@@ -168,9 +169,12 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 	Manager->GetPrimaryAssetIdList(UPRLootTableDataAsset::LootTablePrimaryAssetType, LootTableIds);
 	Manager->GetPrimaryAssetIdList(UPRMissionProgressionDataAsset::MissionPrimaryAssetType, MissionIds);
 	Manager->GetPrimaryAssetIdList(UPRShipRepairDataAsset::ShipRepairPrimaryAssetType, ShipRepairIds);
-	TestEqual(TEXT("Six ProjectRift item assets are registered"), ItemIds.Num(), 6);
+	TestEqual(TEXT("Nine ProjectRift item assets are registered"), ItemIds.Num(), 9);
 	TestTrue(TEXT("Test rifle is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("TestRifle"))));
 	TestTrue(TEXT("Rifle ammo is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("RifleAmmo"))));
+	TestTrue(TEXT("Test armor is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("DA_TestArmor"))));
+	TestTrue(TEXT("Test chip is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("DA_TestChip"))));
+	TestTrue(TEXT("Field Toolkit is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("DA_FieldToolkit"))));
 	TestEqual(TEXT("One ProjectRift loot table is registered"), LootTableIds.Num(), 1);
 	TestEqual(TEXT("One ProjectRift mission is registered"), MissionIds.Num(), 1);
 	TestEqual(TEXT("One ProjectRift ship repair is registered"), ShipRepairIds.Num(), 1);
@@ -181,6 +185,13 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 		TEXT("Loaded HealthInjector has the canonical primary ID"),
 		HealthInjector ? HealthInjector->GetPrimaryAssetId().ToString() : FString(),
 		FString(TEXT("ProjectRiftItem:HealthInjector")));
+
+	const UPREquipmentDataAsset* TestArmor = Cast<UPREquipmentDataAsset>(Manager->LoadItemDataSync(TEXT("DA_TestArmor")));
+	const UPREquipmentDataAsset* TestChip = Cast<UPREquipmentDataAsset>(Manager->LoadItemDataSync(TEXT("DA_TestChip")));
+	const UPREquipmentDataAsset* FieldToolkit = Cast<UPREquipmentDataAsset>(Manager->LoadItemDataSync(TEXT("DA_FieldToolkit")));
+	TestEqual(TEXT("Test Armor occupies Armor"), TestArmor ? TestArmor->EquipmentSlot : EPREquipmentSlot::None, EPREquipmentSlot::Armor);
+	TestEqual(TEXT("Test Chip occupies Chip"), TestChip ? TestChip->EquipmentSlot : EPREquipmentSlot::None, EPREquipmentSlot::Chip);
+	TestEqual(TEXT("Field Toolkit occupies Tool"), FieldToolkit ? FieldToolkit->EquipmentSlot : EPREquipmentSlot::None, EPREquipmentSlot::Tool);
 
 	UPRLootTableDataAsset* TestLootTable = Manager->LoadLootTableSync(TEXT("DA_TestLootTable"));
 	TestNotNull(TEXT("Test loot table loads by PrimaryAssetId"), TestLootTable);

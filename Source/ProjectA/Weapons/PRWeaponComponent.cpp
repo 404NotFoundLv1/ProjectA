@@ -9,6 +9,7 @@
 #include "Core/PRGameplayTags.h"
 #include "GameFramework/PlayerState.h"
 #include "Items/PRInventoryComponent.h"
+#include "Items/PREquipmentComponent.h"
 #include "Items/PRItemTransactionComponent.h"
 #include "Items/PRWeaponDataAsset.h"
 #include "Net/UnrealNetwork.h"
@@ -451,31 +452,62 @@ EPRWeaponFireResult UPRWeaponComponent::TryFire()
 
 int32 UPRWeaponComponent::FindPrimaryEquipmentIndex() const
 {
-	return EquipmentEntries.IndexOfByPredicate([](const FPRProfileEquipmentEntry& Entry)
+	return GetEquipmentEntries().IndexOfByPredicate([](const FPRProfileEquipmentEntry& Entry)
 	{
 		return Entry.SlotId == ProjectRiftWeaponSlots::Primary;
 	});
 }
 
-void UPRWeaponComponent::SetPrimaryEquipment(const FPRItemInstance& Item)
+TArray<FPRProfileEquipmentEntry> UPRWeaponComponent::GetEquipmentEntries() const
 {
-	const int32 Index = FindPrimaryEquipmentIndex();
+	const UPREquipmentComponent* EquipmentComponent = GetEquipmentComponent();
+	return EquipmentComponent ? EquipmentComponent->GetEquipmentEntries() : TArray<FPRProfileEquipmentEntry>();
+}
+
+UPREquipmentComponent* UPRWeaponComponent::GetEquipmentComponent() const
+{
+	const APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
+	return PlayerState ? PlayerState->GetEquipmentComponent() : nullptr;
+}
+
+bool UPRWeaponComponent::SetPrimaryEquipment(const FPRItemInstance& Item)
+{
+	UPREquipmentComponent* EquipmentComponent = GetEquipmentComponent();
+	if (!EquipmentComponent)
+	{
+		return false;
+	}
+	TArray<FPRProfileEquipmentEntry> Entries = EquipmentComponent->GetEquipmentEntries();
+	const int32 Index = Entries.IndexOfByPredicate([](const FPRProfileEquipmentEntry& Entry)
+	{
+		return Entry.SlotId == ProjectRiftWeaponSlots::Primary;
+	});
 	if (Index == INDEX_NONE)
 	{
-		EquipmentEntries.Emplace(ProjectRiftWeaponSlots::Primary, Item);
+		Entries.Emplace(ProjectRiftWeaponSlots::Primary, Item);
 	}
 	else
 	{
-		EquipmentEntries[Index].Item = Item;
+		Entries[Index].Item = Item;
 	}
+	FString Diagnostic;
+	return EquipmentComponent->ReplaceEquipmentEntries(Entries, Diagnostic);
 }
 
-void UPRWeaponComponent::ClearPrimaryEquipment()
+bool UPRWeaponComponent::ClearPrimaryEquipment()
 {
-	EquipmentEntries.RemoveAll([](const FPRProfileEquipmentEntry& Entry)
+	UPREquipmentComponent* EquipmentComponent = GetEquipmentComponent();
+	if (!EquipmentComponent)
+	{
+		return false;
+	}
+	TArray<FPRProfileEquipmentEntry> Entries = EquipmentComponent->GetEquipmentEntries();
+	Entries.RemoveAll([](const FPRProfileEquipmentEntry& Entry)
 	{
 		return Entry.SlotId == ProjectRiftWeaponSlots::Primary;
 	});
+	FString Diagnostic;
+	return EquipmentComponent->ReplaceEquipmentEntries(Entries, Diagnostic);
 }
 
 bool UPRWeaponComponent::AddMagazineToInventory(const UPRWeaponDataAsset* WeaponData)
@@ -525,7 +557,18 @@ bool UPRWeaponComponent::RestoreTransaction(
 	{
 		return false;
 	}
-	EquipmentEntries = Equipment;
+	if (UPREquipmentComponent* EquipmentComponent = GetEquipmentComponent())
+	{
+		FString Diagnostic;
+		if (!EquipmentComponent->ReplaceEquipmentEntries(Equipment, Diagnostic))
+		{
+			return false;
+		}
+	}
+	else
+	{
+		return false;
+	}
 	EquippedWeapon = Weapon;
 	MagazineAmmo = Ammo;
 	RefreshWeaponActor();
@@ -554,11 +597,12 @@ bool UPRWeaponComponent::EquipWeaponFromInventory(const FName ItemId)
 	const FPRItemInstance SourceWeaponCopy = *SourceWeapon;
 
 	const TArray<FPRItemInstance> OldInventory = Inventory->GetInventoryItems();
-	const TArray<FPRProfileEquipmentEntry> OldEquipment = EquipmentEntries;
+	const TArray<FPRProfileEquipmentEntry> OldEquipment = GetEquipmentEntries();
 	const FPRItemInstance OldWeapon = EquippedWeapon;
 	const int32 OldMagazine = MagazineAmmo;
 	const int32 PrimaryIndex = FindPrimaryEquipmentIndex();
-	const FPRItemInstance OldPrimary = PrimaryIndex != INDEX_NONE ? EquipmentEntries[PrimaryIndex].Item : FPRItemInstance();
+	const TArray<FPRProfileEquipmentEntry> CurrentEquipment = GetEquipmentEntries();
+	const FPRItemInstance OldPrimary = PrimaryIndex != INDEX_NONE ? CurrentEquipment[PrimaryIndex].Item : FPRItemInstance();
 	const UPRWeaponDataAsset* OldWeaponData = GetEquippedWeaponData();
 	CancelReloadAuthoritative();
 	SetAimingAuthoritative(false);
@@ -578,7 +622,11 @@ bool UPRWeaponComponent::EquipWeaponFromInventory(const FName ItemId)
 		NewWeapon.InstanceGuid = FGuid::NewGuid();
 	}
 	EquippedWeapon = NewWeapon;
-	SetPrimaryEquipment(NewWeapon);
+	if (!SetPrimaryEquipment(NewWeapon))
+	{
+		RestoreTransaction(OldInventory, OldEquipment, OldWeapon, OldMagazine);
+		return false;
+	}
 	MagazineAmmo = 0;
 	if (!LoadMagazineFromInventory(NewWeaponData))
 	{
@@ -601,10 +649,10 @@ bool UPRWeaponComponent::UnequipWeapon()
 	}
 
 	const TArray<FPRItemInstance> OldInventory = Inventory->GetInventoryItems();
-	const TArray<FPRProfileEquipmentEntry> OldEquipment = EquipmentEntries;
+	const TArray<FPRProfileEquipmentEntry> OldEquipment = GetEquipmentEntries();
 	const FPRItemInstance OldWeapon = EquippedWeapon;
 	const int32 OldMagazine = MagazineAmmo;
-	const FPRItemInstance OldPrimary = EquipmentEntries[PrimaryIndex].Item;
+	const FPRItemInstance OldPrimary = OldEquipment[PrimaryIndex].Item;
 	const UPRWeaponDataAsset* OldWeaponData = GetEquippedWeaponData();
 	CancelReloadAuthoritative();
 	SetAimingAuthoritative(false);
@@ -613,7 +661,11 @@ bool UPRWeaponComponent::UnequipWeapon()
 		RestoreTransaction(OldInventory, OldEquipment, OldWeapon, OldMagazine);
 		return false;
 	}
-	ClearPrimaryEquipment();
+	if (!ClearPrimaryEquipment())
+	{
+		RestoreTransaction(OldInventory, OldEquipment, OldWeapon, OldMagazine);
+		return false;
+	}
 	EquippedWeapon = FPRItemInstance();
 	MagazineAmmo = 0;
 	DestroyWeaponActor();
@@ -631,13 +683,17 @@ bool UPRWeaponComponent::ReplaceEquipmentEntries(const TArray<FPRProfileEquipmen
 	}
 	CancelReloadAuthoritative();
 	SetAimingAuthoritative(false);
-	EquipmentEntries = InEntries;
+	UPREquipmentComponent* EquipmentComponent = GetEquipmentComponent();
+	if (!EquipmentComponent || !EquipmentComponent->ReplaceEquipmentEntries(InEntries, OutDiagnostic))
+	{
+		return false;
+	}
 	EquippedWeapon = FPRItemInstance();
 	MagazineAmmo = 0;
 	const int32 PrimaryIndex = FindPrimaryEquipmentIndex();
 	if (PrimaryIndex != INDEX_NONE)
 	{
-		const FPRItemInstance Candidate = EquipmentEntries[PrimaryIndex].Item;
+		const FPRItemInstance Candidate = GetEquipmentEntries()[PrimaryIndex].Item;
 		APRPlayerState* TypedPlayerState = Cast<APRPlayerState>(GetOwner());
 		UPRInventoryComponent* Inventory = TypedPlayerState ? TypedPlayerState->GetInventoryComponent() : nullptr;
 		UPRWeaponDataAsset* WeaponData = Inventory ? Cast<UPRWeaponDataAsset>(Inventory->FindItemData(Candidate.ItemId)) : nullptr;
@@ -693,7 +749,7 @@ bool UPRWeaponComponent::EnsureStarterWeapon(const FName StarterWeaponItemId, FS
 		return false;
 	}
 	if (Inventory->GetItemCount(StarterWeaponItemId) > 0
-		|| EquipmentEntries.ContainsByPredicate([StarterWeaponItemId](const FPRProfileEquipmentEntry& Entry)
+		|| GetEquipmentEntries().ContainsByPredicate([StarterWeaponItemId](const FPRProfileEquipmentEntry& Entry)
 		{
 			return Entry.Item.ItemId == StarterWeaponItemId;
 		}))
@@ -702,7 +758,7 @@ bool UPRWeaponComponent::EnsureStarterWeapon(const FName StarterWeaponItemId, FS
 	}
 
 	const TArray<FPRItemInstance> OldInventory = Inventory->GetInventoryItems();
-	const TArray<FPRProfileEquipmentEntry> OldEquipment = EquipmentEntries;
+	const TArray<FPRProfileEquipmentEntry> OldEquipment = GetEquipmentEntries();
 	const FPRItemInstance OldWeapon = EquippedWeapon;
 	const int32 OldMagazine = MagazineAmmo;
 	FPRItemInstance Ammo;
@@ -720,8 +776,7 @@ bool UPRWeaponComponent::EnsureStarterWeapon(const FName StarterWeaponItemId, FS
 	if (FindPrimaryEquipmentIndex() == INDEX_NONE)
 	{
 		EquippedWeapon = Weapon;
-		SetPrimaryEquipment(Weapon);
-		if (!LoadMagazineFromInventory(WeaponData))
+		if (!SetPrimaryEquipment(Weapon) || !LoadMagazineFromInventory(WeaponData))
 		{
 			RestoreTransaction(OldInventory, OldEquipment, OldWeapon, OldMagazine);
 			OutDiagnostic = TEXT("Starter magazine initialization failed.");
@@ -745,7 +800,6 @@ void UPRWeaponComponent::CopyRuntimeStateFrom(const UPRWeaponComponent* SourceCo
 	{
 		return;
 	}
-	EquipmentEntries = SourceComponent->EquipmentEntries;
 	EquippedWeapon = SourceComponent->EquippedWeapon;
 	MagazineAmmo = SourceComponent->MagazineAmmo;
 	bAiming = false;

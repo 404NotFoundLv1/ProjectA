@@ -1,0 +1,428 @@
+#include "Items/PREquipmentComponent.h"
+
+#include "Abilities/PRAbilitySystemComponent.h"
+#include "Abilities/PRAttributeSet.h"
+#include "AbilitySystemComponent.h"
+#include "Characters/PRCharacter.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "GameplayEffect.h"
+#include "Items/PRInventoryComponent.h"
+#include "Items/PREquipmentDataAsset.h"
+#include "Items/PREquipmentVisualActor.h"
+#include "Player/PRPlayerState.h"
+#include "Net/UnrealNetwork.h"
+
+UPREquipmentComponent::UPREquipmentComponent()
+{
+	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
+}
+
+FPRItemInstance UPREquipmentComponent::GetEquippedItem(const FName SlotId) const
+{
+	const FPRProfileEquipmentEntry* Entry = EquipmentEntries.FindByPredicate([SlotId](const FPRProfileEquipmentEntry& Candidate)
+	{
+		return Candidate.SlotId == SlotId;
+	});
+	return Entry ? Entry->Item : FPRItemInstance();
+}
+
+void UPREquipmentComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (GetOwner() && GetOwner()->HasAuthority())
+	{
+		ClearGrantedHandles();
+		DestroyVisualActors();
+	}
+	Super::EndPlay(EndPlayReason);
+}
+
+void UPREquipmentComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME_CONDITION(UPREquipmentComponent, EquipmentEntries, COND_OwnerOnly);
+	DOREPLIFETIME(UPREquipmentComponent, PublicAppearanceEntries);
+}
+
+FName UPREquipmentComponent::GetSlotId(const EPREquipmentSlot Slot)
+{
+	switch (Slot)
+	{
+	case EPREquipmentSlot::Weapon: return ProjectRiftEquipmentSlots::Weapon;
+	case EPREquipmentSlot::Armor: return ProjectRiftEquipmentSlots::Armor;
+	case EPREquipmentSlot::Chip: return ProjectRiftEquipmentSlots::Chip;
+	case EPREquipmentSlot::Tool: return ProjectRiftEquipmentSlots::Tool;
+	default: return NAME_None;
+	}
+}
+
+bool UPREquipmentComponent::ReplaceEquipmentEntries(const TArray<FPRProfileEquipmentEntry>& InEntries, FString& OutDiagnostic)
+{
+	APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
+	if (!PlayerState || !PlayerState->HasAuthority())
+	{
+		OutDiagnostic = TEXT("Equipment can only be changed by the authoritative PlayerState.");
+		return false;
+	}
+	if (!ValidateEquipmentEntries(InEntries, OutDiagnostic))
+	{
+		return false;
+	}
+
+	const TArray<FPRProfileEquipmentEntry> PreviousEntries = EquipmentEntries;
+	UPRAttributeSet* AttributeSet = PlayerState->GetAttributeSet();
+	const float PreviousMaxHealth = AttributeSet ? AttributeSet->GetMaxHealth() : 0.0f;
+	const float PreviousHealthFraction = PreviousMaxHealth > KINDA_SMALL_NUMBER
+		? FMath::Clamp(AttributeSet->GetHealth() / PreviousMaxHealth, 0.0f, 1.0f)
+		: 1.0f;
+	ClearGrantedHandles();
+	EquipmentEntries = InEntries;
+	RebuildPublicAppearanceEntries();
+	if (!RefreshGrantedHandles())
+	{
+		ClearGrantedHandles();
+		EquipmentEntries = PreviousEntries;
+		RebuildPublicAppearanceEntries();
+		FString RestoreDiagnostic;
+		if (!RefreshGrantedHandles())
+		{
+			OutDiagnostic = TEXT("Equipment grant replacement failed and the previous grants could not be restored.");
+			return false;
+		}
+		OutDiagnostic = TEXT("Equipment grant replacement failed; the previous equipment state was restored.");
+		return false;
+	}
+	if (AttributeSet && PreviousMaxHealth > KINDA_SMALL_NUMBER
+		&& GetAbilitySystemComponent() && GetAbilitySystemComponent()->GetOwnerActor())
+	{
+		AttributeSet->SetHealth(FMath::Clamp(PreviousHealthFraction * AttributeSet->GetMaxHealth(), 0.0f, AttributeSet->GetMaxHealth()));
+	}
+	RefreshVisualActors();
+
+	NotifyEquipmentChanged();
+	return true;
+}
+
+bool UPREquipmentComponent::RefreshGrantedHandles()
+{
+	APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
+	UPRAbilitySystemComponent* AbilitySystemComponent = GetAbilitySystemComponent();
+	if (!PlayerState || !PlayerState->HasAuthority() || !AbilitySystemComponent)
+	{
+		return false;
+	}
+	if (HasMatchingGrantedHandles())
+	{
+		return true;
+	}
+
+	ClearGrantedHandles();
+	TMap<FGuid, FPREquipmentRuntimeHandles> CandidateHandles;
+	for (const FPRProfileEquipmentEntry& Entry : EquipmentEntries)
+	{
+		const UPREquipmentDataAsset* Definition = ResolveEquipmentDefinition(Entry.Item);
+		if (!Definition)
+		{
+			// Unknown legacy definitions remain persisted but cannot grant runtime gameplay.
+			continue;
+		}
+		if (Definition->EquipmentSlot == EPREquipmentSlot::None || GetSlotId(Definition->EquipmentSlot) != Entry.SlotId)
+		{
+			for (const TPair<FGuid, FPREquipmentRuntimeHandles>& Pair : CandidateHandles)
+			{
+				RemoveHandles(Pair.Value);
+			}
+			return false;
+		}
+
+		FPREquipmentRuntimeHandles Handles;
+		if (!ApplyGrantsForEntry(Entry, Definition, Handles))
+		{
+			RemoveHandles(Handles);
+			for (const TPair<FGuid, FPREquipmentRuntimeHandles>& Pair : CandidateHandles)
+			{
+				RemoveHandles(Pair.Value);
+			}
+			return false;
+		}
+		CandidateHandles.Add(Entry.Item.InstanceGuid, MoveTemp(Handles));
+	}
+
+	RuntimeHandlesByInstance = MoveTemp(CandidateHandles);
+	return true;
+}
+
+void UPREquipmentComponent::ClearGrantedHandles()
+{
+	for (const TPair<FGuid, FPREquipmentRuntimeHandles>& Pair : RuntimeHandlesByInstance)
+	{
+		RemoveHandles(Pair.Value);
+	}
+	RuntimeHandlesByInstance.Reset();
+}
+
+void UPREquipmentComponent::CopyRuntimeStateFrom(const UPREquipmentComponent* SourceComponent)
+{
+	if (!SourceComponent)
+	{
+		return;
+	}
+	ClearGrantedHandles();
+	EquipmentEntries = SourceComponent->EquipmentEntries;
+	PublicAppearanceEntries = SourceComponent->PublicAppearanceEntries;
+	RuntimeHandlesByInstance.Reset();
+	NotifyEquipmentChanged();
+}
+
+void UPREquipmentComponent::HandleAvatarChanged()
+{
+	if (GetOwner() && GetOwner()->HasAuthority())
+	{
+		RefreshGrantedHandles();
+		RefreshVisualActors();
+	}
+}
+
+bool UPREquipmentComponent::ValidateEquipmentEntries(const TArray<FPRProfileEquipmentEntry>& InEntries, FString& OutDiagnostic) const
+{
+	TSet<FName> SeenSlots;
+	TSet<FGuid> SeenInstances;
+	for (const FPRProfileEquipmentEntry& Entry : InEntries)
+	{
+		const UPREquipmentDataAsset* Definition = ResolveEquipmentDefinition(Entry.Item);
+		const bool bKnownDefinitionWithoutIdentity = Definition && !Entry.Item.HasValidIdentity();
+		if (Entry.SlotId.IsNone() || !Entry.Item.IsValid() || bKnownDefinitionWithoutIdentity
+			|| SeenSlots.Contains(Entry.SlotId)
+			|| (Entry.Item.HasValidIdentity() && SeenInstances.Contains(Entry.Item.InstanceGuid)))
+		{
+			OutDiagnostic = TEXT("Equipment entries contain an invalid, duplicate slot, or duplicate instance identity.");
+			return false;
+		}
+		SeenSlots.Add(Entry.SlotId);
+		if (Entry.Item.HasValidIdentity())
+		{
+			SeenInstances.Add(Entry.Item.InstanceGuid);
+		}
+	}
+	return true;
+}
+
+bool UPREquipmentComponent::HasMatchingGrantedHandles() const
+{
+	UPRAbilitySystemComponent* AbilitySystemComponent = GetAbilitySystemComponent();
+	if (!AbilitySystemComponent)
+	{
+		return false;
+	}
+	int32 KnownDefinitionCount = 0;
+	for (const FPRProfileEquipmentEntry& Entry : EquipmentEntries)
+	{
+		if (ResolveEquipmentDefinition(Entry.Item))
+		{
+			++KnownDefinitionCount;
+			const FPREquipmentRuntimeHandles* Handles = RuntimeHandlesByInstance.Find(Entry.Item.InstanceGuid);
+			if (!Handles)
+			{
+				return false;
+			}
+			for (const FActiveGameplayEffectHandle& Handle : Handles->ActiveEffectHandles)
+			{
+				if (!Handle.IsValid() || !AbilitySystemComponent->GetActiveGameplayEffect(Handle))
+				{
+					return false;
+				}
+			}
+			for (const FGameplayAbilitySpecHandle& Handle : Handles->GrantedAbilityHandles)
+			{
+				if (!Handle.IsValid() || !AbilitySystemComponent->FindAbilitySpecFromHandle(Handle))
+				{
+					return false;
+				}
+			}
+		}
+	}
+	return RuntimeHandlesByInstance.Num() == KnownDefinitionCount;
+}
+
+bool UPREquipmentComponent::ApplyGrantsForEntry(
+	const FPRProfileEquipmentEntry& Entry,
+	const UPREquipmentDataAsset* Definition,
+	FPREquipmentRuntimeHandles& OutHandles)
+{
+	UPRAbilitySystemComponent* AbilitySystemComponent = GetAbilitySystemComponent();
+	if (!AbilitySystemComponent || !Definition)
+	{
+		return false;
+	}
+	for (const TSubclassOf<UGameplayEffect>& EffectClass : Definition->GrantedEffects)
+	{
+		const UGameplayEffect* Effect = EffectClass ? EffectClass->GetDefaultObject<UGameplayEffect>() : nullptr;
+		if (!Effect)
+		{
+			return false;
+		}
+		FGameplayEffectContextHandle Context = AbilitySystemComponent->MakeEffectContext();
+		Context.AddSourceObject(const_cast<UPREquipmentDataAsset*>(Definition));
+		const FGameplayEffectSpecHandle SpecHandle = AbilitySystemComponent->MakeOutgoingSpec(EffectClass, FMath::Max(1, Entry.Item.Level), Context);
+		if (!SpecHandle.IsValid())
+		{
+			return false;
+		}
+		const FActiveGameplayEffectHandle ActiveHandle = AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+		if (!ActiveHandle.IsValid())
+		{
+			return false;
+		}
+		OutHandles.ActiveEffectHandles.Add(ActiveHandle);
+	}
+	for (const TSubclassOf<UGameplayAbility>& AbilityClass : Definition->GrantedAbilities)
+	{
+		if (!AbilityClass)
+		{
+			return false;
+		}
+		const FGameplayAbilitySpecHandle Handle = AbilitySystemComponent->GiveAbility(
+			FGameplayAbilitySpec(AbilityClass, FMath::Max(1, Entry.Item.Level), INDEX_NONE, const_cast<UPREquipmentDataAsset*>(Definition)));
+		if (!Handle.IsValid())
+		{
+			return false;
+		}
+		OutHandles.GrantedAbilityHandles.Add(Handle);
+	}
+	return true;
+}
+
+void UPREquipmentComponent::RemoveHandles(const FPREquipmentRuntimeHandles& Handles)
+{
+	UPRAbilitySystemComponent* AbilitySystemComponent = GetAbilitySystemComponent();
+	if (!AbilitySystemComponent)
+	{
+		return;
+	}
+	for (const FActiveGameplayEffectHandle& Handle : Handles.ActiveEffectHandles)
+	{
+		if (Handle.IsValid())
+		{
+			AbilitySystemComponent->RemoveActiveGameplayEffect(Handle);
+		}
+	}
+	for (const FGameplayAbilitySpecHandle& Handle : Handles.GrantedAbilityHandles)
+	{
+		if (Handle.IsValid() && AbilitySystemComponent->FindAbilitySpecFromHandle(Handle))
+		{
+			AbilitySystemComponent->CancelAbilityHandle(Handle);
+			AbilitySystemComponent->ClearAbility(Handle);
+		}
+	}
+}
+
+void UPREquipmentComponent::RebuildPublicAppearanceEntries()
+{
+	PublicAppearanceEntries.Reset();
+	for (const FPRProfileEquipmentEntry& Entry : EquipmentEntries)
+	{
+		if (ResolveEquipmentDefinition(Entry.Item))
+		{
+			PublicAppearanceEntries.Add({ Entry.SlotId, Entry.Item.ItemId });
+		}
+	}
+}
+
+void UPREquipmentComponent::RefreshVisualActors()
+{
+	APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
+	APRCharacter* Character = PlayerState ? Cast<APRCharacter>(PlayerState->GetPawn()) : nullptr;
+	USkeletalMeshComponent* Mesh = Character ? Character->GetMesh() : nullptr;
+	if (!PlayerState || !PlayerState->HasAuthority() || !Mesh || !GetWorld())
+	{
+		return;
+	}
+	TSet<FName> DesiredSlots;
+	for (const FPRProfileEquipmentEntry& Entry : EquipmentEntries)
+	{
+		if (Entry.SlotId == ProjectRiftEquipmentSlots::Weapon)
+		{
+			continue;
+		}
+		const UPREquipmentDataAsset* Definition = ResolveEquipmentDefinition(Entry.Item);
+		if (!Definition || !Definition->VisualActorClass)
+		{
+			continue;
+		}
+		DesiredSlots.Add(Entry.SlotId);
+		APREquipmentVisualActor* Existing = SpawnedVisualActors.FindRef(Entry.SlotId);
+		if (!Existing || Existing->GetClass() != Definition->VisualActorClass)
+		{
+			if (Existing)
+			{
+				Existing->Destroy();
+			}
+			FActorSpawnParameters SpawnParameters;
+			SpawnParameters.Owner = PlayerState;
+			SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			Existing = GetWorld()->SpawnActor<APREquipmentVisualActor>(Definition->VisualActorClass, FTransform::Identity, SpawnParameters);
+			if (!Existing)
+			{
+				continue;
+			}
+			SpawnedVisualActors.Add(Entry.SlotId, Existing);
+		}
+		Existing->AttachToComponent(Mesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, Definition->AttachmentSocket);
+		Existing->SetActorRelativeTransform(Definition->AttachmentTransform);
+	}
+	for (auto It = SpawnedVisualActors.CreateIterator(); It; ++It)
+	{
+		if (!DesiredSlots.Contains(It.Key()))
+		{
+			if (It.Value())
+			{
+				It.Value()->Destroy();
+			}
+			It.RemoveCurrent();
+		}
+	}
+}
+
+void UPREquipmentComponent::DestroyVisualActors()
+{
+	for (const TPair<FName, TObjectPtr<APREquipmentVisualActor>>& Pair : SpawnedVisualActors)
+	{
+		if (Pair.Value)
+		{
+			Pair.Value->Destroy();
+		}
+	}
+	SpawnedVisualActors.Reset();
+}
+
+void UPREquipmentComponent::NotifyEquipmentChanged()
+{
+	OnEquipmentChanged.Broadcast();
+	if (AActor* OwnerActor = GetOwner())
+	{
+		OwnerActor->ForceNetUpdate();
+	}
+}
+
+UPRAbilitySystemComponent* UPREquipmentComponent::GetAbilitySystemComponent() const
+{
+	const APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
+	return PlayerState ? PlayerState->GetProjectRiftAbilitySystemComponent() : nullptr;
+}
+
+const UPREquipmentDataAsset* UPREquipmentComponent::ResolveEquipmentDefinition(const FPRItemInstance& Item) const
+{
+	const APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
+	const UPRInventoryComponent* Inventory = PlayerState ? PlayerState->GetInventoryComponent() : nullptr;
+	return Inventory ? Cast<UPREquipmentDataAsset>(Inventory->FindItemData(Item.ItemId)) : nullptr;
+}
+
+void UPREquipmentComponent::OnRep_EquipmentEntries()
+{
+	NotifyEquipmentChanged();
+}
+
+void UPREquipmentComponent::OnRep_PublicAppearanceEntries()
+{
+	NotifyEquipmentChanged();
+}

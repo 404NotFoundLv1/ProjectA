@@ -25,6 +25,8 @@
 #include "InputMappingContext.h"
 #include "Items/PRInventoryComponent.h"
 #include "Items/PRItemDataAsset.h"
+#include "Items/PREquipmentDataAsset.h"
+#include "Items/PREquipmentComponent.h"
 #include "Items/PRItemTransactionComponent.h"
 #include "Items/PRLootTableDataAsset.h"
 #include "Items/PRLootTableLibrary.h"
@@ -583,7 +585,15 @@ void APRPlayerController::EquipInventoryWeapon(const FName ItemId)
 	FPRItemTransactionRequest Request;
 	Request.Header.TransactionId = FGuid::NewGuid();
 	Request.Header.ExpectedRevision = Transactions->GetRevision();
-	Request.Intent = EPRItemTransactionIntent::EquipPrimary;
+	if (const UPREquipmentDataAsset* EquipmentData = Cast<UPREquipmentDataAsset>(Inventory->FindItemData(Item.ItemId)))
+	{
+		Request.Intent = EPRItemTransactionIntent::Equip;
+		Request.SlotId = UPREquipmentComponent::GetSlotId(EquipmentData->EquipmentSlot);
+	}
+	else
+	{
+		Request.Intent = EPRItemTransactionIntent::EquipPrimary;
+	}
 	Request.InstanceGuid = Item.InstanceGuid;
 	Transactions->ExecuteAuthoritativeTransaction(Request);
 }
@@ -609,6 +619,32 @@ void APRPlayerController::UnequipPrimaryWeapon()
 	Transactions->ExecuteAuthoritativeTransaction(Request);
 }
 
+void APRPlayerController::UnequipEquipmentSlot(const FName SlotId)
+{
+	if (!HasAuthority())
+	{
+		ServerUnequipEquipmentSlot(SlotId);
+		return;
+	}
+	if (SlotId == ProjectRiftEquipmentSlots::Weapon)
+	{
+		UnequipPrimaryWeapon();
+		return;
+	}
+	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	UPRItemTransactionComponent* Transactions = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetItemTransactionComponent() : nullptr;
+	if (!Transactions)
+	{
+		return;
+	}
+	FPRItemTransactionRequest Request;
+	Request.Header.TransactionId = FGuid::NewGuid();
+	Request.Header.ExpectedRevision = Transactions->GetRevision();
+	Request.Intent = EPRItemTransactionIntent::Unequip;
+	Request.SlotId = SlotId;
+	Transactions->ExecuteAuthoritativeTransaction(Request);
+}
+
 void APRPlayerController::SpawnTestLoot()
 {
 	if (HasAuthority())
@@ -618,6 +654,16 @@ void APRPlayerController::SpawnTestLoot()
 	}
 
 	ServerSpawnTestLoot();
+}
+
+void APRPlayerController::GiveTestEquipmentKit()
+{
+	if (HasAuthority())
+	{
+		TryGiveTestEquipmentKitOnServer();
+		return;
+	}
+	ServerGiveTestEquipmentKit();
 }
 
 void APRPlayerController::ToggleDiagnosticsPanel()
@@ -1188,9 +1234,19 @@ void APRPlayerController::ServerUnequipPrimaryWeapon_Implementation()
 	UnequipPrimaryWeapon();
 }
 
+void APRPlayerController::ServerUnequipEquipmentSlot_Implementation(const FName SlotId)
+{
+	UnequipEquipmentSlot(SlotId);
+}
+
 void APRPlayerController::ServerSpawnTestLoot_Implementation()
 {
 	TrySpawnTestLootOnServer();
+}
+
+void APRPlayerController::ServerGiveTestEquipmentKit_Implementation()
+{
+	TryGiveTestEquipmentKitOnServer();
 }
 
 void APRPlayerController::SubmitLocalMultiplayerProfile()
@@ -1781,6 +1837,48 @@ APRPickupActor* APRPlayerController::TrySpawnTestLootOnServer(const float RollOv
 	return LootPickup;
 }
 
+bool APRPlayerController::TryGiveTestEquipmentKitOnServer()
+{
+#if UE_BUILD_SHIPPING
+	return false;
+#else
+	if (!HasAuthority())
+	{
+		return false;
+	}
+	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	UPRInventoryComponent* Inventory = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetInventoryComponent() : nullptr;
+	UPREquipmentComponent* Equipment = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetEquipmentComponent() : nullptr;
+	if (!Inventory || !Equipment)
+	{
+		return false;
+	}
+	const TArray<FName> ItemIds = { TEXT("DA_TestArmor"), TEXT("DA_TestChip"), TEXT("DA_FieldToolkit") };
+	for (const FName ItemId : ItemIds)
+	{
+		const bool bAlreadyOwned = Inventory->GetItemCount(ItemId) > 0
+			|| Equipment->GetEquipmentEntries().ContainsByPredicate([ItemId](const FPRProfileEquipmentEntry& Entry)
+			{
+				return Entry.Item.ItemId == ItemId;
+			});
+		if (bAlreadyOwned)
+		{
+			continue;
+		}
+		FPRItemInstance Item;
+		Item.InstanceGuid = FGuid::NewGuid();
+		Item.ItemId = ItemId;
+		Item.Count = 1;
+		if (!Inventory->AddItem(Item))
+		{
+			return false;
+		}
+	}
+	UE_LOG(LogProjectA, Log, TEXT("Granted v0.7.1 test equipment kit. Controller=%s"), *GetNameSafe(this));
+	return true;
+#endif
+}
+
 void APRPlayerController::RefreshLobbyReadyDebugDisplay()
 {
 	if (IsShipRepairPanelVisible() && ShipRepairWidget)
@@ -1960,6 +2058,7 @@ void APRPlayerController::CreateInventoryUI()
 		InventoryWidget->OnDropItemRequested.AddUniqueDynamic(this, &APRPlayerController::HandleInventoryDropRequested);
 		InventoryWidget->OnEquipItemRequested.AddUniqueDynamic(this, &APRPlayerController::HandleInventoryEquipRequested);
 		InventoryWidget->OnUnequipPrimaryRequested.AddUniqueDynamic(this, &APRPlayerController::HandlePrimaryWeaponUnequipRequested);
+		InventoryWidget->OnUnequipEquipmentRequested.AddUniqueDynamic(this, &APRPlayerController::HandleEquipmentUnequipRequested);
 		InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
 		InventoryWidget->AddToPlayerScreen(30);
 		InventoryWidget->SetPositionInViewport(FVector2D::ZeroVector, false);
@@ -1980,6 +2079,7 @@ void APRPlayerController::DestroyInventoryUI()
 		InventoryWidget->OnDropItemRequested.RemoveDynamic(this, &APRPlayerController::HandleInventoryDropRequested);
 		InventoryWidget->OnEquipItemRequested.RemoveDynamic(this, &APRPlayerController::HandleInventoryEquipRequested);
 		InventoryWidget->OnUnequipPrimaryRequested.RemoveDynamic(this, &APRPlayerController::HandlePrimaryWeaponUnequipRequested);
+		InventoryWidget->OnUnequipEquipmentRequested.RemoveDynamic(this, &APRPlayerController::HandleEquipmentUnequipRequested);
 		InventoryWidget->RemoveFromParent();
 		InventoryWidget = nullptr;
 	}
@@ -2451,6 +2551,11 @@ void APRPlayerController::HandleInventoryDropRequested(const FName ItemId, const
 void APRPlayerController::HandleInventoryEquipRequested(const FName ItemId)
 {
 	EquipInventoryWeapon(ItemId);
+}
+
+void APRPlayerController::HandleEquipmentUnequipRequested(const FName SlotId)
+{
+	UnequipEquipmentSlot(SlotId);
 }
 
 void APRPlayerController::HandlePrimaryWeaponUnequipRequested()

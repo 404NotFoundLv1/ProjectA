@@ -3,14 +3,14 @@
 #include "CoreMinimal.h"
 #include "Abilities/PRCombatFeedbackTypes.h"
 #include "GameplayTagContainer.h"
-#include "Items/PRItemDataAsset.h"
+#include "Items/PREquipmentDataAsset.h"
 #include "PRWeaponDataAsset.generated.h"
 
 class APRWeaponActor;
 
 /** Data-driven firearm definition stored in the existing ProjectRiftItem registry. */
 UCLASS(BlueprintType)
-class PROJECTA_API UPRWeaponDataAsset : public UPRItemDataAsset
+class PROJECTA_API UPRWeaponDataAsset : public UPREquipmentDataAsset
 {
 	GENERATED_BODY()
 

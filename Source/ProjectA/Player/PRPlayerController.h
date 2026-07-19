@@ -84,8 +84,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Equipment")
 	void UnequipPrimaryWeapon();
 
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Equipment")
+	void UnequipEquipmentSlot(FName SlotId);
+
 	UFUNCTION(BlueprintCallable, Category = "Loot|Debug")
 	void SpawnTestLoot();
+
+	/** Development-only grant for validating the v0.7.1 non-weapon equipment flow. */
+	UFUNCTION(BlueprintCallable, Category = "Equipment|Debug")
+	void GiveTestEquipmentKit();
 
 	UFUNCTION(BlueprintCallable, Category = "Diagnostics|UI")
 	void ToggleDiagnosticsPanel();
@@ -213,8 +220,14 @@ public:
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Inventory|Equipment")
 	void ServerUnequipPrimaryWeapon();
 
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Inventory|Equipment")
+	void ServerUnequipEquipmentSlot(FName SlotId);
+
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Loot|Debug")
 	void ServerSpawnTestLoot();
+
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Equipment|Debug")
+	void ServerGiveTestEquipmentKit();
 
 	UFUNCTION(BlueprintCallable, Category = "Lobby|Profile")
 	void SubmitLocalMultiplayerProfile();
@@ -270,6 +283,7 @@ public:
 	bool TryUseInventoryItemOnServer(FName ItemId);
 	bool TryDropInventoryItemOnServer(FName ItemId, int32 Count);
 	APRPickupActor* TrySpawnTestLootOnServer(float RollOverride = -1.0f);
+	bool TryGiveTestEquipmentKitOnServer();
 
 protected:
 	virtual void BeginPlay() override;
@@ -321,6 +335,9 @@ private:
 
 	UFUNCTION()
 	void HandlePrimaryWeaponUnequipRequested();
+
+	UFUNCTION()
+	void HandleEquipmentUnequipRequested(FName SlotId);
 
 	bool CanServerPickup(APRPickupActor* PickupActor, FString* OutFailureReason = nullptr) const;
 	bool TryBeginReviveOnServer(APRCharacter* TargetCharacter);

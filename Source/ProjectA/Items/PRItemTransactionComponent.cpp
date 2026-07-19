@@ -1,6 +1,8 @@
 #include "Items/PRItemTransactionComponent.h"
 
 #include "Items/PRInventoryComponent.h"
+#include "Items/PREquipmentComponent.h"
+#include "Items/PREquipmentDataAsset.h"
 #include "Items/PRPickupActor.h"
 #include "Net/UnrealNetwork.h"
 #include "Player/PRPlayerState.h"
@@ -330,6 +332,139 @@ FPRItemTransactionResult UPRItemTransactionComponent::ResolveRequest(const FPRIt
 		Result.Status = EPRItemTransactionStatus::Success;
 		Result.CurrentRevision = ++Revision;
 		Result.Diagnostic = TEXT("Authoritative primary weapon equipment transaction committed.");
+		CacheFinalResult(Result);
+		if (AActor* OwnerActor = GetOwner())
+		{
+			OwnerActor->ForceNetUpdate();
+		}
+		return Result;
+	}
+	if (Request.Intent == EPRItemTransactionIntent::Equip || Request.Intent == EPRItemTransactionIntent::Unequip)
+	{
+		APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
+		UPRInventoryComponent* Inventory = PlayerState ? PlayerState->GetInventoryComponent() : nullptr;
+		UPREquipmentComponent* Equipment = PlayerState ? PlayerState->GetEquipmentComponent() : nullptr;
+		UPRWeaponComponent* Weapon = PlayerState ? PlayerState->GetWeaponComponent() : nullptr;
+		if (!Inventory || !Equipment || Request.SlotId.IsNone())
+		{
+			Result.Status = EPRItemTransactionStatus::InvalidState;
+			Result.Diagnostic = TEXT("The authoritative inventory or equipment slots are unavailable.");
+			CacheFinalResult(Result);
+			return Result;
+		}
+		if (Request.SlotId == ProjectRiftEquipmentSlots::Weapon)
+		{
+			FPRItemTransactionRequest LegacyRequest = Request;
+			LegacyRequest.Intent = Request.Intent == EPRItemTransactionIntent::Equip
+				? EPRItemTransactionIntent::EquipPrimary : EPRItemTransactionIntent::UnequipPrimary;
+			return ResolveRequest(LegacyRequest);
+		}
+		if (Request.SlotId != ProjectRiftEquipmentSlots::Armor && Request.SlotId != ProjectRiftEquipmentSlots::Chip
+			&& Request.SlotId != ProjectRiftEquipmentSlots::Tool)
+		{
+			Result.Status = EPRItemTransactionStatus::InvalidRequest;
+			Result.Diagnostic = TEXT("The requested equipment slot is not supported.");
+			CacheFinalResult(Result);
+			return Result;
+		}
+
+		const TArray<FPRItemInstance> PreviousInventory = Inventory->GetInventoryItems();
+		const TArray<FPRProfileEquipmentEntry> PreviousEquipment = Equipment->GetEquipmentEntries();
+		TArray<FPRItemInstance> CandidateInventory = PreviousInventory;
+		TArray<FPRProfileEquipmentEntry> CandidateEquipment = PreviousEquipment;
+		FPRItemInstance ChangedItem;
+		if (Request.Intent == EPRItemTransactionIntent::Equip)
+		{
+			if (!Request.InstanceGuid.IsValid())
+			{
+				Result.Status = EPRItemTransactionStatus::InvalidRequest;
+				Result.Diagnostic = TEXT("Equipping requires an item instance identity.");
+				CacheFinalResult(Result);
+				return Result;
+			}
+			const int32 SourceIndex = CandidateInventory.IndexOfByPredicate([&Request](const FPRItemInstance& Item) { return Item.InstanceGuid == Request.InstanceGuid; });
+			if (SourceIndex == INDEX_NONE)
+			{
+				Result.Status = EPRItemTransactionStatus::NotFound;
+				Result.Diagnostic = TEXT("The requested equipment instance is not in the authoritative inventory.");
+				CacheFinalResult(Result);
+				return Result;
+			}
+			ChangedItem = CandidateInventory[SourceIndex];
+			UPREquipmentDataAsset* Definition = Cast<UPREquipmentDataAsset>(Inventory->FindItemData(ChangedItem.ItemId));
+			if (!Definition || !Definition->bCanEquip || UPREquipmentComponent::GetSlotId(Definition->EquipmentSlot) != Request.SlotId)
+			{
+				Result.Status = EPRItemTransactionStatus::InvalidRequest;
+				Result.Diagnostic = TEXT("The item definition does not match the requested equipment slot.");
+				CacheFinalResult(Result);
+				return Result;
+			}
+			if (ChangedItem.Count != 1)
+			{
+				Result.Status = EPRItemTransactionStatus::InvalidRequest;
+				Result.Diagnostic = TEXT("Equipment instances must occupy a single-item inventory stack.");
+				CacheFinalResult(Result);
+				return Result;
+			}
+			CandidateInventory.RemoveAt(SourceIndex);
+			const int32 ExistingSlotIndex = CandidateEquipment.IndexOfByPredicate([&Request](const FPRProfileEquipmentEntry& Entry) { return Entry.SlotId == Request.SlotId; });
+			if (ExistingSlotIndex != INDEX_NONE)
+			{
+				if (!Inventory->CanAddItem(CandidateEquipment[ExistingSlotIndex].Item))
+				{
+					Result.Status = EPRItemTransactionStatus::CapacityExceeded;
+					Result.Diagnostic = TEXT("The replaced equipment cannot return to the inventory.");
+					CacheFinalResult(Result);
+					return Result;
+				}
+				CandidateInventory.Add(CandidateEquipment[ExistingSlotIndex].Item);
+				CandidateEquipment.RemoveAt(ExistingSlotIndex);
+			}
+			CandidateEquipment.Emplace(Request.SlotId, ChangedItem);
+		}
+		else
+		{
+			const int32 EquippedIndex = CandidateEquipment.IndexOfByPredicate([&Request](const FPRProfileEquipmentEntry& Entry) { return Entry.SlotId == Request.SlotId; });
+			if (EquippedIndex == INDEX_NONE)
+			{
+				Result.Status = EPRItemTransactionStatus::NotFound;
+				Result.Diagnostic = TEXT("No item is equipped in the requested slot.");
+				CacheFinalResult(Result);
+				return Result;
+			}
+			ChangedItem = CandidateEquipment[EquippedIndex].Item;
+			if (!Inventory->CanAddItem(ChangedItem))
+			{
+				Result.Status = EPRItemTransactionStatus::CapacityExceeded;
+				Result.Diagnostic = TEXT("The equipped item cannot return to the inventory.");
+				CacheFinalResult(Result);
+				return Result;
+			}
+			CandidateEquipment.RemoveAt(EquippedIndex);
+			CandidateInventory.Add(ChangedItem);
+		}
+
+		FString Diagnostic;
+		if (!Inventory->ReplaceInventoryItems(CandidateInventory) || !Equipment->ReplaceEquipmentEntries(CandidateEquipment, Diagnostic))
+		{
+			Inventory->ReplaceInventoryItems(PreviousInventory);
+			Equipment->ReplaceEquipmentEntries(PreviousEquipment, Diagnostic);
+			Result.Status = EPRItemTransactionStatus::InternalFailure;
+			Result.Diagnostic = TEXT("The equipment transaction did not commit and was restored.");
+			CacheFinalResult(Result);
+			return Result;
+		}
+		Result.Status = EPRItemTransactionStatus::Success;
+		Result.CurrentRevision = ++Revision;
+		if (Request.Intent == EPRItemTransactionIntent::Equip)
+		{
+			Result.RemovedInstanceGuids.Add(ChangedItem.InstanceGuid);
+		}
+		else
+		{
+			Result.CreatedInstanceGuids.Add(ChangedItem.InstanceGuid);
+		}
+		Result.Diagnostic = TEXT("Authoritative equipment transaction committed.");
 		CacheFinalResult(Result);
 		if (AActor* OwnerActor = GetOwner())
 		{

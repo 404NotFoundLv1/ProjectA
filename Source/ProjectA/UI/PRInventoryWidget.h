@@ -8,6 +8,7 @@
 class SScrollBox;
 class STextBlock;
 class UPRItemDataAsset;
+class UPREquipmentComponent;
 class UPRInventoryComponent;
 class UPRWeaponComponent;
 class UTexture2D;
@@ -16,6 +17,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPRInventoryItemUseRequestedSignatur
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPRInventoryItemDropRequestedSignature, FName, ItemId, int32, Count);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPRInventoryItemEquipRequestedSignature, FName, ItemId);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPRInventoryPrimaryUnequipRequestedSignature);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPRInventoryEquipmentUnequipRequestedSignature, FName, SlotId);
 
 /**
  * Lightweight runtime inventory panel backed by the replicated owner inventory.
@@ -71,6 +73,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory|Equipment")
 	FText GetPrimaryWeaponSummaryText() const;
 
+	UFUNCTION(BlueprintPure, Category = "Inventory|Equipment")
+	FText GetEquipmentSummaryText() const;
+
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	void RequestUseSelectedItem();
 
@@ -89,6 +94,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Equipment")
 	void RequestUnequipPrimaryWeapon();
 
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Equipment")
+	void RequestUnequipEquipmentSlot(FName SlotId);
+
 	UPROPERTY(BlueprintAssignable, Category = "Inventory|UI")
 	FPRInventoryItemUseRequestedSignature OnUseItemRequested;
 
@@ -100,6 +108,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Inventory|Equipment")
 	FPRInventoryPrimaryUnequipRequestedSignature OnUnequipPrimaryRequested;
+
+	UPROPERTY(BlueprintAssignable, Category = "Inventory|Equipment")
+	FPRInventoryEquipmentUnequipRequestedSignature OnUnequipEquipmentRequested;
 
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
@@ -113,16 +124,22 @@ private:
 	UFUNCTION()
 	void HandleWeaponStateChanged();
 
+	UFUNCTION()
+	void HandleEquipmentChanged();
+
 	FReply HandleItemClicked(int32 ItemIndex);
 	FReply HandleUseSelectedClicked();
 	FReply HandleDropSelectedClicked();
 	FReply HandleEquipSelectedClicked();
 	FReply HandleUnequipPrimaryClicked();
+	FReply HandleUnequipEquipmentSlotClicked(FName SlotId);
 	void RebuildItemList();
 	void RefreshSelectedItemDetails();
 	void RefreshShipResourceSummary();
 	void RefreshPrimaryWeaponSummary();
+	void RefreshEquipmentSummary();
 	UPRWeaponComponent* GetBoundWeaponComponent() const;
+	UPREquipmentComponent* GetBoundEquipmentComponent() const;
 	UPRItemDataAsset* FindItemData(const FPRItemInstance& Item) const;
 	FString BuildItemSummary(const FPRItemInstance& Item) const;
 	FText BuildSelectedItemDetails() const;
@@ -138,4 +155,5 @@ private:
 	TSharedPtr<STextBlock> DetailTextBlock;
 	TSharedPtr<STextBlock> ShipResourceSummaryTextBlock;
 	TSharedPtr<STextBlock> PrimaryWeaponSummaryTextBlock;
+	TSharedPtr<STextBlock> EquipmentSummaryTextBlock;
 };

@@ -4,6 +4,7 @@
 #include "Abilities/PRAttributeSet.h"
 #include "Deployables/PRDeployableComponent.h"
 #include "Items/PRInventoryComponent.h"
+#include "Items/PREquipmentComponent.h"
 #include "Items/PRItemTransactionComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "ProjectA.h"
@@ -46,6 +47,7 @@ APRPlayerState::APRPlayerState()
 	AttributeSet = CreateDefaultSubobject<UPRAttributeSet>(TEXT("AttributeSet"));
 	InventoryComponent = CreateDefaultSubobject<UPRInventoryComponent>(TEXT("InventoryComponent"));
 	ItemTransactionComponent = CreateDefaultSubobject<UPRItemTransactionComponent>(TEXT("ItemTransactionComponent"));
+	EquipmentComponent = CreateDefaultSubobject<UPREquipmentComponent>(TEXT("EquipmentComponent"));
 	WeaponComponent = CreateDefaultSubobject<UPRWeaponComponent>(TEXT("WeaponComponent"));
 	RoleComponent = CreateDefaultSubobject<UPRRoleComponent>(TEXT("RoleComponent"));
 	DeployableComponent = CreateDefaultSubobject<UPRDeployableComponent>(TEXT("DeployableComponent"));
@@ -580,6 +582,10 @@ void APRPlayerState::CopyProjectRiftStateFrom(const APRPlayerState* SourcePlayer
 	if (ItemTransactionComponent && SourcePlayerState->ItemTransactionComponent)
 	{
 		ItemTransactionComponent->CopyRuntimeStateFrom(SourcePlayerState->ItemTransactionComponent);
+	}
+	if (EquipmentComponent && SourcePlayerState->EquipmentComponent)
+	{
+		EquipmentComponent->CopyRuntimeStateFrom(SourcePlayerState->EquipmentComponent);
 	}
 	if (WeaponComponent && SourcePlayerState->WeaponComponent)
 	{
