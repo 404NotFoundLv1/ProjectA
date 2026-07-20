@@ -196,7 +196,7 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	{
 		TestEqual(TEXT("Game default map is ship lobby"), Maps->GetGameDefaultMap(), FString(TEXT("/Game/ProjectRift/Maps/L_ShipLobby")));
 		TestEqual(TEXT("Project name is ProjectRift"), Project->ProjectName, FString(TEXT("ProjectRift")));
-		TestEqual(TEXT("Project version is v0.7.3"), Project->ProjectVersion, FString(TEXT("0.7.3")));
+		TestEqual(TEXT("Project version is v0.7.4"), Project->ProjectVersion, FString(TEXT("0.7.4")));
 	}
 
 	TArray<FString> MapsToCook;

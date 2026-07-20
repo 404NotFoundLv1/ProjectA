@@ -6,6 +6,7 @@
 #include "Items/PRInventoryComponent.h"
 #include "Items/PREquipmentComponent.h"
 #include "Items/PRItemTransactionComponent.h"
+#include "Items/PRQuickbarComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "ProjectA.h"
 #include "Progression/PRMissionProgressionDataAsset.h"
@@ -51,6 +52,7 @@ APRPlayerState::APRPlayerState()
 	WeaponComponent = CreateDefaultSubobject<UPRWeaponComponent>(TEXT("WeaponComponent"));
 	RoleComponent = CreateDefaultSubobject<UPRRoleComponent>(TEXT("RoleComponent"));
 	DeployableComponent = CreateDefaultSubobject<UPRDeployableComponent>(TEXT("DeployableComponent"));
+	QuickbarComponent = CreateDefaultSubobject<UPRQuickbarComponent>(TEXT("QuickbarComponent"));
 }
 
 void APRPlayerState::BeginPlay()
@@ -255,6 +257,11 @@ bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjectio
 	{
 		ItemTransactionComponent->ResetForNewProfileBinding();
 	}
+	if (QuickbarComponent)
+	{
+		QuickbarComponent->ResetForNewProfileBinding();
+		QuickbarComponent->SetQuickSlotsFromProfile(Projection.QuickSlots);
+	}
 	BoundProfileId = Projection.ProfileId;
 	bMultiplayerProfileBound = true;
 	BoundStoryProgress = Projection.Story;
@@ -281,6 +288,10 @@ void APRPlayerState::ClearMultiplayerProfileBinding()
 	if (ItemTransactionComponent)
 	{
 		ItemTransactionComponent->ResetForNewProfileBinding();
+	}
+	if (QuickbarComponent)
+	{
+		QuickbarComponent->ResetForNewProfileBinding();
 	}
 	BoundStoryProgress = FPRProfileStoryProgress();
 	BoundShipModules.Reset();
@@ -606,6 +617,10 @@ void APRPlayerState::CopyProjectRiftStateFrom(const APRPlayerState* SourcePlayer
 	if (RoleComponent && SourcePlayerState->RoleComponent)
 	{
 		RoleComponent->CopyRuntimeStateFrom(SourcePlayerState->RoleComponent);
+	}
+	if (QuickbarComponent && SourcePlayerState->QuickbarComponent)
+	{
+		QuickbarComponent->CopyRuntimeStateFrom(SourcePlayerState->QuickbarComponent);
 	}
 	SelectedRoleModule = SourcePlayerState->SelectedRoleModule;
 	PlayerDisplayName = SourcePlayerState->PlayerDisplayName;

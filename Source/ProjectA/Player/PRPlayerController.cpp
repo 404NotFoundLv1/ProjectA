@@ -25,6 +25,7 @@
 #include "InputMappingContext.h"
 #include "Items/PRInventoryComponent.h"
 #include "Items/PRItemDataAsset.h"
+#include "Items/PRQuickbarComponent.h"
 #include "Items/PREquipmentDataAsset.h"
 #include "Items/PREquipmentComponent.h"
 #include "Items/PRItemTransactionComponent.h"
@@ -46,6 +47,7 @@
 #include "UI/PRRoleLoadoutWidget.h"
 #include "UI/PRShipRepairWidget.h"
 #include "UI/PRWeaponHUDWidget.h"
+#include "UI/PRQuickbarHUDWidget.h"
 #include "Roles/PRRoleComponent.h"
 #include "Roles/PRRoleDataAsset.h"
 #include "Roles/PRRoleModuleDataAsset.h"
@@ -155,6 +157,7 @@ APRPlayerController::APRPlayerController()
 
 	InventoryWidgetClass = UPRInventoryWidget::StaticClass();
 	WeaponHUDWidgetClass = UPRWeaponHUDWidget::StaticClass();
+	QuickbarHUDWidgetClass = UPRQuickbarHUDWidget::StaticClass();
 	RiftSettlementWidgetClass = UPRRiftSettlementWidget::StaticClass();
 	ShipRepairWidgetClass = UPRShipRepairWidget::StaticClass();
 	RoleLoadoutWidgetClass = UPRRoleLoadoutWidget::StaticClass();
@@ -201,6 +204,7 @@ void APRPlayerController::BeginPlay()
 
 		CreateInventoryUI();
 		CreateWeaponHUD();
+		CreateQuickbarHUD();
 		CreateRiftSettlementUI();
 		CreateShipRepairUI();
 		CreateRoleLoadoutUI();
@@ -225,6 +229,7 @@ void APRPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	DestroyRoleLoadoutUI();
 	DestroyInventoryUI();
 	DestroyWeaponHUD();
+	DestroyQuickbarHUD();
 	DestroyDiagnosticsUI();
 	DestroyLobbyReadyDebugHUD();
 	DestroyGASDebugHUD();
@@ -240,7 +245,14 @@ void APRPlayerController::SetupInputComponent()
 
 	if (InputComponent)
 	{
-		InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APRPlayerController::SelectAssaultRoleModule);
+		InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APRPlayerController::UseQuickbarSlot1);
+		InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &APRPlayerController::UseQuickbarSlot2);
+		InputComponent->BindKey(EKeys::Three, IE_Pressed, this, &APRPlayerController::UseQuickbarSlot3);
+		InputComponent->BindKey(EKeys::Four, IE_Pressed, this, &APRPlayerController::UseQuickbarSlot4);
+		InputComponent->BindKey(EKeys::Gamepad_DPad_Up, IE_Pressed, this, &APRPlayerController::UseQuickbarSlot1);
+		InputComponent->BindKey(EKeys::Gamepad_DPad_Right, IE_Pressed, this, &APRPlayerController::UseQuickbarSlot2);
+		InputComponent->BindKey(EKeys::Gamepad_DPad_Down, IE_Pressed, this, &APRPlayerController::UseQuickbarSlot3);
+		InputComponent->BindKey(EKeys::Gamepad_DPad_Left, IE_Pressed, this, &APRPlayerController::UseQuickbarSlot4);
 		InputComponent->BindKey(EKeys::P, IE_Pressed, this, &APRPlayerController::ToggleReady);
 		InputComponent->BindKey(EKeys::O, IE_Pressed, this, &APRPlayerController::StartRiftMission);
 		InputComponent->BindKey(EKeys::C, IE_Pressed, this, &APRPlayerController::ToggleRoleLoadoutPanel);
@@ -261,6 +273,26 @@ void APRPlayerController::CancelPendingDeployable()
 	if (Deployables && Deployables->GetPlacementState().bPending)
 	{
 		ServerCancelDeployable();
+	}
+}
+
+void APRPlayerController::UseQuickbarSlot1() { UseQuickbarSlot(0); }
+void APRPlayerController::UseQuickbarSlot2() { UseQuickbarSlot(1); }
+void APRPlayerController::UseQuickbarSlot3() { UseQuickbarSlot(2); }
+void APRPlayerController::UseQuickbarSlot4() { UseQuickbarSlot(3); }
+
+void APRPlayerController::UseQuickbarSlot(const int32 SlotIndex)
+{
+	if (APRCharacter* ProjectRiftCharacter = Cast<APRCharacter>(GetPawn()))
+	{
+		switch (SlotIndex)
+		{
+		case 0: ProjectRiftCharacter->DoQuickbarSlot1(); break;
+		case 1: ProjectRiftCharacter->DoQuickbarSlot2(); break;
+		case 2: ProjectRiftCharacter->DoQuickbarSlot3(); break;
+		case 3: ProjectRiftCharacter->DoQuickbarSlot4(); break;
+		default: break;
+		}
 	}
 }
 
@@ -1627,64 +1659,33 @@ bool APRPlayerController::TryUseInventoryItemOnServer(const FName ItemId)
 		return false;
 	}
 
-	FString FailureReason;
-	if (!CanUseInventoryItemOnServer(ItemId, &FailureReason))
-	{
-		UE_LOG(
-			LogProjectA,
-			Log,
-			TEXT("Inventory item use rejected. Controller=%s ItemId=%s Reason=%s"),
-			*GetNameSafe(this),
-			*ItemId.ToString(),
-			*FailureReason);
-		return false;
-	}
-
 	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
-	UPRAbilitySystemComponent* AbilitySystemComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetProjectRiftAbilitySystemComponent() : nullptr;
 	UPRInventoryComponent* InventoryComponent = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetInventoryComponent() : nullptr;
-	UPRItemTransactionComponent* Transactions = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetItemTransactionComponent() : nullptr;
-	const TSubclassOf<UGameplayEffect> ConsumableEffectClass = ResolveConsumableEffectClass(ItemId);
+	UPRQuickbarComponent* Quickbar = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetQuickbarComponent() : nullptr;
 	FPRItemInstance ConsumedItem;
-	if (!AbilitySystemComponent || !InventoryComponent || !Transactions || !ConsumableEffectClass
+	if (!Quickbar || !InventoryComponent
 		|| !FindInventoryItemById(InventoryComponent, ItemId, ConsumedItem) || !ConsumedItem.HasValidIdentity())
 	{
-		UE_LOG(LogProjectA, Warning, TEXT("Inventory item use failed after validation for %s."), *ItemId.ToString());
+		UE_LOG(LogProjectA, Warning, TEXT("Inventory item use failed because the source item or timed-use service is unavailable for %s."), *ItemId.ToString());
 		return false;
 	}
-	FPRItemTransactionRequest Request;
-	Request.Header.TransactionId = FGuid::NewGuid();
-	Request.Header.ExpectedRevision = Transactions->GetRevision();
-	Request.Intent = EPRItemTransactionIntent::Use;
-	Request.InstanceGuid = ConsumedItem.InstanceGuid;
-	Request.Count = 1;
-	const FPRItemTransactionResult TransactionResult = Transactions->ExecuteAuthoritativeTransaction(Request);
-	if (TransactionResult.Status != EPRItemTransactionStatus::Success)
+	if (!Quickbar->RequestUseInstance(ConsumedItem.InstanceGuid))
 	{
 		UE_LOG(
 			LogProjectA,
 			Log,
-			TEXT("Inventory item use transaction rejected. Controller=%s ItemId=%s Status=%d Diagnostic=%s"),
+			TEXT("Inventory item timed use rejected. Controller=%s ItemId=%s"),
 			*GetNameSafe(this),
-			*ItemId.ToString(),
-			static_cast<int32>(TransactionResult.Status),
-			*TransactionResult.Diagnostic);
+			*ItemId.ToString());
 		return false;
 	}
-
-	const UGameplayEffect* ConsumableEffect = ConsumableEffectClass->GetDefaultObject<UGameplayEffect>();
-	FGameplayEffectContextHandle EffectContext = AbilitySystemComponent->MakeEffectContext();
-	EffectContext.AddSourceObject(this);
-	AbilitySystemComponent->ApplyGameplayEffectToSelf(ConsumableEffect, 1.0f, EffectContext);
 
 	UE_LOG(
 		LogProjectA,
 		Log,
-		TEXT("Inventory item used. Controller=%s ItemId=%s Remaining=%d Effect=%s"),
+		TEXT("Inventory item timed use started. Controller=%s ItemId=%s"),
 		*GetNameSafe(this),
-		*ItemId.ToString(),
-		InventoryComponent->GetItemCount(ItemId),
-		*GetNameSafe(ConsumableEffect));
+		*ItemId.ToString());
 
 	return true;
 }
@@ -2058,6 +2059,8 @@ void APRPlayerController::CreateInventoryUI()
 		InventoryWidget->OnUseItemRequested.AddUniqueDynamic(this, &APRPlayerController::HandleInventoryUseRequested);
 		InventoryWidget->OnDropItemRequested.AddUniqueDynamic(this, &APRPlayerController::HandleInventoryDropRequested);
 		InventoryWidget->OnEquipItemRequested.AddUniqueDynamic(this, &APRPlayerController::HandleInventoryEquipRequested);
+		InventoryWidget->OnQuickbarAssignRequested.AddUniqueDynamic(this, &APRPlayerController::HandleQuickbarAssignRequested);
+		InventoryWidget->OnQuickbarClearRequested.AddUniqueDynamic(this, &APRPlayerController::HandleQuickbarClearRequested);
 		InventoryWidget->OnUnequipPrimaryRequested.AddUniqueDynamic(this, &APRPlayerController::HandlePrimaryWeaponUnequipRequested);
 		InventoryWidget->OnUnequipEquipmentRequested.AddUniqueDynamic(this, &APRPlayerController::HandleEquipmentUnequipRequested);
 		InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
@@ -2079,6 +2082,8 @@ void APRPlayerController::DestroyInventoryUI()
 		InventoryWidget->OnUseItemRequested.RemoveDynamic(this, &APRPlayerController::HandleInventoryUseRequested);
 		InventoryWidget->OnDropItemRequested.RemoveDynamic(this, &APRPlayerController::HandleInventoryDropRequested);
 		InventoryWidget->OnEquipItemRequested.RemoveDynamic(this, &APRPlayerController::HandleInventoryEquipRequested);
+		InventoryWidget->OnQuickbarAssignRequested.RemoveDynamic(this, &APRPlayerController::HandleQuickbarAssignRequested);
+		InventoryWidget->OnQuickbarClearRequested.RemoveDynamic(this, &APRPlayerController::HandleQuickbarClearRequested);
 		InventoryWidget->OnUnequipPrimaryRequested.RemoveDynamic(this, &APRPlayerController::HandlePrimaryWeaponUnequipRequested);
 		InventoryWidget->OnUnequipEquipmentRequested.RemoveDynamic(this, &APRPlayerController::HandleEquipmentUnequipRequested);
 		InventoryWidget->RemoveFromParent();
@@ -2122,6 +2127,38 @@ void APRPlayerController::DestroyWeaponHUD()
 	{
 		WeaponHUDWidget->RemoveFromParent();
 		WeaponHUDWidget = nullptr;
+	}
+}
+
+void APRPlayerController::CreateQuickbarHUD()
+{
+	if (!IsLocalPlayerController() || QuickbarHUDWidget)
+	{
+		return;
+	}
+	if (!QuickbarHUDWidgetClass)
+	{
+		QuickbarHUDWidgetClass = UPRQuickbarHUDWidget::StaticClass();
+	}
+	QuickbarHUDWidget = CreateWidget<UPRQuickbarHUDWidget>(this, QuickbarHUDWidgetClass);
+	if (!QuickbarHUDWidget)
+	{
+		return;
+	}
+	QuickbarHUDWidget->InitializeForController(this);
+	QuickbarHUDWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+	QuickbarHUDWidget->AddToPlayerScreen(24);
+	QuickbarHUDWidget->SetPositionInViewport(FVector2D(24.0f, 980.0f), false);
+	QuickbarHUDWidget->SetAnchorsInViewport(FAnchors(0.0f, 0.0f));
+	QuickbarHUDWidget->SetAlignmentInViewport(FVector2D::ZeroVector);
+}
+
+void APRPlayerController::DestroyQuickbarHUD()
+{
+	if (QuickbarHUDWidget)
+	{
+		QuickbarHUDWidget->RemoveFromParent();
+		QuickbarHUDWidget = nullptr;
 	}
 }
 
@@ -2552,6 +2589,28 @@ void APRPlayerController::HandleInventoryDropRequested(const FName ItemId, const
 void APRPlayerController::HandleInventoryEquipRequested(const FName ItemId)
 {
 	EquipInventoryWeapon(ItemId);
+}
+
+void APRPlayerController::HandleQuickbarAssignRequested(const int32 SlotIndex, const FGuid InstanceGuid)
+{
+	if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
+	{
+		if (UPRQuickbarComponent* Quickbar = ProjectRiftPlayerState->GetQuickbarComponent())
+		{
+			Quickbar->AssignSlot(SlotIndex, InstanceGuid);
+		}
+	}
+}
+
+void APRPlayerController::HandleQuickbarClearRequested(const int32 SlotIndex)
+{
+	if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
+	{
+		if (UPRQuickbarComponent* Quickbar = ProjectRiftPlayerState->GetQuickbarComponent())
+		{
+			Quickbar->ClearSlot(SlotIndex);
+		}
+	}
 }
 
 void APRPlayerController::HandleEquipmentUnequipRequested(const FName SlotId)

@@ -199,6 +199,18 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input|Actions")
 	UInputAction* OpenInventoryAction;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Input|Actions")
+	UInputAction* QuickbarSlot1Action;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input|Actions")
+	UInputAction* QuickbarSlot2Action;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input|Actions")
+	UInputAction* QuickbarSlot3Action;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input|Actions")
+	UInputAction* QuickbarSlot4Action;
+
 public:
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoInteract();
@@ -248,7 +260,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoOpenInventory();
 
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	void DoQuickbarSlot1();
+
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	void DoQuickbarSlot2();
+
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	void DoQuickbarSlot3();
+
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	void DoQuickbarSlot4();
+
 private:
+	void UseQuickbarSlot(int32 SlotIndex);
 	friend class UPRReviveComponent;
 	float DefaultCameraArmLength = 400.0f;
 	float DefaultCameraFieldOfView = 90.0f;

@@ -6,6 +6,7 @@
 #include "Items/PRAffixDefinitionDataAsset.h"
 #include "Core/PRAssetManager.h"
 #include "Items/PRItemDataAsset.h"
+#include "Items/PRQuickbarComponent.h"
 #include "Items/PREquipmentComponent.h"
 #include "Items/PRWeaponDataAsset.h"
 #include "Misc/Paths.h"
@@ -265,6 +266,17 @@ FText UPRInventoryWidget::GetEquipmentSummaryText() const
 		*GetSlotName(ProjectRiftEquipmentSlots::Tool)));
 }
 
+FText UPRInventoryWidget::GetQuickbarSummaryText() const
+{
+	const APRPlayerState* PlayerState = BoundInventory.IsValid() ? Cast<APRPlayerState>(BoundInventory->GetOwner()) : nullptr;
+	const UPRQuickbarComponent* Quickbar = PlayerState ? PlayerState->GetQuickbarComponent() : nullptr;
+	if (!Quickbar)
+	{
+		return FText::FromString(TEXT("Quickbar: Unavailable"));
+	}
+	return FText::FromString(FString::Printf(TEXT("Quickbar: %d / 4%s"), Quickbar->GetQuickSlots().Num(), Quickbar->IsUsingItem() ? TEXT("  USING") : TEXT("")));
+}
+
 void UPRInventoryWidget::RequestUseSelectedItem()
 {
 	if (HasSelectedItem())
@@ -281,6 +293,22 @@ void UPRInventoryWidget::RequestUseDisplayedItem(const int32 ItemIndex)
 		OnUseItemRequested.Broadcast(DisplayedItems[ItemIndex].ItemId);
 		RebuildItemList();
 		RefreshSelectedItemDetails();
+	}
+}
+
+void UPRInventoryWidget::RequestAssignSelectedItemToQuickbar(const int32 SlotIndex)
+{
+	if (HasSelectedItem() && SlotIndex >= 0 && SlotIndex < 4)
+	{
+		OnQuickbarAssignRequested.Broadcast(SlotIndex, DisplayedItems[SelectedItemIndex].InstanceGuid);
+	}
+}
+
+void UPRInventoryWidget::RequestClearQuickbarSlot(const int32 SlotIndex)
+{
+	if (SlotIndex >= 0 && SlotIndex < 4)
+	{
+		OnQuickbarClearRequested.Broadcast(SlotIndex);
 	}
 }
 

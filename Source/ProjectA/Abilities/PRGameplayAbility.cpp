@@ -16,6 +16,7 @@ UPRGameplayAbility::UPRGameplayAbility()
 	ActivationBlockedTags.AddTag(ProjectRiftGameplayTags::State_PlacingDeployable);
 	ActivationBlockedTags.AddTag(ProjectRiftGameplayTags::State_Reviving);
 	ActivationBlockedTags.AddTag(ProjectRiftGameplayTags::State_BeingRevived);
+	ActivationBlockedTags.AddTag(ProjectRiftGameplayTags::State_UsingItem);
 }
 
 bool UPRGameplayAbility::ApplyConfiguredStatusEffects(

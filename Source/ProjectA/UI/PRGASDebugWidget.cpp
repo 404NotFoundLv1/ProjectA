@@ -17,6 +17,7 @@
 #include "Roles/PRRoleComponent.h"
 #include "Items/PRWeaponDataAsset.h"
 #include "Items/PRItemTransactionComponent.h"
+#include "Items/PRQuickbarComponent.h"
 #include "Weapons/PRWeaponComponent.h"
 #include "EngineUtils.h"
 #include "Styling/CoreStyle.h"
@@ -33,7 +34,7 @@ TSharedRef<SWidget> UPRGASDebugWidget::RebuildWidget()
 			.AutoWrapText(true)
 			.ColorAndOpacity(FSlateColor(FLinearColor::White))
 			.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 14))
-		.Text(FText::FromString(TEXT("ProjectRift v0.7.3 GAS Debug\nWaiting for player state...")))
+		.Text(FText::FromString(TEXT("ProjectRift v0.7.4 GAS Debug\nWaiting for player state...")))
 		];
 }
 
@@ -89,6 +90,7 @@ FString UPRGASDebugWidget::GetDebugText() const
 	}
 	const UPRWeaponComponent* Weapon = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetWeaponComponent() : nullptr;
 	const UPRItemTransactionComponent* Transactions = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetItemTransactionComponent() : nullptr;
+	const UPRQuickbarComponent* Quickbar = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetQuickbarComponent() : nullptr;
 	const UPRWeaponDataAsset* WeaponData = Weapon ? Weapon->GetEquippedWeaponData() : nullptr;
 	const UPRCombatFeedbackComponent* CombatFeedback = ProjectRiftCharacter
 		? ProjectRiftCharacter->FindComponentByClass<UPRCombatFeedbackComponent>()
@@ -123,8 +125,10 @@ FString UPRGASDebugWidget::GetDebugText() const
 	if (!AttributeSet)
 	{
 		return FString::Printf(
-		TEXT("ProjectRift v0.7.3 GAS Debug\nPawn: %s\nAttributeSet: Missing\nDowned: %s\nBleed-out: %.1fs\nRevive: %s\nDrone: %s\nDifficulty Players: %d\nRole: %s\nLoadout: %s\nCooldowns: %s"),
+		TEXT("ProjectRift v0.7.4 GAS Debug\nPawn: %s\nAttributeSet: Missing\nQuickbar: %d slots / Using: %s\nDowned: %s\nBleed-out: %.1fs\nRevive: %s\nDrone: %s\nDifficulty Players: %d\nRole: %s\nLoadout: %s\nCooldowns: %s"),
 			*GetNameSafe(ProjectRiftCharacter),
+			Quickbar ? Quickbar->GetQuickSlots().Num() : 0,
+			Quickbar && Quickbar->IsUsingItem() ? TEXT("true") : TEXT("false"),
 			ProjectRiftCharacter && ProjectRiftCharacter->IsDowned() ? TEXT("true") : TEXT("false"),
 			Revive ? Revive->GetBleedOutRemainingSeconds() : 0.0f,
 			*ReviveText,
@@ -136,7 +140,7 @@ FString UPRGASDebugWidget::GetDebugText() const
 	}
 
 	return FString::Printf(
-		TEXT("ProjectRift v0.7.3 GAS Debug\nHealth: %.0f / %.0f\nShield: %.0f / %.0f\nEnergy: %.0f / %.0f\nMaxHealth Base -> Current: %.0f -> %.0f\nMaxShield Base -> Current: %.0f -> %.0f\nMaxEnergy Base -> Current: %.0f -> %.0f\nAttackPower Base -> Current: %.0f -> %.0f\nMoveSpeed Base -> Current: %.0f -> %.0f\nPollutionResistance Base -> Current: %.0f%% -> %.0f%%\nStatuses: %s\nHitStaggered: %s\nLast Cue: %s\nCue Active/Handled: %d / %d\nHit Confirm Sent/Received: %d / %d\nWeapon: %s\nAmmo: %d / %d\nAiming: %s\nReloading: %s\nItem Revision: %d\nDowned: %s\nBleed-out: %.1fs\nRevive: %s\nDrone: %s\nDifficulty Players: %d\nRole: %s\nLoadout: %s\nCooldowns: %s\nASC Ready: %s\nDefault GE: %s\nRole Abilities: %s"),
+		TEXT("ProjectRift v0.7.4 GAS Debug\nHealth: %.0f / %.0f\nShield: %.0f / %.0f\nEnergy: %.0f / %.0f\nMaxHealth Base -> Current: %.0f -> %.0f\nMaxShield Base -> Current: %.0f -> %.0f\nMaxEnergy Base -> Current: %.0f -> %.0f\nAttackPower Base -> Current: %.0f -> %.0f\nMoveSpeed Base -> Current: %.0f -> %.0f\nPollutionResistance Base -> Current: %.0f%% -> %.0f%%\nStatuses: %s\nHitStaggered: %s\nLast Cue: %s\nCue Active/Handled: %d / %d\nHit Confirm Sent/Received: %d / %d\nWeapon: %s\nAmmo: %d / %d\nAiming: %s\nReloading: %s\nQuickbar: %d slots / Using: %s\nItem Revision: %d\nDowned: %s\nBleed-out: %.1fs\nRevive: %s\nDrone: %s\nDifficulty Players: %d\nRole: %s\nLoadout: %s\nCooldowns: %s\nASC Ready: %s\nDefault GE: %s\nRole Abilities: %s"),
 		AttributeSet->GetHealth(),
 		AttributeSet->GetMaxHealth(),
 		AttributeSet->GetShield(),
@@ -167,6 +171,8 @@ FString UPRGASDebugWidget::GetDebugText() const
 		Weapon ? Weapon->GetReserveAmmo() : 0,
 		Weapon && Weapon->IsAiming() ? TEXT("true") : TEXT("false"),
 		Weapon && Weapon->IsReloading() ? TEXT("true") : TEXT("false"),
+		Quickbar ? Quickbar->GetQuickSlots().Num() : 0,
+		Quickbar && Quickbar->IsUsingItem() ? TEXT("true") : TEXT("false"),
 		Transactions ? Transactions->GetRevision() : 0,
 		ProjectRiftCharacter && ProjectRiftCharacter->IsDowned() ? TEXT("true") : TEXT("false"),
 		Revive ? Revive->GetBleedOutRemainingSeconds() : 0.0f,

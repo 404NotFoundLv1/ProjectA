@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "Items/PRItemTypes.h"
+#include "Items/PRItemUseTypes.h"
 #include "PRItemDataAsset.generated.h"
 
 class UGameplayEffect;
@@ -44,6 +45,17 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
 	bool bCanDrop = true;
+
+	/** Reserved for the later crafting system; task-critical items set this false now. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
+	bool bCanCraft = true;
+
+	/** Mission-local task carriers are removed before the settlement snapshot is persisted. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
+	bool bAutoProcessAtMissionEnd = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|Use")
+	FPRItemUseDefinition UseDefinition;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
 	TSubclassOf<UGameplayEffect> UseEffect;

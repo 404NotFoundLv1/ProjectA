@@ -142,6 +142,7 @@ bool FPRMultiplayerProfileProjection::IsValid(FString* OutDiagnostic) const
 	}
 	FPRProfileSnapshot IdentitySnapshot;
 	IdentitySnapshot.BackpackItems = BackpackItems;
+	IdentitySnapshot.QuickSlots = QuickSlots;
 	IdentitySnapshot.Equipment = Equipment;
 	if (!IdentitySnapshot.HasValidItemIdentities(OutDiagnostic))
 	{
@@ -186,6 +187,7 @@ bool FPRPlayerSettlementReceipt::IsValid(FString* OutDiagnostic) const
 	}
 	FPRProfileSnapshot IdentitySnapshot;
 	IdentitySnapshot.BackpackItems = SettledBackpackItems;
+	IdentitySnapshot.QuickSlots = SettledQuickSlots;
 	IdentitySnapshot.Equipment = SettledEquipment;
 	IdentitySnapshot.WarehouseItems = GrantedWarehouseItems;
 	if (!IdentitySnapshot.HasValidItemIdentities(OutDiagnostic))

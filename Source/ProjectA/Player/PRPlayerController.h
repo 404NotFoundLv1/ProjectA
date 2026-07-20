@@ -19,6 +19,7 @@ class UPRShipRepairWidget;
 class UPRRoleLoadoutWidget;
 class UPRDiagnosticsWidget;
 class UPRWeaponHUDWidget;
+class UPRQuickbarHUDWidget;
 class UPRLootTableDataAsset;
 class UGameplayEffect;
 class APRPickupActor;
@@ -111,6 +112,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Weapon|UI")
 	UPRWeaponHUDWidget* GetWeaponHUDWidget() const { return WeaponHUDWidget.Get(); }
+
+	UFUNCTION(BlueprintPure, Category = "Quickbar|UI")
+	UPRQuickbarHUDWidget* GetQuickbarHUDWidget() const { return QuickbarHUDWidget.Get(); }
 
 	/** Server-only endpoint used by resolved combat feedback to notify this owning client. */
 	void SendHitConfirmationToOwner(const FPRHitConfirmation& Confirmation);
@@ -305,6 +309,8 @@ private:
 	void DestroyInventoryUI();
 	void CreateWeaponHUD();
 	void DestroyWeaponHUD();
+	void CreateQuickbarHUD();
+	void DestroyQuickbarHUD();
 	void CreateRiftSettlementUI();
 	void DestroyRiftSettlementUI();
 	void CreateShipRepairUI();
@@ -318,11 +324,16 @@ private:
 	void ApplyRoleLoadoutInputMode();
 	void RestoreRoleLoadoutInputMode();
 	void CancelPendingDeployable();
+	void UseQuickbarSlot1();
+	void UseQuickbarSlot2();
+	void UseQuickbarSlot3();
+	void UseQuickbarSlot4();
 	UPRInventoryComponent* GetLocalInventoryComponent() const;
 	TSubclassOf<UGameplayEffect> ResolveConsumableEffectClass(FName ItemId) const;
 	bool CanUseInventoryItemOnServer(FName ItemId, FString* OutFailureReason = nullptr) const;
 	bool CanDropInventoryItemOnServer(FName ItemId, int32 Count, FString* OutFailureReason = nullptr) const;
 	APRPickupActor* SpawnDroppedPickupOnServer(const FPRItemInstance& DroppedItem) const;
+	void UseQuickbarSlot(int32 SlotIndex);
 
 	UFUNCTION()
 	void HandleInventoryUseRequested(FName ItemId);
@@ -332,6 +343,12 @@ private:
 
 	UFUNCTION()
 	void HandleInventoryEquipRequested(FName ItemId);
+
+	UFUNCTION()
+	void HandleQuickbarAssignRequested(int32 SlotIndex, FGuid InstanceGuid);
+
+	UFUNCTION()
+	void HandleQuickbarClearRequested(int32 SlotIndex);
 
 	UFUNCTION()
 	void HandlePrimaryWeaponUnequipRequested();
@@ -375,6 +392,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPRWeaponHUDWidget> WeaponHUDWidget;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Quickbar|UI")
+	TSubclassOf<UPRQuickbarHUDWidget> QuickbarHUDWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPRQuickbarHUDWidget> QuickbarHUDWidget;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Rift|Settlement")
 	TSubclassOf<UPRRiftSettlementWidget> RiftSettlementWidgetClass;

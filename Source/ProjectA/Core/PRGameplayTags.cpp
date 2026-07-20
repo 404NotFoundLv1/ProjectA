@@ -48,6 +48,7 @@ namespace ProjectRiftGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_PlacingDeployable, "State.PlacingDeployable", "Player is confirming a deployable placement");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Reviving, "State.Reviving", "Player is reviving a downed ally");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_BeingRevived, "State.BeingRevived", "Player is receiving a revive");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_UsingItem, "State.UsingItem", "Player is channeling a quickbar item");
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Combat_Impact_Shield, "GameplayCue.Combat.Impact.Shield", "Shield damage feedback");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Combat_Impact_ShieldBreak, "GameplayCue.Combat.Impact.ShieldBreak", "Shield break feedback");
@@ -63,4 +64,11 @@ namespace ProjectRiftGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill_Q, "Cooldown.Skill.Q", "Cooldown for Q skill");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill_E, "Cooldown.Skill.E", "Cooldown for E skill");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill_R, "Cooldown.Skill.R", "Cooldown for R skill");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Item_HealthInjector, "Cooldown.Item.HealthInjector", "Cooldown for health injector");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Item_ShieldPack, "Cooldown.Item.ShieldPack", "Cooldown for shield pack");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Item_EnergyCell, "Cooldown.Item.EnergyCell", "Cooldown for energy cell");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Item_Purifier, "Cooldown.Item.Purifier", "Cooldown for purifier");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Item_AmmoPack, "Cooldown.Item.AmmoPack", "Cooldown for ammunition pack");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Item_Using, "GameplayCue.Item.Using", "Quickbar use is in progress");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Item_Completed, "GameplayCue.Item.Completed", "Quickbar use completed");
 }

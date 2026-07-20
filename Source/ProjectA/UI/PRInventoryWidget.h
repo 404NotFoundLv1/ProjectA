@@ -16,6 +16,8 @@ class UTexture2D;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPRInventoryItemUseRequestedSignature, FName, ItemId);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPRInventoryItemDropRequestedSignature, FName, ItemId, int32, Count);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPRInventoryItemEquipRequestedSignature, FName, ItemId);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPRInventoryQuickbarAssignRequestedSignature, int32, SlotIndex, FGuid, InstanceGuid);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPRInventoryQuickbarClearRequestedSignature, int32, SlotIndex);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPRInventoryPrimaryUnequipRequestedSignature);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPRInventoryEquipmentUnequipRequestedSignature, FName, SlotId);
 
@@ -76,11 +78,20 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory|Equipment")
 	FText GetEquipmentSummaryText() const;
 
+	UFUNCTION(BlueprintPure, Category = "Inventory|Quickbar")
+	FText GetQuickbarSummaryText() const;
+
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	void RequestUseSelectedItem();
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	void RequestUseDisplayedItem(int32 ItemIndex);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Quickbar", meta = (ClampMin = "0", ClampMax = "3"))
+	void RequestAssignSelectedItemToQuickbar(int32 SlotIndex);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Quickbar", meta = (ClampMin = "0", ClampMax = "3"))
+	void RequestClearQuickbarSlot(int32 SlotIndex);
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI", meta = (ClampMin = "1"))
 	void RequestDropSelectedItem(int32 Count = 1);
@@ -105,6 +116,12 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Inventory|Equipment")
 	FPRInventoryItemEquipRequestedSignature OnEquipItemRequested;
+
+	UPROPERTY(BlueprintAssignable, Category = "Inventory|Quickbar")
+	FPRInventoryQuickbarAssignRequestedSignature OnQuickbarAssignRequested;
+
+	UPROPERTY(BlueprintAssignable, Category = "Inventory|Quickbar")
+	FPRInventoryQuickbarClearRequestedSignature OnQuickbarClearRequested;
 
 	UPROPERTY(BlueprintAssignable, Category = "Inventory|Equipment")
 	FPRInventoryPrimaryUnequipRequestedSignature OnUnequipPrimaryRequested;

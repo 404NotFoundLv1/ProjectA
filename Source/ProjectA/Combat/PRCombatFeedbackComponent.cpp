@@ -17,6 +17,8 @@
 #include "Persistence/PRProfileTypes.h"
 #include "Persistence/PRSaveSubsystem.h"
 #include "Player/PRPlayerController.h"
+#include "Player/PRPlayerState.h"
+#include "Items/PRQuickbarComponent.h"
 #include "TimerManager.h"
 #include "UI/PRWeaponHUDWidget.h"
 
@@ -159,6 +161,19 @@ void UPRCombatFeedbackComponent::RecordResolvedDamage(
 	}
 	GameplayCueDispatchCount += LastDamageCueTags.Num();
 	bResolvedDamagePulsePending = !LastDamageCueTags.IsEmpty();
+	if ((ResolvedDamage.ShieldDamage > 0.0f || ResolvedDamage.HealthDamage > 0.0f))
+	{
+		if (const APRCharacter* Character = Cast<APRCharacter>(GetOwner()))
+		{
+			if (APRPlayerState* PlayerState = Character->GetPlayerState<APRPlayerState>())
+			{
+				if (UPRQuickbarComponent* Quickbar = PlayerState->GetQuickbarComponent())
+				{
+					Quickbar->CancelActiveUse();
+				}
+			}
+		}
+	}
 }
 
 void UPRCombatFeedbackComponent::HandleGameplayCue(

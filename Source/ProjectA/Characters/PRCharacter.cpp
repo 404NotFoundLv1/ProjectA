@@ -22,6 +22,7 @@
 #include "InputAction.h"
 #include "Player/PRPlayerController.h"
 #include "Player/PRPlayerState.h"
+#include "Items/PRQuickbarComponent.h"
 #include "Deployables/PRDeployableComponent.h"
 #include "Roles/PRRoleComponent.h"
 #include "ProjectA.h"
@@ -184,6 +185,7 @@ APRCharacter::APRCharacter()
 	{
 		ReloadAction = ReloadActionAsset.Object;
 	}
+
 }
 
 UAbilitySystemComponent* APRCharacter::GetAbilitySystemComponent() const
@@ -228,6 +230,10 @@ void APRCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	ClearAttributeChangeDelegates();
 	if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
 	{
+		if (UPRQuickbarComponent* Quickbar = ProjectRiftPlayerState->GetQuickbarComponent())
+		{
+			Quickbar->CancelActiveUse();
+		}
 		if (UPRWeaponComponent* WeaponComponent = ProjectRiftPlayerState->GetWeaponComponent())
 		{
 			WeaponComponent->HandleAvatarChanged(nullptr);
@@ -460,6 +466,13 @@ bool APRCharacter::GrantAbilityIfMissing(const TSubclassOf<UGameplayAbility> Abi
 
 bool APRCharacter::EnterDownedState()
 {
+	if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
+	{
+		if (UPRQuickbarComponent* Quickbar = ProjectRiftPlayerState->GetQuickbarComponent())
+		{
+			Quickbar->CancelActiveUse();
+		}
+	}
 	return ReviveComponent && ReviveComponent->EnterDownedState();
 }
 
@@ -659,6 +672,10 @@ void APRCharacter::HandleStunnedTagChanged(const FGameplayTag StatusTag, const i
 		}
 		if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
 		{
+			if (UPRQuickbarComponent* Quickbar = ProjectRiftPlayerState->GetQuickbarComponent())
+			{
+				Quickbar->CancelActiveUse();
+			}
 			if (UPRWeaponComponent* WeaponComponent = ProjectRiftPlayerState->GetWeaponComponent())
 			{
 				WeaponComponent->SetAiming(false);
@@ -679,6 +696,10 @@ void APRCharacter::HandleHitStaggeredTagChanged(const FGameplayTag StatusTag, co
 		}
 		if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
 		{
+			if (UPRQuickbarComponent* Quickbar = ProjectRiftPlayerState->GetQuickbarComponent())
+			{
+				Quickbar->CancelActiveUse();
+			}
 			if (UPRWeaponComponent* WeaponComponent = ProjectRiftPlayerState->GetWeaponComponent())
 			{
 				WeaponComponent->SetAiming(false);
@@ -775,6 +796,7 @@ void APRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	{
 		EnhancedInputComponent->BindAction(OpenInventoryAction, ETriggerEvent::Started, this, &APRCharacter::DoOpenInventory);
 	}
+
 }
 
 void APRCharacter::RefreshPlayerDebugLabel()
@@ -984,6 +1006,23 @@ void APRCharacter::DoOpenInventory()
 	if (APRPlayerController* ProjectRiftController = Cast<APRPlayerController>(GetController()))
 	{
 		ProjectRiftController->ToggleInventory();
+	}
+}
+
+void APRCharacter::DoQuickbarSlot1() { UseQuickbarSlot(0); }
+void APRCharacter::DoQuickbarSlot2() { UseQuickbarSlot(1); }
+void APRCharacter::DoQuickbarSlot3() { UseQuickbarSlot(2); }
+void APRCharacter::DoQuickbarSlot4() { UseQuickbarSlot(3); }
+
+void APRCharacter::UseQuickbarSlot(const int32 SlotIndex)
+{
+	ShowInputDebugMessage(this, *FString::Printf(TEXT("Quickbar %d"), SlotIndex + 1));
+	if (APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>())
+	{
+		if (UPRQuickbarComponent* Quickbar = ProjectRiftPlayerState->GetQuickbarComponent())
+		{
+			Quickbar->RequestUseSlot(SlotIndex);
+		}
 	}
 }
 

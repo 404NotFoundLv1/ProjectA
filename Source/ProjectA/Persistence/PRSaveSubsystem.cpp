@@ -589,6 +589,7 @@ FPRProfileOperationResult UPRSaveSubsystem::BuildMultiplayerProfileProjection(FP
 	OutProjection.ProfileId = ActiveProfile->ProfileId;
 	OutProjection.DisplayName = ActiveProfile->DisplayName;
 	OutProjection.BackpackItems = ActiveProfile->Snapshot.BackpackItems;
+	OutProjection.QuickSlots = ActiveProfile->Snapshot.QuickSlots;
 	OutProjection.Equipment = ActiveProfile->Snapshot.Equipment;
 	OutProjection.ResourceWallet = ActiveProfile->Snapshot.ResourceWallet;
 	OutProjection.SelectedRoleId = ActiveProfile->Snapshot.SelectedRoleId;
@@ -667,6 +668,7 @@ FPRProfileOperationResult UPRSaveSubsystem::ApplyMultiplayerSettlementReceipt(co
 
 	UPRProfileSave* Candidate = DuplicateObject<UPRProfileSave>(ActiveProfile, this);
 	Candidate->Snapshot.BackpackItems = Receipt.SettledBackpackItems;
+	Candidate->Snapshot.QuickSlots = Receipt.SettledQuickSlots;
 	Candidate->Snapshot.Equipment = Receipt.SettledEquipment;
 	Candidate->Snapshot.ResourceWallet = Receipt.SettledResourceWallet;
 	Candidate->Snapshot.WarehouseItems.Append(Receipt.GrantedWarehouseItems);

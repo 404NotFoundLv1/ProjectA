@@ -32,6 +32,12 @@ public:
 	/** Cancels a pending reload without mutating inventory or advancing the revision. */
 	FPRItemTransactionResult CancelPendingReload(const FGuid& TransactionId, const FString& Diagnostic);
 
+	/** Completes a pending consumable use. Any optional inventory grant is committed with its consumption. */
+	FPRItemTransactionResult CompletePendingUse(const FGuid& TransactionId, FName GrantedItemId, int32 GrantedItemCount);
+
+	/** Cancels a pending consumable use without consuming its source stack. */
+	FPRItemTransactionResult CancelPendingUse(const FGuid& TransactionId, const FString& Diagnostic);
+
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Item Transaction")
 	void ServerSubmitItemTransaction(const FPRItemTransactionRequest& Request);
 
@@ -46,6 +52,8 @@ private:
 	void CacheFinalResult(const FPRItemTransactionResult& Result);
 	const FPRItemTransactionResult* FindCachedResult(const FGuid& TransactionId) const;
 	const FPRItemTransactionResult* FindPendingResult(const FGuid& TransactionId) const;
+	const FPRItemTransactionRequest* FindPendingRequest(const FGuid& TransactionId) const;
+	void RemovePendingTransaction(const FGuid& TransactionId);
 
 	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Item Transaction", meta = (AllowPrivateAccess = "true"))
 	int32 Revision = 0;
@@ -55,6 +63,9 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<FPRItemTransactionResult> PendingResults;
+
+	UPROPERTY(Transient)
+	TArray<FPRItemTransactionRequest> PendingRequests;
 
 	static constexpr int32 MaxCachedResults = 256;
 };

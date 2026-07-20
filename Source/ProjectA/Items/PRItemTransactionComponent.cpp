@@ -40,6 +40,7 @@ void UPRItemTransactionComponent::CopyRuntimeStateFrom(const UPRItemTransactionC
 	Revision = SourceComponent->Revision;
 	RecentResults = SourceComponent->RecentResults;
 	PendingResults = SourceComponent->PendingResults;
+	PendingRequests = SourceComponent->PendingRequests;
 }
 
 void UPRItemTransactionComponent::ResetForNewProfileBinding()
@@ -47,6 +48,7 @@ void UPRItemTransactionComponent::ResetForNewProfileBinding()
 	Revision = 0;
 	RecentResults.Reset();
 	PendingResults.Reset();
+	PendingRequests.Reset();
 }
 
 FPRItemTransactionResult UPRItemTransactionComponent::ExecuteAuthoritativeTransaction(const FPRItemTransactionRequest& Request)
@@ -76,10 +78,7 @@ FPRItemTransactionResult UPRItemTransactionComponent::CompletePendingReload(
 	Result.bWasReplay = false;
 	Result.PreviousRevision = Revision;
 	Result.CurrentRevision = Revision;
-	PendingResults.RemoveAll([TransactionId](const FPRItemTransactionResult& Candidate)
-	{
-		return Candidate.TransactionId == TransactionId;
-	});
+	RemovePendingTransaction(TransactionId);
 
 	APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
 	UPRInventoryComponent* Inventory = PlayerState ? PlayerState->GetInventoryComponent() : nullptr;
@@ -164,10 +163,146 @@ FPRItemTransactionResult UPRItemTransactionComponent::CancelPendingReload(const 
 	Result.PreviousRevision = Revision;
 	Result.CurrentRevision = Revision;
 	Result.Diagnostic = Diagnostic.IsEmpty() ? TEXT("Reload transaction was cancelled.") : Diagnostic;
-	PendingResults.RemoveAll([TransactionId](const FPRItemTransactionResult& Candidate)
+	RemovePendingTransaction(TransactionId);
+	CacheFinalResult(Result);
+	return Result;
+}
+
+FPRItemTransactionResult UPRItemTransactionComponent::CompletePendingUse(
+	const FGuid& TransactionId,
+	const FName GrantedItemId,
+	const int32 GrantedItemCount)
+{
+	FPRItemTransactionResult Result;
+	const FPRItemTransactionResult* Pending = FindPendingResult(TransactionId);
+	const FPRItemTransactionRequest* PendingRequest = FindPendingRequest(TransactionId);
+	if (!Pending || !PendingRequest || Pending->Intent != EPRItemTransactionIntent::BeginUse)
 	{
-		return Candidate.TransactionId == TransactionId;
+		Result.TransactionId = TransactionId;
+		Result.Intent = EPRItemTransactionIntent::BeginUse;
+		Result.Status = EPRItemTransactionStatus::NotFound;
+		Result.PreviousRevision = Revision;
+		Result.CurrentRevision = Revision;
+		Result.Diagnostic = TEXT("The consumable use transaction is not pending.");
+		return Result;
+	}
+
+	Result = *Pending;
+	Result.bWasReplay = false;
+	Result.PreviousRevision = Revision;
+	Result.CurrentRevision = Revision;
+	const FPRItemTransactionRequest Request = *PendingRequest;
+	RemovePendingTransaction(TransactionId);
+
+	APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
+	UPRInventoryComponent* Inventory = PlayerState ? PlayerState->GetInventoryComponent() : nullptr;
+	if (!Inventory || !Request.InstanceGuid.IsValid() || Request.Count != 1
+		|| GrantedItemCount < 0 || (GrantedItemCount > 0 && GrantedItemId.IsNone()))
+	{
+		Result.Status = EPRItemTransactionStatus::Cancelled;
+		Result.Diagnostic = TEXT("Consumable completion lost a valid inventory or grant contract.");
+		CacheFinalResult(Result);
+		return Result;
+	}
+
+	TArray<FPRItemInstance> CandidateItems = Inventory->GetInventoryItems();
+	const int32 SourceIndex = CandidateItems.IndexOfByPredicate([&Request](const FPRItemInstance& Item)
+	{
+		return Item.InstanceGuid == Request.InstanceGuid && Item.Count > 0;
 	});
+	if (SourceIndex == INDEX_NONE)
+	{
+		Result.Status = EPRItemTransactionStatus::Cancelled;
+		Result.Diagnostic = TEXT("Consumable completion could not find its original source instance.");
+		CacheFinalResult(Result);
+		return Result;
+	}
+
+	FPRItemInstance& SourceItem = CandidateItems[SourceIndex];
+	--SourceItem.Count;
+	if (SourceItem.Count == 0)
+	{
+		Result.RemovedInstanceGuids.Add(SourceItem.InstanceGuid);
+		CandidateItems.RemoveAt(SourceIndex);
+	}
+	else
+	{
+		Result.ChangedInstanceGuids.Add(SourceItem.InstanceGuid);
+	}
+
+	if (GrantedItemCount > 0)
+	{
+		FPRItemInstance GrantItem;
+		GrantItem.ItemId = GrantedItemId;
+		GrantItem.Count = GrantedItemCount;
+		const int32 MaxStackCount = Inventory->GetMaxStackCount(GrantedItemId);
+		int32 Remaining = GrantedItemCount;
+		for (FPRItemInstance& Candidate : CandidateItems)
+		{
+			if (Remaining <= 0 || !Candidate.HasEquivalentStackingState(GrantItem) || Candidate.Count >= MaxStackCount)
+			{
+				continue;
+			}
+			const int32 Applied = FMath::Min(Remaining, MaxStackCount - Candidate.Count);
+			Candidate.Count += Applied;
+			Remaining -= Applied;
+			Result.ChangedInstanceGuids.AddUnique(Candidate.InstanceGuid);
+		}
+		while (Remaining > 0)
+		{
+			FPRItemInstance NewStack = GrantItem;
+			NewStack.InstanceGuid = FGuid::NewGuid();
+			NewStack.Count = FMath::Min(Remaining, MaxStackCount);
+			CandidateItems.Add(NewStack);
+			Result.CreatedInstanceGuids.Add(NewStack.InstanceGuid);
+			Remaining -= NewStack.Count;
+		}
+	}
+
+	if (!Inventory->ReplaceInventoryItems(CandidateItems))
+	{
+		Result.Status = EPRItemTransactionStatus::InternalFailure;
+		Result.AppliedCount = 0;
+		Result.ChangedInstanceGuids.Reset();
+		Result.CreatedInstanceGuids.Reset();
+		Result.RemovedInstanceGuids.Reset();
+		Result.Diagnostic = TEXT("Consumable completion could not atomically commit its inventory delta.");
+		CacheFinalResult(Result);
+		return Result;
+	}
+
+	Result.Status = EPRItemTransactionStatus::Success;
+	Result.AppliedCount = 1;
+	Result.CurrentRevision = ++Revision;
+	Result.Diagnostic = TEXT("Pending consumable use committed exactly once.");
+	CacheFinalResult(Result);
+	if (AActor* OwnerActor = GetOwner())
+	{
+		OwnerActor->ForceNetUpdate();
+	}
+	return Result;
+}
+
+FPRItemTransactionResult UPRItemTransactionComponent::CancelPendingUse(const FGuid& TransactionId, const FString& Diagnostic)
+{
+	FPRItemTransactionResult Result;
+	const FPRItemTransactionResult* Pending = FindPendingResult(TransactionId);
+	if (!Pending || Pending->Intent != EPRItemTransactionIntent::BeginUse)
+	{
+		Result.TransactionId = TransactionId;
+		Result.Intent = EPRItemTransactionIntent::BeginUse;
+		Result.Status = EPRItemTransactionStatus::NotFound;
+		Result.PreviousRevision = Revision;
+		Result.CurrentRevision = Revision;
+		Result.Diagnostic = TEXT("The consumable use transaction is not pending.");
+		return Result;
+	}
+	Result = *Pending;
+	Result.Status = EPRItemTransactionStatus::Cancelled;
+	Result.PreviousRevision = Revision;
+	Result.CurrentRevision = Revision;
+	Result.Diagnostic = Diagnostic.IsEmpty() ? TEXT("Consumable use was cancelled.") : Diagnostic;
+	RemovePendingTransaction(TransactionId);
 	CacheFinalResult(Result);
 	return Result;
 }
@@ -206,11 +341,21 @@ FPRItemTransactionResult UPRItemTransactionComponent::ResolveRequest(const FPRIt
 		return Result;
 	}
 
-	if (Request.Intent == EPRItemTransactionIntent::BeginReload)
+	if (Request.Intent == EPRItemTransactionIntent::BeginReload || Request.Intent == EPRItemTransactionIntent::BeginUse)
 	{
+		if (Request.Intent == EPRItemTransactionIntent::BeginUse && (!Request.InstanceGuid.IsValid() || Request.Count != 1))
+		{
+			Result.Status = EPRItemTransactionStatus::InvalidRequest;
+			Result.Diagnostic = TEXT("Pending consumable use requires one valid source instance.");
+			CacheFinalResult(Result);
+			return Result;
+		}
 		Result.Status = EPRItemTransactionStatus::Pending;
-		Result.Diagnostic = TEXT("Reload has been accepted and is awaiting authoritative completion.");
+		Result.Diagnostic = Request.Intent == EPRItemTransactionIntent::BeginUse
+			? TEXT("Consumable use has been accepted and is awaiting authoritative completion.")
+			: TEXT("Reload has been accepted and is awaiting authoritative completion.");
 		PendingResults.Add(Result);
+		PendingRequests.Add(Request);
 		return Result;
 	}
 	if (Request.Intent == EPRItemTransactionIntent::Pickup)
@@ -611,5 +756,25 @@ const FPRItemTransactionResult* UPRItemTransactionComponent::FindPendingResult(c
 	return PendingResults.FindByPredicate([TransactionId](const FPRItemTransactionResult& Result)
 	{
 		return Result.TransactionId == TransactionId;
+	});
+}
+
+const FPRItemTransactionRequest* UPRItemTransactionComponent::FindPendingRequest(const FGuid& TransactionId) const
+{
+	return PendingRequests.FindByPredicate([TransactionId](const FPRItemTransactionRequest& Request)
+	{
+		return Request.Header.TransactionId == TransactionId;
+	});
+}
+
+void UPRItemTransactionComponent::RemovePendingTransaction(const FGuid& TransactionId)
+{
+	PendingResults.RemoveAll([TransactionId](const FPRItemTransactionResult& Candidate)
+	{
+		return Candidate.TransactionId == TransactionId;
+	});
+	PendingRequests.RemoveAll([TransactionId](const FPRItemTransactionRequest& Candidate)
+	{
+		return Candidate.Header.TransactionId == TransactionId;
 	});
 }

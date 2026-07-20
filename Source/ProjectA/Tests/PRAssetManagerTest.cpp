@@ -124,9 +124,9 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 	const UGeneralProjectSettings* ProjectSettings = GetDefault<UGeneralProjectSettings>();
 	TestNotNull(TEXT("General project settings exist"), ProjectSettings);
 	TestEqual(
-		TEXT("Project version is v0.7.3"),
+		TEXT("Project version is v0.7.4"),
 		ProjectSettings ? ProjectSettings->ProjectVersion : FString(),
-		FString(TEXT("0.7.3")));
+		FString(TEXT("0.7.4")));
 
 	TestTrue(TEXT("Global manager is UPRAssetManager"), UAssetManager::Get().IsA<UPRAssetManager>());
 	TestEqual(
@@ -179,7 +179,11 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 	Manager->GetPrimaryAssetIdList(UPRMissionProgressionDataAsset::MissionPrimaryAssetType, MissionIds);
 	Manager->GetPrimaryAssetIdList(UPRRewardBudgetDataAsset::RewardBudgetPrimaryAssetType, RewardBudgetIds);
 	Manager->GetPrimaryAssetIdList(UPRShipRepairDataAsset::ShipRepairPrimaryAssetType, ShipRepairIds);
-	TestEqual(TEXT("Nine ProjectRift item assets are registered"), ItemIds.Num(), 9);
+	TestEqual(TEXT("Thirteen ProjectRift item assets are registered"), ItemIds.Num(), 13);
+	TestTrue(TEXT("Energy cell is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("EnergyCell"))));
+	TestTrue(TEXT("Purifier is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("Purifier"))));
+	TestTrue(TEXT("Ammo pack is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("AmmoPack"))));
+	TestTrue(TEXT("Mission tool is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("MissionTool"))));
 	TestTrue(TEXT("Test rifle is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("TestRifle"))));
 	TestTrue(TEXT("Rifle ammo is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("RifleAmmo"))));
 	TestTrue(TEXT("Test armor is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("DA_TestArmor"))));
@@ -196,6 +200,22 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 		TEXT("Loaded HealthInjector has the canonical primary ID"),
 		HealthInjector ? HealthInjector->GetPrimaryAssetId().ToString() : FString(),
 		FString(TEXT("ProjectRiftItem:HealthInjector")));
+	TestEqual(TEXT("HealthInjector uses the timed health contract"), HealthInjector ? HealthInjector->UseDefinition.Kind : EPRItemUseKind::None, EPRItemUseKind::RestoreHealth);
+	TestEqual(TEXT("HealthInjector has the v0.7.4 use duration"), HealthInjector ? HealthInjector->UseDefinition.UseDurationSeconds : 0.0f, 0.75f);
+
+	UPRItemDataAsset* EnergyCell = Manager->LoadItemDataSync(TEXT("EnergyCell"));
+	UPRItemDataAsset* Purifier = Manager->LoadItemDataSync(TEXT("Purifier"));
+	UPRItemDataAsset* AmmoPack = Manager->LoadItemDataSync(TEXT("AmmoPack"));
+	UPRItemDataAsset* MissionTool = Manager->LoadItemDataSync(TEXT("MissionTool"));
+	TestEqual(TEXT("Energy cell restores energy"), EnergyCell ? EnergyCell->UseDefinition.Kind : EPRItemUseKind::None, EPRItemUseKind::RestoreEnergy);
+	TestEqual(TEXT("Energy cell restores for 0.75 seconds"), EnergyCell ? EnergyCell->UseDefinition.UseDurationSeconds : 0.0f, 0.75f);
+	TestEqual(TEXT("Purifier has the purify use kind"), Purifier ? Purifier->UseDefinition.Kind : EPRItemUseKind::None, EPRItemUseKind::Purify);
+	TestEqual(TEXT("Purifier has the configured duration"), Purifier ? Purifier->UseDefinition.UseDurationSeconds : 0.0f, 1.0f);
+	TestEqual(TEXT("Ammo pack grants the canonical rifle ammo item"), AmmoPack ? AmmoPack->UseDefinition.GrantedItemId : NAME_None, FName(TEXT("RifleAmmo")));
+	TestEqual(TEXT("Ammo pack grants 24 rounds"), AmmoPack ? AmmoPack->UseDefinition.GrantedItemCount : 0, 24);
+	TestTrue(TEXT("Mission tool is auto-processed at mission end"), MissionTool && MissionTool->bAutoProcessAtMissionEnd);
+	TestFalse(TEXT("Mission tool cannot be dropped"), MissionTool && MissionTool->bCanDrop);
+	TestFalse(TEXT("Mission tool cannot be crafted"), MissionTool && MissionTool->bCanCraft);
 
 	const UPREquipmentDataAsset* TestArmor = Cast<UPREquipmentDataAsset>(Manager->LoadItemDataSync(TEXT("DA_TestArmor")));
 	const UPREquipmentDataAsset* TestChip = Cast<UPREquipmentDataAsset>(Manager->LoadItemDataSync(TEXT("DA_TestChip")));

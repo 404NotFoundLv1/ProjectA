@@ -15,7 +15,8 @@ enum class EPRItemTransactionIntent : uint8
 	UnequipPrimary,
 	BeginReload,
 	Equip,
-	Unequip
+	Unequip,
+	BeginUse
 };
 
 UENUM(BlueprintType)
@@ -71,6 +72,13 @@ struct PROJECTA_API FPRItemTransactionRequest
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Transaction")
 	TObjectPtr<AActor> TargetActor;
+
+	/** Optional inventory grant committed atomically with a pending item use (for ammunition packs). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Transaction")
+	FName GrantedItemId = NAME_None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Transaction", meta = (ClampMin = "0"))
+	int32 GrantedItemCount = 0;
 };
 
 USTRUCT(BlueprintType)

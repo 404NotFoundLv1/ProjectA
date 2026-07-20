@@ -146,7 +146,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FPRProfileContractTest::RunTest(const FString& Parameters)
 {
-	TestEqual(TEXT("Current player profile schema is version 7"), UPRProfileSave::LatestSaveVersion, 7);
+	TestEqual(TEXT("Current player profile schema is version 8"), UPRProfileSave::LatestSaveVersion, 8);
 	TestNotNull(
 		TEXT("Profile snapshot exposes a durable repair transaction ledger"),
 		FindFProperty<FArrayProperty>(FPRProfileSnapshot::StaticStruct(), TEXT("ProcessedRepairTransactionIds")));
@@ -170,7 +170,7 @@ bool FPRProfileContractTest::RunTest(const FString& Parameters)
 	FPRProfileOperationResult MigrationResult = LegacyProfile->MigrateToLatest();
 	TestTrue(TEXT("v1 profile migrates successfully"), MigrationResult.IsSuccess());
 	TestTrue(TEXT("Migration result is marked"), MigrationResult.bMigrated);
-	TestEqual(TEXT("Migrated profile reaches v7"), LegacyProfile->SaveVersion, 7);
+	TestEqual(TEXT("Migrated profile reaches v8"), LegacyProfile->SaveVersion, 8);
 	TestTrue(TEXT("v1 to v6 migration preserves existing story progress"), LegacyProfile->Snapshot.Story.CompletedStoryNodeIds.Contains(TEXT("Story.Prologue.Intro")));
 	TestTrue(
 		TEXT("Selected role is added to unlocked roles"),
@@ -186,7 +186,7 @@ bool FPRProfileContractTest::RunTest(const FString& Parameters)
 		TEXT("Future profile is rejected explicitly"),
 		FutureResult.Status,
 		EPRProfileOperationStatus::UnsupportedFutureVersion);
-	TestEqual(TEXT("Future profile remains untouched"), FutureProfile->SaveVersion, 8);
+	TestEqual(TEXT("Future profile remains untouched"), FutureProfile->SaveVersion, 9);
 
 	UPRProfileSave* VersionTwoProfile = MakeProfile(TEXT("Version Two"));
 	VersionTwoProfile->SaveVersion = 2;
@@ -194,7 +194,7 @@ bool FPRProfileContractTest::RunTest(const FString& Parameters)
 	const FPRProfileOperationResult V2MigrationResult = VersionTwoProfile->MigrateToLatest();
 	TestTrue(TEXT("v2 profile migrates successfully"), V2MigrationResult.IsSuccess());
 	TestTrue(TEXT("v2 migration result is marked"), V2MigrationResult.bMigrated);
-	TestEqual(TEXT("v2 profile reaches v7"), VersionTwoProfile->SaveVersion, 7);
+	TestEqual(TEXT("v2 profile reaches v8"), VersionTwoProfile->SaveVersion, 8);
 	TestTrue(TEXT("v2 profile starts with an empty settlement ledger"), VersionTwoProfile->Snapshot.ProcessedSettlementIds.IsEmpty());
 
 	UPRProfileSave* VersionThreeProfile = MakeProfile(TEXT("Version Three"));
@@ -203,7 +203,7 @@ bool FPRProfileContractTest::RunTest(const FString& Parameters)
 	const FPRProfileOperationResult V3MigrationResult = VersionThreeProfile->MigrateToLatest();
 	TestTrue(TEXT("v3 profile migrates successfully"), V3MigrationResult.IsSuccess());
 	TestTrue(TEXT("v3 migration result is marked"), V3MigrationResult.bMigrated);
-	TestEqual(TEXT("v3 profile reaches v7"), VersionThreeProfile->SaveVersion, 7);
+	TestEqual(TEXT("v3 profile reaches v8"), VersionThreeProfile->SaveVersion, 8);
 	TestTrue(TEXT("v3 profile starts with an empty repair transaction ledger"), VersionThreeProfile->Snapshot.ProcessedRepairTransactionIds.IsEmpty());
 	TestTrue(TEXT("v3 to v6 migration preserves story progress"), VersionThreeProfile->Snapshot.Story.CompletedStoryNodeIds.Contains(TEXT("Story.Prologue.Intro")));
 
@@ -297,7 +297,7 @@ bool FPRProfileAffixPersistenceTest::RunTest(const FString& Parameters)
 	V5Profile->Snapshot.BackpackItems[0].RolledAffixes.Reset();
 	const FPRProfileOperationResult Migration = V5Profile->MigrateToLatest();
 	TestTrue(TEXT("v5 legacy ID-only affix profile migrates"), Migration.IsSuccess());
-	TestEqual(TEXT("v5 legacy profile reaches v7"), V5Profile->SaveVersion, 7);
+	TestEqual(TEXT("v5 legacy profile reaches v8"), V5Profile->SaveVersion, 8);
 	TestEqual(TEXT("v5 legacy affix IDs are preserved without fabricated rolls"), V5Profile->Snapshot.BackpackItems[0].Affixes.Num(), 1);
 	TestTrue(TEXT("v5 legacy affix keeps no final roll payload"), V5Profile->Snapshot.BackpackItems[0].RolledAffixes.IsEmpty());
 

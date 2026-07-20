@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Items/PRItemTypes.h"
+#include "Items/PRQuickbarTypes.h"
 #include "Items/PRRewardTypes.h"
 #include "Roles/PRRoleTypes.h"
 #include "PRProfileTypes.generated.h"
@@ -172,6 +173,10 @@ struct PROJECTA_API FPRProfileSnapshot
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Profile|Inventory")
 	TArray<FPRItemInstance> BackpackItems;
+
+	/** Four persistent references into BackpackItems; never duplicate item instances. v8+. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Profile|Quickbar")
+	TArray<FPRQuickSlotReference> QuickSlots;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Profile|Inventory")
 	TArray<FPRItemInstance> WarehouseItems;

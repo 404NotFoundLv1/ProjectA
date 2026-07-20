@@ -9,9 +9,11 @@
 #include "GameplayEffect.h"
 #include "Items/PRInventoryComponent.h"
 #include "Items/PRItemDataAsset.h"
+#include "Items/PRQuickbarComponent.h"
 #include "Player/PRPlayerController.h"
 #include "Player/PRPlayerState.h"
 #include "Tests/AutomationCommon.h"
+#include "TimerManager.h"
 #include "UI/PRInventoryWidget.h"
 #include "UObject/StrongObjectPtr.h"
 #include "UObject/StructOnScope.h"
@@ -61,12 +63,27 @@ bool SetConsumableUseTestItemDataAssets(FAutomationTestBase& Test, UPRInventoryC
 	return true;
 }
 
+void AdvanceConsumableUseTimer(UWorld* World, const float DurationSeconds)
+{
+	if (!World)
+	{
+		return;
+	}
+	// Test worlds do not advance their timer manager through the editor's normal
+	// frame loop. Tick it explicitly so the production timer callback is tested.
+	++GFrameCounter;
+	World->GetTimerManager().Tick(0.001f);
+	++GFrameCounter;
+	World->GetTimerManager().Tick(DurationSeconds);
+}
+
 struct FConsumableUseTestPlayer
 {
 	TObjectPtr<APRPlayerController> Controller;
 	TObjectPtr<APRPlayerState> PlayerState;
 	TObjectPtr<APRCharacter> Character;
 	TObjectPtr<UPRInventoryComponent> Inventory;
+	TObjectPtr<UPRQuickbarComponent> Quickbar;
 	TObjectPtr<UPRAttributeSet> Attributes;
 };
 
@@ -95,8 +112,10 @@ FConsumableUseTestPlayer SpawnConsumableUseTestPlayer(FAutomationTestBase& Test,
 	Result.Controller->Possess(Result.Character);
 
 	Result.Inventory = Result.PlayerState->GetInventoryComponent();
+	Result.Quickbar = Result.PlayerState->GetQuickbarComponent();
 	Result.Attributes = Result.PlayerState->GetAttributeSet();
 	Test.TestNotNull(TEXT("Consumable test inventory exists"), Result.Inventory.Get());
+	Test.TestNotNull(TEXT("Consumable test quickbar exists"), Result.Quickbar.Get());
 	Test.TestNotNull(TEXT("Consumable test attributes exist"), Result.Attributes.Get());
 	Test.TestTrue(TEXT("Consumable test character initializes ASC"), Result.Character->IsAbilitySystemInitialized());
 
@@ -140,14 +159,18 @@ bool FPRConsumableUseTest::RunTest(const FString& Parameters)
 	}
 
 	FConsumableUseTestPlayer TestPlayer = SpawnConsumableUseTestPlayer(*this, World);
-	if (!TestPlayer.Controller || !TestPlayer.Inventory || !TestPlayer.Attributes || !TestPlayer.Character)
+	if (!TestPlayer.Controller || !TestPlayer.Inventory || !TestPlayer.Quickbar || !TestPlayer.Attributes || !TestPlayer.Character)
 	{
 		return false;
 	}
 
 	TestPlayer.Attributes->SetHealth(40.0f);
 	TestTrue(TEXT("Can seed HealthInjector stack"), TestPlayer.Inventory->AddItem(MakeConsumableUseTestItem(TEXT("HealthInjector"), 2)));
-	TestTrue(TEXT("HealthInjector can be used on the server"), TestPlayer.Controller->TryUseInventoryItemOnServer(TEXT("HealthInjector")));
+	TestTrue(TEXT("HealthInjector starts through the controller's timed-use route"), TestPlayer.Controller->TryUseInventoryItemOnServer(TEXT("HealthInjector")));
+	TestTrue(TEXT("Direct inventory use retains an active timed transaction"), TestPlayer.Quickbar->GetActiveUse().IsActive());
+	TestEqual(TEXT("Direct inventory use has no synthetic quick slot binding"), TestPlayer.Quickbar->GetActiveUse().SlotIndex, INDEX_NONE);
+	TestEqual(TEXT("HealthInjector is not consumed before timed completion"), TestPlayer.Inventory->GetItemCount(TEXT("HealthInjector")), 2);
+	AdvanceConsumableUseTimer(World, 0.8f);
 	TestTrue(TEXT("HealthInjector increases Health"), TestPlayer.Attributes->GetHealth() > 40.0f);
 	TestTrue(TEXT("HealthInjector clamps Health to MaxHealth"), TestPlayer.Attributes->GetHealth() <= TestPlayer.Attributes->GetMaxHealth());
 	TestEqual(TEXT("HealthInjector consumes one item"), TestPlayer.Inventory->GetItemCount(TEXT("HealthInjector")), 1);
@@ -160,7 +183,8 @@ bool FPRConsumableUseTest::RunTest(const FString& Parameters)
 
 	TestPlayer.Attributes->SetShield(10.0f);
 	TestTrue(TEXT("Can seed ShieldPack"), TestPlayer.Inventory->AddItem(MakeConsumableUseTestItem(TEXT("ShieldPack"), 1)));
-	TestTrue(TEXT("ShieldPack can be used on the server"), TestPlayer.Controller->TryUseInventoryItemOnServer(TEXT("ShieldPack")));
+	TestTrue(TEXT("ShieldPack starts through the controller's timed-use route"), TestPlayer.Controller->TryUseInventoryItemOnServer(TEXT("ShieldPack")));
+	AdvanceConsumableUseTimer(World, 1.1f);
 	TestTrue(TEXT("ShieldPack increases Shield"), TestPlayer.Attributes->GetShield() > 10.0f);
 	TestTrue(TEXT("ShieldPack clamps Shield to MaxShield"), TestPlayer.Attributes->GetShield() <= TestPlayer.Attributes->GetMaxShield());
 	TestEqual(TEXT("ShieldPack consumes one item"), TestPlayer.Inventory->GetItemCount(TEXT("ShieldPack")), 0);
@@ -190,11 +214,15 @@ bool FPRConsumableUseTest::RunTest(const FString& Parameters)
 	CustomHealthInjectorData->MaxStackCount = 5;
 	CustomHealthInjectorData->bCanUse = true;
 	CustomHealthInjectorData->UseEffect = UPRHealthConsumableGameplayEffect::StaticClass();
+	CustomHealthInjectorData->UseDefinition.Kind = EPRItemUseKind::RestoreHealth;
+	CustomHealthInjectorData->UseDefinition.bQuickbarEligible = true;
+	CustomHealthInjectorData->UseDefinition.UseDurationSeconds = 0.01f;
 	TestTrue(TEXT("Can register data-driven consumable item data"), SetConsumableUseTestItemDataAssets(*this, TestPlayer.Inventory, { CustomHealthInjectorData }));
 
 	TestPlayer.Attributes->SetHealth(30.0f);
 	TestTrue(TEXT("Can seed custom data-driven consumable"), TestPlayer.Inventory->AddItem(MakeConsumableUseTestItem(TEXT("CustomHealthInjector"), 1)));
-	TestTrue(TEXT("Custom consumable uses its ItemData UseEffect"), TestPlayer.Controller->TryUseInventoryItemOnServer(TEXT("CustomHealthInjector")));
+	TestTrue(TEXT("Custom consumable starts with its ItemData timed-use definition"), TestPlayer.Controller->TryUseInventoryItemOnServer(TEXT("CustomHealthInjector")));
+	AdvanceConsumableUseTimer(World, 0.02f);
 	TestTrue(TEXT("Custom consumable increases Health through GameplayEffect"), TestPlayer.Attributes->GetHealth() > 30.0f);
 	TestEqual(TEXT("Custom consumable consumes one item"), TestPlayer.Inventory->GetItemCount(TEXT("CustomHealthInjector")), 0);
 

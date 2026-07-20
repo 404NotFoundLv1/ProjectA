@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.7.4] - 2026-07-20
+
+- Added a PlayerState-owned, owner-only replicated four-slot quickbar referencing authoritative item-instance GUIDs, including timed server use transactions, cancellation, cooldown state, and save migration to profile schema v8.
+- Added declarative consumable-use metadata, health/shield/energy/purification/ammunition use kinds, a `State.UsingItem` blocker, and interruption from direct physical damage, stagger, stun, downed state, and pawn removal.
+- Added native quickbar HUD/debug state, keyboard quick-slot bindings, mission-tool objective requirements, and settlement-time auto-processing for data-marked mission items.
+
 ## [0.7.3] - 2026-07-20
 
 - Added deterministic server-owned run seeds, frozen reward eligibility, shared consumable/world-drop policy, and direct-to-warehouse personal equipment settlement rewards.

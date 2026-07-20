@@ -1,5 +1,7 @@
 #include "Core/PRRiftObjectiveActor.h"
 
+#include "Items/PRInventoryComponent.h"
+#include "Items/PRItemTransactionComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Core/PRRiftGameMode.h"
@@ -8,6 +10,7 @@
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
 #include "Player/PRPlayerController.h"
+#include "Player/PRPlayerState.h"
 #include "ProjectA.h"
 #include "Settings/PRProjectSettings.h"
 #include "UI/PRInteractionPromptWidget.h"
@@ -87,6 +90,30 @@ bool APRRiftObjectiveActor::ActivateObjective(AController* ActivatingController)
 	{
 		return false;
 	}
+	if (!RequiredMissionItemId.IsNone() && bConsumeRequiredMissionItem)
+	{
+		APRPlayerState* PlayerState = ActivatingController ? ActivatingController->GetPlayerState<APRPlayerState>() : nullptr;
+		UPRInventoryComponent* Inventory = PlayerState ? PlayerState->GetInventoryComponent() : nullptr;
+		UPRItemTransactionComponent* Transactions = PlayerState ? PlayerState->GetItemTransactionComponent() : nullptr;
+		const FPRItemInstance* RequiredItem = Inventory ? Inventory->GetItems().FindByPredicate([this](const FPRItemInstance& Item)
+		{
+			return Item.ItemId == RequiredMissionItemId && Item.Count > 0 && Item.HasValidIdentity();
+		}) : nullptr;
+		if (!RequiredItem || !Transactions)
+		{
+			return false;
+		}
+		FPRItemTransactionRequest Request;
+		Request.Header.TransactionId = FGuid::NewGuid();
+		Request.Header.ExpectedRevision = Transactions->GetRevision();
+		Request.Intent = EPRItemTransactionIntent::Use;
+		Request.InstanceGuid = RequiredItem->InstanceGuid;
+		Request.Count = 1;
+		if (Transactions->ExecuteAuthoritativeTransaction(Request).Status != EPRItemTransactionStatus::Success)
+		{
+			return false;
+		}
+	}
 
 	SetObjectiveState(EPRRiftObjectiveState::Active);
 	SetObjectiveProgress(0.0f);
@@ -102,7 +129,17 @@ bool APRRiftObjectiveActor::ActivateObjective(AController* ActivatingController)
 
 bool APRRiftObjectiveActor::CanActivateObjective(AController* ActivatingController) const
 {
-	return ObjectiveState == EPRRiftObjectiveState::NotStarted;
+	if (ObjectiveState != EPRRiftObjectiveState::NotStarted)
+	{
+		return false;
+	}
+	if (RequiredMissionItemId.IsNone())
+	{
+		return true;
+	}
+	const APRPlayerState* PlayerState = ActivatingController ? ActivatingController->GetPlayerState<APRPlayerState>() : nullptr;
+	const UPRInventoryComponent* Inventory = PlayerState ? PlayerState->GetInventoryComponent() : nullptr;
+	return Inventory && Inventory->GetItemCount(RequiredMissionItemId) > 0;
 }
 
 void APRRiftObjectiveActor::CompleteObjective()
@@ -133,7 +170,9 @@ FText APRRiftObjectiveActor::GetInteractionPromptText() const
 		return FText::FromString(TEXT("\u4EFB\u52A1\u5B8C\u6210"));
 	case EPRRiftObjectiveState::NotStarted:
 	default:
-		return FText::FromString(TEXT("\u6309 F \u5F00\u59CB\u4EFB\u52A1"));
+		return RequiredMissionItemId.IsNone()
+			? FText::FromString(TEXT("\u6309 F \u5F00\u59CB\u4EFB\u52A1"))
+			: FText::FromString(FString::Printf(TEXT("\u9700\u8981 %s"), *RequiredMissionItemId.ToString()));
 	}
 }
 

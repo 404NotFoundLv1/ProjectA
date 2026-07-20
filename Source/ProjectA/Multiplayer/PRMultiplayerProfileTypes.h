@@ -20,6 +20,9 @@ struct PROJECTA_API FPRMultiplayerProfileProjection
 	TArray<FPRItemInstance> BackpackItems;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Profile")
+	TArray<FPRQuickSlotReference> QuickSlots;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Profile")
 	TArray<FPRProfileEquipmentEntry> Equipment;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Profile")
@@ -80,6 +83,9 @@ struct PROJECTA_API FPRPlayerSettlementReceipt
 
 	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Settlement")
 	TArray<FPRItemInstance> SettledBackpackItems;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Settlement")
+	TArray<FPRQuickSlotReference> SettledQuickSlots;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Settlement")
 	TArray<FPRProfileEquipmentEntry> SettledEquipment;

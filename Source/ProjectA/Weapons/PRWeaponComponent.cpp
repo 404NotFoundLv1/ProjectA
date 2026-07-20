@@ -136,7 +136,8 @@ bool UPRWeaponComponent::CanUseWeapon() const
 		&& !ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Stunned)
 		&& !ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_PlacingDeployable)
 		&& !ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Reviving)
-		&& !ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_BeingRevived);
+		&& !ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_BeingRevived)
+		&& !ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_UsingItem);
 }
 
 void UPRWeaponComponent::SetStateTag(const FGameplayTag Tag, const bool bEnabled)
@@ -195,7 +196,8 @@ void UPRWeaponComponent::SetAiming(const bool bNewAiming)
 			|| ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Stunned)
 			|| ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_PlacingDeployable)
 			|| ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_Reviving)
-			|| ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_BeingRevived))
+			|| ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_BeingRevived)
+			|| ASC->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_UsingItem))
 		{
 			return;
 		}

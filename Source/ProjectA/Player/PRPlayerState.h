@@ -17,6 +17,7 @@ class UPRMissionProgressionDataAsset;
 class UPRWeaponComponent;
 class UPRRoleComponent;
 class UPRDeployableComponent;
+class UPRQuickbarComponent;
 
 USTRUCT(BlueprintType)
 struct PROJECTA_API FPRShipResourceStack
@@ -75,6 +76,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Deployable")
 	UPRDeployableComponent* GetDeployableComponent() const { return DeployableComponent.Get(); }
+
+	UFUNCTION(BlueprintPure, Category = "Quickbar")
+	UPRQuickbarComponent* GetQuickbarComponent() const { return QuickbarComponent.Get(); }
 
 	UFUNCTION(BlueprintPure, Category = "Lobby")
 	bool IsReady() const { return bIsReady; }
@@ -181,6 +185,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Deployable", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPRDeployableComponent> DeployableComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Quickbar", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPRQuickbarComponent> QuickbarComponent;
 
 	UPROPERTY(ReplicatedUsing = OnRep_IsReady, VisibleInstanceOnly, BlueprintReadOnly, Category = "Lobby", meta = (AllowPrivateAccess = "true"))
 	bool bIsReady;

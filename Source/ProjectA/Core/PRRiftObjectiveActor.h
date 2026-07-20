@@ -53,6 +53,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Rift|Objective")
 	FText GetInteractionPromptText() const;
 
+	UFUNCTION(BlueprintPure, Category = "Rift|Objective")
+	FName GetRequiredMissionItemId() const { return RequiredMissionItemId; }
+
 	UWidgetComponent* GetInteractionPromptWidget() const { return InteractionPromptWidget; }
 
 protected:
@@ -83,6 +86,12 @@ protected:
 
 	UPROPERTY(ReplicatedUsing = OnRep_ObjectiveProgress, BlueprintReadOnly, Category = "Rift|Objective")
 	float ObjectiveProgress = 0.0f;
+
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Rift|Objective|Mission Item")
+	FName RequiredMissionItemId;
+
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Rift|Objective|Mission Item")
+	bool bConsumeRequiredMissionItem = true;
 
 	UFUNCTION()
 	void OnRep_ObjectiveState();

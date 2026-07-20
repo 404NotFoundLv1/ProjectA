@@ -2,6 +2,7 @@
 
 #include "Core/PRAssetManager.h"
 #include "Items/PRInventoryComponent.h"
+#include "Items/PRQuickbarComponent.h"
 #include "Items/PREquipmentTypes.h"
 #include "Player/PRPlayerState.h"
 #include "Roles/PRRoleComponent.h"
@@ -74,15 +75,17 @@ bool FPRProfileRuntimeBridge::CaptureFromPlayerState(
 	const UPRInventoryComponent* Inventory = PlayerState ? PlayerState->GetInventoryComponent() : nullptr;
 	const UPRWeaponComponent* Weapon = PlayerState ? PlayerState->GetWeaponComponent() : nullptr;
 	const UPRRoleComponent* RoleComponent = PlayerState ? PlayerState->GetRoleComponent() : nullptr;
-	if (!PlayerState || !Inventory || !Weapon || !RoleComponent)
+	const UPRQuickbarComponent* Quickbar = PlayerState ? PlayerState->GetQuickbarComponent() : nullptr;
+	if (!PlayerState || !Inventory || !Weapon || !RoleComponent || !Quickbar)
 	{
-		OutDiagnostic = TEXT("PlayerState, inventory, weapon, or role component is unavailable.");
+		OutDiagnostic = TEXT("PlayerState, inventory, weapon, role, or quickbar component is unavailable.");
 		return false;
 	}
 	if (!Weapon->BuildPersistentBackpack(InOutSnapshot.BackpackItems, OutDiagnostic))
 	{
 		return false;
 	}
+	InOutSnapshot.QuickSlots = Quickbar->GetQuickSlots();
 
 	InOutSnapshot.Equipment.RemoveAll([](const FPRProfileEquipmentEntry& Entry)
 	{
@@ -133,9 +136,10 @@ bool FPRProfileRuntimeBridge::ApplyToPlayerState(
 	UPRInventoryComponent* Inventory = PlayerState ? PlayerState->GetInventoryComponent() : nullptr;
 	UPRWeaponComponent* Weapon = PlayerState ? PlayerState->GetWeaponComponent() : nullptr;
 	UPRRoleComponent* RoleComponent = PlayerState ? PlayerState->GetRoleComponent() : nullptr;
-	if (!PlayerState || !Inventory || !Weapon || !RoleComponent)
+	UPRQuickbarComponent* Quickbar = PlayerState ? PlayerState->GetQuickbarComponent() : nullptr;
+	if (!PlayerState || !Inventory || !Weapon || !RoleComponent || !Quickbar)
 	{
-		OutDiagnostic = TEXT("PlayerState, inventory, weapon, or role component is unavailable.");
+		OutDiagnostic = TEXT("PlayerState, inventory, weapon, role, or quickbar component is unavailable.");
 		return false;
 	}
 	if (!Snapshot.IsValid(&OutDiagnostic))
@@ -236,5 +240,6 @@ bool FPRProfileRuntimeBridge::ApplyToPlayerState(
 		OutDiagnostic = TEXT("PlayerState rejected profile role state.");
 		return false;
 	}
+	Quickbar->SetQuickSlotsFromProfile(Snapshot.QuickSlots);
 	return true;
 }

@@ -18,6 +18,7 @@
 #include "Items/PRInventoryComponent.h"
 #include "Items/PRItemDataAsset.h"
 #include "Items/PRItemTypes.h"
+#include "Items/PRQuickbarComponent.h"
 #include "Items/PRRewardBudgetDataAsset.h"
 #include "Items/PRRewardGenerationLibrary.h"
 #include "Kismet/GameplayStatics.h"
@@ -568,6 +569,31 @@ FPRPlayerSettlementReceipt APRRiftGameMode::BuildPersonalSettlementReceipt(
 	Receipt.SettledBackpackItems = Result == EPRRiftMissionResult::Success && Receipt.bExtracted
 		? RuntimeItems
 		: FPRMultiplayerSettlementPolicy::BuildNonExtractedInventory(PlayerState->GetMissionStartBackpackItems(), RuntimeItems);
+	if (const UPRQuickbarComponent* Quickbar = PlayerState->GetQuickbarComponent())
+	{
+		Receipt.SettledQuickSlots = Quickbar->GetQuickSlots();
+	}
+	if (const UPRInventoryComponent* Inventory = PlayerState->GetInventoryComponent())
+	{
+		TSet<FGuid> AutoProcessedInstances;
+		Receipt.SettledBackpackItems.RemoveAll([Inventory, &AutoProcessedInstances](const FPRItemInstance& Item)
+		{
+			const UPRItemDataAsset* Data = Inventory->FindItemData(Item.ItemId);
+			if (Data && Data->bAutoProcessAtMissionEnd)
+			{
+				AutoProcessedInstances.Add(Item.InstanceGuid);
+				return true;
+			}
+			return false;
+		});
+		if (AutoProcessedInstances.Num() > 0)
+		{
+			Receipt.SettledQuickSlots.RemoveAll([&AutoProcessedInstances](const FPRQuickSlotReference& Slot)
+			{
+				return AutoProcessedInstances.Contains(Slot.InstanceGuid);
+			});
+		}
+	}
 	Receipt.SettledEquipment = Weapon->GetEquipmentEntries();
 	for (const FPRShipResourceStack& Resource : PlayerState->GetShipResources())
 	{

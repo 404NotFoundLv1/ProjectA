@@ -169,6 +169,30 @@ void FPRProfileSnapshot::Normalize()
 
 	BackpackItems.RemoveAll([](const FPRItemInstance& Item) { return !Item.IsValid(); });
 	WarehouseItems.RemoveAll([](const FPRItemInstance& Item) { return !Item.IsValid(); });
+	TSet<int32> QuickbarIndices;
+	TSet<FGuid> BackpackGuids;
+	for (const FPRItemInstance& Item : BackpackItems)
+	{
+		if (Item.HasValidIdentity())
+		{
+			BackpackGuids.Add(Item.InstanceGuid);
+		}
+	}
+	TSet<FGuid> QuickbarGuids;
+	QuickSlots.RemoveAll([&QuickbarIndices, &QuickbarGuids, &BackpackGuids](const FPRQuickSlotReference& Slot)
+	{
+		if (!Slot.IsValid() || QuickbarIndices.Contains(Slot.SlotIndex) || QuickbarGuids.Contains(Slot.InstanceGuid) || !BackpackGuids.Contains(Slot.InstanceGuid))
+		{
+			return true;
+		}
+		QuickbarIndices.Add(Slot.SlotIndex);
+		QuickbarGuids.Add(Slot.InstanceGuid);
+		return false;
+	});
+	QuickSlots.Sort([](const FPRQuickSlotReference& Left, const FPRQuickSlotReference& Right)
+	{
+		return Left.SlotIndex < Right.SlotIndex;
+	});
 
 	TSet<FName> EquipmentSlots;
 	Equipment.RemoveAll([&EquipmentSlots](const FPRProfileEquipmentEntry& Entry)
@@ -273,6 +297,28 @@ bool FPRProfileSnapshot::IsValid(FString* OutDiagnostic) const
 	{
 		if (OutDiagnostic) { *OutDiagnostic = TEXT("Inventory contains an invalid item instance."); }
 		return false;
+	}
+	if (QuickSlots.Num() > 4)
+	{
+		if (OutDiagnostic) { *OutDiagnostic = TEXT("Quickbar exceeds four supported slots."); }
+		return false;
+	}
+	TSet<int32> QuickbarIndices;
+	TSet<FGuid> QuickbarGuids;
+	TSet<FGuid> BackpackGuids;
+	for (const FPRItemInstance& Item : BackpackItems)
+	{
+		if (Item.HasValidIdentity()) { BackpackGuids.Add(Item.InstanceGuid); }
+	}
+	for (const FPRQuickSlotReference& Slot : QuickSlots)
+	{
+		if (!Slot.IsValid() || QuickbarIndices.Contains(Slot.SlotIndex) || QuickbarGuids.Contains(Slot.InstanceGuid) || !BackpackGuids.Contains(Slot.InstanceGuid))
+		{
+			if (OutDiagnostic) { *OutDiagnostic = TEXT("Quickbar contains an invalid, duplicate, or missing backpack reference."); }
+			return false;
+		}
+		QuickbarIndices.Add(Slot.SlotIndex);
+		QuickbarGuids.Add(Slot.InstanceGuid);
 	}
 	TSet<FName> EquipmentSlots;
 	for (const FPRProfileEquipmentEntry& Entry : Equipment)

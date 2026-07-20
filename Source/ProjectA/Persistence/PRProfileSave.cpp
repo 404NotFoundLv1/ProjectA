@@ -139,6 +139,12 @@ FPRProfileOperationResult UPRProfileSave::MigrateToLatest()
 			Snapshot.Normalize();
 			SaveVersion = 7;
 			break;
+		case 7:
+			// v0.7.4 persists only GUID references; older profiles begin with no quickbar bindings.
+			Snapshot.QuickSlots.Reset();
+			Snapshot.Normalize();
+			SaveVersion = 8;
+			break;
 		default:
 			return FPRProfileOperationResult::MakeFailure(
 				EPRProfileOperationStatus::MigrationFailed,
