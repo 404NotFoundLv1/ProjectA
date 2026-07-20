@@ -3,6 +3,7 @@
 #include "Items/PRItemDataAsset.h"
 #include "Items/PRAffixDefinitionDataAsset.h"
 #include "Items/PRLootTableDataAsset.h"
+#include "Items/PRRewardBudgetDataAsset.h"
 #include "Progression/PRMissionProgressionDataAsset.h"
 #include "Roles/PRRoleDataAsset.h"
 #include "Roles/PRRoleModuleDataAsset.h"
@@ -52,6 +53,13 @@ FPrimaryAssetId UPRAssetManager::MakeLootTablePrimaryAssetId(const FName AssetNa
 		: FPrimaryAssetId(UPRLootTableDataAsset::LootTablePrimaryAssetType, AssetName);
 }
 
+FPrimaryAssetId UPRAssetManager::MakeRewardBudgetPrimaryAssetId(const FName AssetName)
+{
+	return AssetName.IsNone()
+		? FPrimaryAssetId()
+		: FPrimaryAssetId(UPRRewardBudgetDataAsset::RewardBudgetPrimaryAssetType, AssetName);
+}
+
 FPrimaryAssetId UPRAssetManager::MakeMissionPrimaryAssetId(const FName MissionId)
 {
 	return MissionId.IsNone()
@@ -87,6 +95,7 @@ void UPRAssetManager::StartInitialLoading()
 	ValidatePrimaryAssetType(UPRItemDataAsset::ItemPrimaryAssetType);
 	ValidatePrimaryAssetType(UPRAffixDefinitionDataAsset::AffixPrimaryAssetType);
 	ValidatePrimaryAssetType(UPRLootTableDataAsset::LootTablePrimaryAssetType);
+	ValidatePrimaryAssetType(UPRRewardBudgetDataAsset::RewardBudgetPrimaryAssetType);
 	ValidatePrimaryAssetType(UPRMissionProgressionDataAsset::MissionPrimaryAssetType);
 	ValidatePrimaryAssetType(UPRRoleDataAsset::RolePrimaryAssetType);
 	ValidatePrimaryAssetType(UPRRoleModuleDataAsset::RoleModulePrimaryAssetType);
@@ -157,6 +166,13 @@ UPRLootTableDataAsset* UPRAssetManager::LoadLootTableSync(const FName AssetName)
 	return Cast<UPRLootTableDataAsset>(LoadPrimaryAssetSync(
 		MakeLootTablePrimaryAssetId(AssetName),
 		UPRLootTableDataAsset::StaticClass()));
+}
+
+UPRRewardBudgetDataAsset* UPRAssetManager::LoadRewardBudgetSync(const FName AssetName)
+{
+	return Cast<UPRRewardBudgetDataAsset>(LoadPrimaryAssetSync(
+		MakeRewardBudgetPrimaryAssetId(AssetName),
+		UPRRewardBudgetDataAsset::StaticClass()));
 }
 
 UPRMissionProgressionDataAsset* UPRAssetManager::LoadMissionSync(const FName MissionId)

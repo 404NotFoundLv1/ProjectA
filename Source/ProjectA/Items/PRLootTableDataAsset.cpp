@@ -34,7 +34,7 @@ TArray<FPRLootTableEntry> UPRLootTableDataAsset::MakeDefaultTestEntries()
 	DefaultEntries.Add(MakeLootEntry(TEXT("HealthInjector"), 40.0f, EPRItemRarity::Common));
 	DefaultEntries.Add(MakeLootEntry(TEXT("ShieldPack"), 30.0f, EPRItemRarity::Common));
 	DefaultEntries.Add(MakeLootEntry(TEXT("EnergyCrystal"), 20.0f, EPRItemRarity::Uncommon));
-	DefaultEntries.Add(MakeLootEntry(TEXT("DA_TestChip"), 10.0f, EPRItemRarity::Common, true));
+	DefaultEntries.Add(MakeLootEntry(TEXT("CommonChip"), 10.0f, EPRItemRarity::Common));
 	return DefaultEntries;
 }
 
@@ -115,12 +115,47 @@ bool UPRLootTableDataAsset::RollRandomLoot(FPRItemInstance& OutItem) const
 
 bool UPRLootTableDataAsset::RollSeededLoot(const int32 LootSeed, FPRItemInstance& OutItem, FString& OutDiagnostic) const
 {
+	return RollSeededLootFiltered(LootSeed, NAME_None, EPRItemRarity::Common, OutItem, OutDiagnostic);
+}
+
+bool UPRLootTableDataAsset::RollSeededLootFiltered(
+	const int32 LootSeed,
+	const FName ExcludedItemId,
+	const EPRItemRarity MinimumRarity,
+	FPRItemInstance& OutItem,
+	FString& OutDiagnostic) const
+{
 	OutItem = FPRItemInstance();
 	OutDiagnostic.Reset();
-	const float TotalWeight = GetTotalWeight();
+	auto IsCandidate = [ExcludedItemId, MinimumRarity](const FPRLootTableEntry& Entry, const bool bApplyExclusion)
+	{
+		return Entry.IsValid()
+			&& Entry.Item.Rarity >= MinimumRarity
+			&& (!bApplyExclusion || ExcludedItemId.IsNone() || Entry.Item.ItemId != ExcludedItemId);
+	};
+	auto GetCandidateWeight = [this, &IsCandidate](const bool bApplyExclusion)
+	{
+		float Weight = 0.0f;
+		for (const FPRLootTableEntry& Entry : Entries)
+		{
+			if (IsCandidate(Entry, bApplyExclusion))
+			{
+				Weight += Entry.Weight;
+			}
+		}
+		return Weight;
+	};
+	bool bApplyExclusion = !ExcludedItemId.IsNone();
+	float TotalWeight = GetCandidateWeight(bApplyExclusion);
+	if (TotalWeight <= 0.0f && bApplyExclusion)
+	{
+		// Repeat protection only excludes an item when another legal candidate exists.
+		bApplyExclusion = false;
+		TotalWeight = GetCandidateWeight(false);
+	}
 	if (TotalWeight <= 0.0f)
 	{
-		OutDiagnostic = TEXT("Loot table has no valid weighted entries.");
+		OutDiagnostic = TEXT("Loot table has no valid weighted entries after reward constraints.");
 		return false;
 	}
 	FRandomStream Stream(LootSeed);
@@ -129,7 +164,7 @@ bool UPRLootTableDataAsset::RollSeededLoot(const int32 LootSeed, FPRItemInstance
 	const FPRLootTableEntry* SelectedEntry = nullptr;
 	for (const FPRLootTableEntry& Entry : Entries)
 	{
-		if (!Entry.IsValid())
+		if (!IsCandidate(Entry, bApplyExclusion))
 		{
 			continue;
 		}

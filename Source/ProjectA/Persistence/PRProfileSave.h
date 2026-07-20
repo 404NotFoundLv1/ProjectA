@@ -12,7 +12,7 @@ class PROJECTA_API UPRProfileSave : public USaveGame
 
 public:
 	static constexpr int32 InitialSaveVersion = 1;
-	static constexpr int32 LatestSaveVersion = 6;
+	static constexpr int32 LatestSaveVersion = 7;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Profile")
 	int32 SaveVersion = LatestSaveVersion;

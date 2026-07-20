@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Items/PRItemTypes.h"
+#include "Items/PRRewardTypes.h"
 #include "PRPickupActor.generated.h"
 
 class USphereComponent;
@@ -30,6 +31,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Pickup")
 	void SetItemInstance(const FPRItemInstance& InItemInstance);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Pickup|Rewards")
+	void SetRewardSource(const FPRRewardSourceContext& InRewardSource);
 
 	UFUNCTION(BlueprintPure, Category = "Pickup")
 	bool CanBePickedUp() const;
@@ -88,6 +92,9 @@ private:
 
 	UPROPERTY(ReplicatedUsing = OnRep_ItemInstance, EditAnywhere, BlueprintReadOnly, Category = "Pickup", meta = (AllowPrivateAccess = "true"))
 	FPRItemInstance ItemInstance;
+
+	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Pickup|Rewards", meta = (AllowPrivateAccess = "true"))
+	FPRRewardSourceContext RewardSource;
 
 	UPROPERTY(ReplicatedUsing = OnRep_IsPickedUp, VisibleInstanceOnly, BlueprintReadOnly, Category = "Pickup", meta = (AllowPrivateAccess = "true"))
 	bool bIsPickedUp;

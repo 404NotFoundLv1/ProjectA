@@ -6,6 +6,7 @@
 #include "PRMissionProgressionDataAsset.generated.h"
 
 class UWorld;
+class UPRRewardBudgetDataAsset;
 
 UCLASS(BlueprintType)
 class PROJECTA_API UPRMissionProgressionDataAsset : public UPrimaryDataAsset
@@ -40,6 +41,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Progression")
 	bool bStarterMission = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rewards")
+	TSoftObjectPtr<UPRRewardBudgetDataAsset> RewardBudget;
 
 	bool IsContractValid(FString* OutDiagnostic = nullptr) const;
 	bool IsEligible(const FPRProfileStoryProgress& Story) const;

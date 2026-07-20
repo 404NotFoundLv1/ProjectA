@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Core/PRRiftSettlementTypes.h"
+#include "Multiplayer/PRMultiplayerProfileTypes.h"
 #include "Fonts/SlateFontInfo.h"
 #include "PRRiftSettlementWidget.generated.h"
 
@@ -33,6 +34,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Rift|Settlement")
 	void SetPersonalSaveStatus(const FString& InStatus);
 
+	UFUNCTION(BlueprintCallable, Category = "Rift|Settlement")
+	void SetPersonalRewardReceipt(const FPRPlayerSettlementReceipt& Receipt);
+
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual void ReleaseSlateResources(bool bReleaseChildren) override;
@@ -46,6 +50,7 @@ private:
 
 	FPRRiftSettlementData DisplayedSettlementData;
 	FString PersonalSaveStatus = TEXT("Waiting");
+	FString PersonalRewardSummary = TEXT("No personal reward");
 	bool bUsePreviewData = false;
 
 	TSharedPtr<SWidget> SettlementRootWidget;

@@ -67,6 +67,7 @@ void APRPickupActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(APRPickupActor, ItemInstance);
+	DOREPLIFETIME(APRPickupActor, RewardSource);
 	DOREPLIFETIME(APRPickupActor, bIsPickedUp);
 }
 
@@ -86,6 +87,16 @@ void APRPickupActor::SetItemInstance(const FPRItemInstance& InItemInstance)
 		*GetNameSafe(this),
 		*ItemInstance.ItemId.ToString(),
 		ItemInstance.Count);
+}
+
+void APRPickupActor::SetRewardSource(const FPRRewardSourceContext& InRewardSource)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	RewardSource = InRewardSource;
+	ForceNetUpdate();
 }
 
 bool APRPickupActor::CanBePickedUp() const

@@ -7,6 +7,7 @@
 class UPRItemDataAsset;
 class UPRAffixDefinitionDataAsset;
 class UPRLootTableDataAsset;
+class UPRRewardBudgetDataAsset;
 class UPRMissionProgressionDataAsset;
 class UPRRoleDataAsset;
 class UPRRoleModuleDataAsset;
@@ -26,6 +27,7 @@ public:
 	static FPrimaryAssetId MakeItemPrimaryAssetId(FName ItemId);
 	static FPrimaryAssetId MakeAffixPrimaryAssetId(FName AffixId);
 	static FPrimaryAssetId MakeLootTablePrimaryAssetId(FName AssetName);
+	static FPrimaryAssetId MakeRewardBudgetPrimaryAssetId(FName AssetName);
 	static FPrimaryAssetId MakeMissionPrimaryAssetId(FName MissionId);
 	static FPrimaryAssetId MakeRolePrimaryAssetId(FName RoleId);
 	static FPrimaryAssetId MakeRoleModulePrimaryAssetId(FName ModuleId);
@@ -39,6 +41,7 @@ public:
 	UPRAffixDefinitionDataAsset* LoadAffixSync(FName AffixId);
 	bool LoadAffixCatalog(TArray<UPRAffixDefinitionDataAsset*>& OutAffixes);
 	UPRLootTableDataAsset* LoadLootTableSync(FName AssetName);
+	UPRRewardBudgetDataAsset* LoadRewardBudgetSync(FName AssetName);
 	UPRMissionProgressionDataAsset* LoadMissionSync(FName MissionId);
 	UPRRoleDataAsset* LoadRoleSync(FName RoleId);
 	UPRRoleModuleDataAsset* LoadRoleModuleSync(FName ModuleId);

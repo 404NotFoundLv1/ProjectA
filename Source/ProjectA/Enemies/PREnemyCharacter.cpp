@@ -287,6 +287,13 @@ APRPickupActor* APREnemyCharacter::SpawnDeathLoot()
 	}
 
 	const FVector SpawnLocation = GetActorLocation() + FVector(0.0f, 0.0f, 28.0f);
+	FPRRewardSourceContext RewardSource;
+	RewardSource.SourceType = EPRRewardSourceType::Enemy;
+	RewardSource.SourceId = TEXT("Enemy.Basic");
+	if (const APRRiftGameMode* RiftGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<APRRiftGameMode>() : nullptr)
+	{
+		RewardSource.Seed = RiftGameMode->AllocateRewardSeed(RewardSource.SourceType, RewardSource.SourceId, FGuid(), 0);
+	}
 	APRPickupActor* LootPickup = nullptr;
 	if (DeathLootRollOverride >= 0.0f)
 	{
@@ -308,7 +315,11 @@ APRPickupActor* APREnemyCharacter::SpawnDeathLoot()
 			PickupActorClass,
 			SpawnLocation,
 			FRotator::ZeroRotator,
-			FMath::Rand());
+			RewardSource.Seed != 0 ? RewardSource.Seed : FMath::Rand());
+	}
+	if (LootPickup)
+	{
+		LootPickup->SetRewardSource(RewardSource);
 	}
 
 	bDeathLootSpawned = LootPickup != nullptr;

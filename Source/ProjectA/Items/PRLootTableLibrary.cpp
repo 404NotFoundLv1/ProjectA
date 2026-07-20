@@ -14,7 +14,7 @@ APRPickupActor* UPRLootTableLibrary::SpawnLootPickupFromTable(
 	const FRotator SpawnRotation,
 	const float RollOverride)
 {
-	if (!WorldContextObject || !LootTable || !LootTable->IsValidLootTable())
+	if (!WorldContextObject || !LootTable || !LootTable->IsValidLootTable() || LootTable->DistributionPolicy != EPRLootDistributionPolicy::SharedWorld)
 	{
 		return nullptr;
 	}
@@ -79,7 +79,7 @@ APRPickupActor* UPRLootTableLibrary::SpawnSeededLootPickupFromTable(
 	const FRotator SpawnRotation,
 	const int32 LootSeed)
 {
-	if (!WorldContextObject || !LootTable || !LootTable->IsValidLootTable())
+	if (!WorldContextObject || !LootTable || !LootTable->IsValidLootTable() || LootTable->DistributionPolicy != EPRLootDistributionPolicy::SharedWorld)
 	{
 		return nullptr;
 	}

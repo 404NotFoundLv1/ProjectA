@@ -60,7 +60,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FPRItemInstanceIdentityTest::RunTest(const FString& Parameters)
 {
-	TestEqual(TEXT("Player profile schema is v6"), UPRProfileSave::LatestSaveVersion, 6);
+	TestEqual(TEXT("Player profile schema is v7"), UPRProfileSave::LatestSaveVersion, 7);
 
 	const FStructProperty* InstanceGuidProperty = FindInstanceGuidProperty();
 	TestNotNull(TEXT("Item instances expose InstanceGuid"), InstanceGuidProperty);
@@ -74,10 +74,10 @@ bool FPRItemInstanceIdentityTest::RunTest(const FString& Parameters)
 	UPRProfileSave* SecondMigration = MakeLegacyIdentityProfile(LegacyProfileId);
 	const FPRProfileOperationResult FirstResult = FirstMigration->MigrateToLatest();
 	const FPRProfileOperationResult SecondResult = SecondMigration->MigrateToLatest();
-	TestTrue(TEXT("First v4 profile migrates to v6"), FirstResult.IsSuccess());
-	TestTrue(TEXT("Second equivalent v4 profile migrates to v6"), SecondResult.IsSuccess());
-	TestEqual(TEXT("First migration reaches v6"), FirstMigration->SaveVersion, 6);
-	TestEqual(TEXT("Second migration reaches v6"), SecondMigration->SaveVersion, 6);
+	TestTrue(TEXT("First v4 profile migrates to v7"), FirstResult.IsSuccess());
+	TestTrue(TEXT("Second equivalent v4 profile migrates to v7"), SecondResult.IsSuccess());
+	TestEqual(TEXT("First migration reaches v7"), FirstMigration->SaveVersion, 7);
+	TestEqual(TEXT("Second migration reaches v7"), SecondMigration->SaveVersion, 7);
 
 	FGuid FirstBackpackGuid;
 	FGuid SecondBackpackGuid;
@@ -113,7 +113,7 @@ bool FPRItemInstanceIdentityTest::RunTest(const FString& Parameters)
 		*MutableInstanceGuidProperty->ContainerPtrToValuePtr<FGuid>(&InvalidV5Profile->Snapshot.WarehouseItems[0]) = DuplicateGuid;
 	}
 	const FPRProfileOperationResult InvalidV5Result = InvalidV5Profile->MigrateToLatest();
-	TestFalse(TEXT("v6 profile rejects duplicate instance GUIDs"), InvalidV5Result.IsSuccess());
+	TestFalse(TEXT("v7 profile rejects duplicate instance GUIDs"), InvalidV5Result.IsSuccess());
 
 	return true;
 }

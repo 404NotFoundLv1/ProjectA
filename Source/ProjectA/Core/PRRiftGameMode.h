@@ -126,6 +126,12 @@ public:
 	FGuid GetCurrentSettlementId() const { return CurrentSettlementId; }
 
 	UFUNCTION(BlueprintPure, Category = "Rift|Diagnostics")
+	int32 GetCurrentRunSeed() const { return CurrentRunSeed; }
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Rewards")
+	int32 AllocateRewardSeed(EPRRewardSourceType SourceType, FName SourceId, FGuid RecipientProfileId, int32 Ordinal) const;
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Diagnostics")
 	FName GetMissionId() const { return MissionId; }
 
 	UFUNCTION(BlueprintPure, Category = "Rift|Settlement")
@@ -202,6 +208,10 @@ private:
 	bool bSettlementFinalizationInProgress = false;
 	FGuid CurrentRunId;
 	FGuid CurrentSettlementId;
+	UPROPERTY(Transient)
+	int32 CurrentRunSeed = 0;
+	UPROPERTY(Transient)
+	TArray<FGuid> EligibleRewardProfileIds;
 	FGuid FinalizedRunId;
 	TSet<TObjectKey<APlayerState>> ExtractedPlayerStates;
 	TSet<TObjectKey<APREnemyCharacter>> CountedKilledEnemies;

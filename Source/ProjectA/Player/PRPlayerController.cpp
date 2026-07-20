@@ -1413,6 +1413,7 @@ void APRPlayerController::ClientReceivePersonalSettlement_Implementation(const F
 	PersonalSettlementSaveStatus = TEXT("Saving");
 	if (RiftSettlementWidget)
 	{
+		RiftSettlementWidget->SetPersonalRewardReceipt(Receipt);
 		RiftSettlementWidget->SetPersonalSaveStatus(PersonalSettlementSaveStatus);
 	}
 	UGameInstance* GameInstance = GetGameInstance();

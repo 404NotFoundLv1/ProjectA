@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.7.3] - 2026-07-20
+
+- Added deterministic server-owned run seeds, frozen reward eligibility, shared consumable/world-drop policy, and direct-to-warehouse personal equipment settlement rewards.
+- Added chapter reward-budget assets, 100/125/150/175 frozen-party budget scaling, CommonChip remainder conversion, Rare pity protection, and two-in-a-row repeat protection.
+- Added v7 profile migration and settlement receipt auditing for reward protection, source context, and idempotent warehouse grants.
+
 ## [0.7.2] - 2026-07-20
 
 - Added deterministic server-seeded Common, Uncommon, Rare, and Prototype equipment generation with persisted final affix rolls.

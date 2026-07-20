@@ -9,6 +9,7 @@
 #include "Items/PRItemDataAsset.h"
 #include "Items/PREquipmentDataAsset.h"
 #include "Items/PRLootTableDataAsset.h"
+#include "Items/PRRewardBudgetDataAsset.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Progression/PRMissionProgressionDataAsset.h"
 #include "Ship/PRShipRepairDataAsset.h"
@@ -98,6 +99,9 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 		TEXT("AssetManager scans ProjectRiftLootTable as AlwaysCook"),
 		HasScanRule(TEXT("ProjectRiftLootTable"), TEXT("/Script/ProjectA.PRLootTableDataAsset"), TEXT("/Game/ProjectRift/Items")));
 	TestTrue(
+		TEXT("AssetManager scans ProjectRiftRewardBudget as AlwaysCook"),
+		HasScanRule(TEXT("ProjectRiftRewardBudget"), TEXT("/Script/ProjectA.PRRewardBudgetDataAsset"), TEXT("/Game/ProjectRift/Rewards")));
+	TestTrue(
 		TEXT("AssetManager scans ProjectRiftMission as AlwaysCook"),
 		HasScanRule(TEXT("ProjectRiftMission"), TEXT("/Script/ProjectA.PRMissionProgressionDataAsset"), TEXT("/Game/ProjectRift/Missions")));
 	TestTrue(
@@ -120,9 +124,9 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 	const UGeneralProjectSettings* ProjectSettings = GetDefault<UGeneralProjectSettings>();
 	TestNotNull(TEXT("General project settings exist"), ProjectSettings);
 	TestEqual(
-		TEXT("Project version is v0.7.2"),
+		TEXT("Project version is v0.7.3"),
 		ProjectSettings ? ProjectSettings->ProjectVersion : FString(),
-		FString(TEXT("0.7.2")));
+		FString(TEXT("0.7.3")));
 
 	TestTrue(TEXT("Global manager is UPRAssetManager"), UAssetManager::Get().IsA<UPRAssetManager>());
 	TestEqual(
@@ -133,6 +137,10 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 		TEXT("Test loot table ID is canonical"),
 		UPRAssetManager::MakeLootTablePrimaryAssetId(TEXT("DA_TestLootTable")).ToString(),
 		FString(TEXT("ProjectRiftLootTable:DA_TestLootTable")));
+	TestEqual(
+		TEXT("Prologue reward budget ID is canonical"),
+		UPRAssetManager::MakeRewardBudgetPrimaryAssetId(TEXT("DA_Prologue_RiftTestRewardBudget")).ToString(),
+		FString(TEXT("ProjectRiftRewardBudget:DA_Prologue_RiftTestRewardBudget")));
 	TestEqual(
 		TEXT("Test mission ID is canonical"),
 		UPRAssetManager::MakeMissionPrimaryAssetId(TEXT("Mission.Rift.Test.Hold")).ToString(),
@@ -164,10 +172,12 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 	TArray<FPrimaryAssetId> ItemIds;
 	TArray<FPrimaryAssetId> LootTableIds;
 	TArray<FPrimaryAssetId> MissionIds;
+	TArray<FPrimaryAssetId> RewardBudgetIds;
 	TArray<FPrimaryAssetId> ShipRepairIds;
 	Manager->GetPrimaryAssetIdList(UPRItemDataAsset::ItemPrimaryAssetType, ItemIds);
 	Manager->GetPrimaryAssetIdList(UPRLootTableDataAsset::LootTablePrimaryAssetType, LootTableIds);
 	Manager->GetPrimaryAssetIdList(UPRMissionProgressionDataAsset::MissionPrimaryAssetType, MissionIds);
+	Manager->GetPrimaryAssetIdList(UPRRewardBudgetDataAsset::RewardBudgetPrimaryAssetType, RewardBudgetIds);
 	Manager->GetPrimaryAssetIdList(UPRShipRepairDataAsset::ShipRepairPrimaryAssetType, ShipRepairIds);
 	TestEqual(TEXT("Nine ProjectRift item assets are registered"), ItemIds.Num(), 9);
 	TestTrue(TEXT("Test rifle is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("TestRifle"))));
@@ -175,7 +185,8 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Test armor is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("DA_TestArmor"))));
 	TestTrue(TEXT("Test chip is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("DA_TestChip"))));
 	TestTrue(TEXT("Field Toolkit is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("DA_FieldToolkit"))));
-	TestEqual(TEXT("One ProjectRift loot table is registered"), LootTableIds.Num(), 1);
+	TestEqual(TEXT("Two ProjectRift loot tables are registered"), LootTableIds.Num(), 2);
+	TestEqual(TEXT("One ProjectRift reward budget is registered"), RewardBudgetIds.Num(), 1);
 	TestEqual(TEXT("One ProjectRift mission is registered"), MissionIds.Num(), 1);
 	TestEqual(TEXT("One ProjectRift ship repair is registered"), ShipRepairIds.Num(), 1);
 
@@ -199,6 +210,9 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 		TEXT("Loaded loot table has the canonical primary ID"),
 		TestLootTable ? TestLootTable->GetPrimaryAssetId().ToString() : FString(),
 		FString(TEXT("ProjectRiftLootTable:DA_TestLootTable")));
+	UPRRewardBudgetDataAsset* RewardBudget = Manager->LoadRewardBudgetSync(TEXT("DA_Prologue_RiftTestRewardBudget"));
+	TestNotNull(TEXT("Prologue reward budget loads by PrimaryAssetId"), RewardBudget);
+	TestTrue(TEXT("Loaded prologue reward budget is valid"), RewardBudget && RewardBudget->IsValidRewardBudget());
 
 	UPRMissionProgressionDataAsset* TestMission = Manager->LoadMissionSync(TEXT("Mission.Rift.Test.Hold"));
 	TestNotNull(TEXT("Test mission loads by PrimaryAssetId"), TestMission);

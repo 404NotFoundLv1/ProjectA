@@ -96,8 +96,9 @@ bool FPRLootTableTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("HealthInjector weight is 40"), LootTable->Entries[0].Weight, 40.0f);
 		TestEqual(TEXT("ShieldPack weight is 30"), LootTable->Entries[1].Weight, 30.0f);
 		TestEqual(TEXT("EnergyCrystal weight is 20"), LootTable->Entries[2].Weight, 20.0f);
-		TestEqual(TEXT("Test chip weight is 10"), LootTable->Entries[3].Weight, 10.0f);
-		TestTrue(TEXT("Test chip entry enables deterministic equipment affixes"), LootTable->Entries[3].bGenerateEquipmentAffixes);
+		TestEqual(TEXT("CommonChip weight is 10"), LootTable->Entries[3].Weight, 10.0f);
+		TestEqual(TEXT("Shared world table ends with CommonChip"), LootTable->Entries[3].Item.ItemId, FName(TEXT("CommonChip")));
+		TestFalse(TEXT("Shared world CommonChip never generates equipment affixes"), LootTable->Entries[3].bGenerateEquipmentAffixes);
 	}
 
 	RollAndTestItem(*this, LootTable, 0.0f, TEXT("HealthInjector"));
@@ -106,31 +107,8 @@ bool FPRLootTableTest::RunTest(const FString& Parameters)
 	RollAndTestItem(*this, LootTable, 69.99f, TEXT("ShieldPack"));
 	RollAndTestItem(*this, LootTable, 70.0f, TEXT("EnergyCrystal"));
 	RollAndTestItem(*this, LootTable, 89.99f, TEXT("EnergyCrystal"));
-	RollAndTestItem(*this, LootTable, 90.0f, TEXT("DA_TestChip"));
-	RollAndTestItem(*this, LootTable, 100.0f, TEXT("DA_TestChip"));
-
-	int32 EquipmentSeed = INDEX_NONE;
-	FPRItemInstance SeededEquipment;
-	for (int32 CandidateSeed = 0; CandidateSeed < 1024; ++CandidateSeed)
-	{
-		FPRItemInstance Candidate;
-		FString Diagnostic;
-		if (LootTable->RollSeededLoot(CandidateSeed, Candidate, Diagnostic) && Candidate.AffixGenerationVersion == 1)
-		{
-			EquipmentSeed = CandidateSeed;
-			SeededEquipment = Candidate;
-			break;
-		}
-	}
-	TestTrue(TEXT("A server seed can select and generate the equipment loot entry"), EquipmentSeed != INDEX_NONE);
-	if (EquipmentSeed != INDEX_NONE)
-	{
-		FPRItemInstance RepeatedSeededEquipment;
-		FString Diagnostic;
-		TestTrue(TEXT("The same server seed rerolls successfully"), LootTable->RollSeededLoot(EquipmentSeed, RepeatedSeededEquipment, Diagnostic));
-		TestTrue(TEXT("The same server seed preserves the final generated instance"), SeededEquipment.HasEquivalentStackingState(RepeatedSeededEquipment));
-		TestEqual(TEXT("Generated equipment persists its server LootSeed"), SeededEquipment.LootSeed, EquipmentSeed);
-	}
+	RollAndTestItem(*this, LootTable, 90.0f, TEXT("CommonChip"));
+	RollAndTestItem(*this, LootTable, 100.0f, TEXT("CommonChip"));
 
 	FTestWorldWrapper WorldWrapper;
 	TestTrue(TEXT("Test world is created"), WorldWrapper.CreateTestWorld(EWorldType::Game));
@@ -160,18 +138,14 @@ bool FPRLootTableTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Spawned loot is EnergyCrystal"), SpawnedLoot->GetItemInstance().ItemId, FName(TEXT("EnergyCrystal")));
 	TestEqual(TEXT("Spawned loot count is one"), SpawnedLoot->GetItemInstance().Count, 1);
 	TestTrue(TEXT("Spawned loot is near death location"), FVector::DistSquared(SpawnedLoot->GetActorLocation(), DeathLocation) < FMath::Square(20.0f));
-	if (EquipmentSeed != INDEX_NONE)
-	{
-		APRPickupActor* SeededPickup = UPRLootTableLibrary::SpawnSeededLootPickupFromTable(
-			World,
-			LootTable,
-			APRPickupActor::StaticClass(),
-			DeathLocation + FVector(80.0f, 0.0f, 0.0f),
-			FRotator::ZeroRotator,
-			EquipmentSeed);
-		TestNotNull(TEXT("Server seed spawns a generated equipment pickup"), SeededPickup);
-		TestTrue(TEXT("Seeded pickup preserves the final deterministic item"), SeededPickup && SeededPickup->GetItemInstance().HasEquivalentStackingState(SeededEquipment));
-	}
+	APRPickupActor* SeededPickup = UPRLootTableLibrary::SpawnSeededLootPickupFromTable(
+		World,
+		LootTable,
+		APRPickupActor::StaticClass(),
+		DeathLocation + FVector(80.0f, 0.0f, 0.0f),
+		FRotator::ZeroRotator,
+		1717);
+	TestNotNull(TEXT("Server seed spawns a deterministic shared pickup"), SeededPickup);
 
 	APRPlayerController* Picker = SpawnLootTableTestPlayer(*this, World, DeathLocation);
 	UPRInventoryComponent* PickerInventory = GetLootTableTestInventory(Picker);

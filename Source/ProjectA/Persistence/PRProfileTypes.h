@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Items/PRItemTypes.h"
+#include "Items/PRRewardTypes.h"
 #include "Roles/PRRoleTypes.h"
 #include "PRProfileTypes.generated.h"
 
@@ -204,6 +205,10 @@ struct PROJECTA_API FPRProfileSnapshot
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Profile|Ship Repair")
 	TArray<FGuid> ProcessedRepairTransactionIds;
+
+	/** Persistent per-budget pity and repeat-protection state. v7+ only. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Profile|Rewards")
+	TArray<FPRLootProtectionState> LootProtectionStates;
 
 	int32 GetResourceCount(FName ResourceId) const;
 	void Normalize();

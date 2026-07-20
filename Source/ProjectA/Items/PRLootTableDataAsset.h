@@ -4,6 +4,7 @@
 #include "Engine/DataAsset.h"
 #include "Items/PRAffixGenerationLibrary.h"
 #include "Items/PRItemTypes.h"
+#include "Items/PRRewardTypes.h"
 #include "PRLootTableDataAsset.generated.h"
 
 USTRUCT(BlueprintType)
@@ -55,9 +56,13 @@ public:
 	bool RollRandomLoot(FPRItemInstance& OutItem) const;
 
 	bool RollSeededLoot(int32 LootSeed, FPRItemInstance& OutItem, FString& OutDiagnostic) const;
+	bool RollSeededLootFiltered(int32 LootSeed, FName ExcludedItemId, EPRItemRarity MinimumRarity, FPRItemInstance& OutItem, FString& OutDiagnostic) const;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot")
 	TArray<FPRLootTableEntry> Entries;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot")
+	EPRLootDistributionPolicy DistributionPolicy = EPRLootDistributionPolicy::SharedWorld;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot|Affixes")
 	TArray<FPRRarityGenerationRule> EquipmentRarityRules;

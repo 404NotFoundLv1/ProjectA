@@ -133,6 +133,12 @@ FPRProfileOperationResult UPRProfileSave::MigrateToLatest()
 			Snapshot.Normalize();
 			SaveVersion = 6;
 			break;
+		case 6:
+			// v0.7.3 introduces deterministic personal-reward protection. Legacy profiles start clean.
+			Snapshot.LootProtectionStates.Reset();
+			Snapshot.Normalize();
+			SaveVersion = 7;
+			break;
 		default:
 			return FPRProfileOperationResult::MakeFailure(
 				EPRProfileOperationStatus::MigrationFailed,

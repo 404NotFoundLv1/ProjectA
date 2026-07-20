@@ -43,6 +43,9 @@ struct PROJECTA_API FPRMultiplayerProfileProjection
 	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Profile")
 	TArray<FPRProfileShipModuleState> ShipModules;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Profile")
+	TArray<FPRLootProtectionState> LootProtectionStates;
+
 	bool IsValid(FString* OutDiagnostic = nullptr) const;
 };
 
@@ -59,6 +62,9 @@ struct PROJECTA_API FPRPlayerSettlementReceipt
 
 	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Settlement")
 	FGuid RunId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Settlement")
+	int32 RunSeed = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Settlement")
 	FGuid SettlementId;
@@ -92,6 +98,15 @@ struct PROJECTA_API FPRPlayerSettlementReceipt
 
 	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Settlement")
 	TArray<FPRRoleModuleSlotEntry> SettledEquippedRoleModules;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Settlement")
+	TArray<FPRItemInstance> GrantedWarehouseItems;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Settlement")
+	FPRLootProtectionState UpdatedLootProtectionState;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Settlement")
+	TArray<FPRRewardAuditEntry> RewardAuditEntries;
 
 	bool IsValid(FString* OutDiagnostic = nullptr) const;
 };

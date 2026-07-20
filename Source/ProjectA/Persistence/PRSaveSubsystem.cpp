@@ -597,6 +597,7 @@ FPRProfileOperationResult UPRSaveSubsystem::BuildMultiplayerProfileProjection(FP
 	OutProjection.EquippedRoleModules = ActiveProfile->Snapshot.EquippedRoleModules;
 	OutProjection.Story = ActiveProfile->Snapshot.Story;
 	OutProjection.ShipModules = ActiveProfile->Snapshot.ShipModules;
+	OutProjection.LootProtectionStates = ActiveProfile->Snapshot.LootProtectionStates;
 	FString Diagnostic;
 	if (!OutProjection.IsValid(&Diagnostic))
 	{
@@ -668,6 +669,22 @@ FPRProfileOperationResult UPRSaveSubsystem::ApplyMultiplayerSettlementReceipt(co
 	Candidate->Snapshot.BackpackItems = Receipt.SettledBackpackItems;
 	Candidate->Snapshot.Equipment = Receipt.SettledEquipment;
 	Candidate->Snapshot.ResourceWallet = Receipt.SettledResourceWallet;
+	Candidate->Snapshot.WarehouseItems.Append(Receipt.GrantedWarehouseItems);
+	if (!Receipt.UpdatedLootProtectionState.RewardBudgetId.IsNone())
+	{
+		const int32 ExistingIndex = Candidate->Snapshot.LootProtectionStates.IndexOfByPredicate([&Receipt](const FPRLootProtectionState& State)
+		{
+			return State.RewardBudgetId == Receipt.UpdatedLootProtectionState.RewardBudgetId;
+		});
+		if (ExistingIndex == INDEX_NONE)
+		{
+			Candidate->Snapshot.LootProtectionStates.Add(Receipt.UpdatedLootProtectionState);
+		}
+		else
+		{
+			Candidate->Snapshot.LootProtectionStates[ExistingIndex] = Receipt.UpdatedLootProtectionState;
+		}
+	}
 	const bool bReceiptCarriesRoleModulePayload = !Receipt.SettledUnlockedRoleModuleIds.IsEmpty()
 		|| !Receipt.SettledEquippedRoleModules.IsEmpty();
 	if (bReceiptCarriesRoleModulePayload)

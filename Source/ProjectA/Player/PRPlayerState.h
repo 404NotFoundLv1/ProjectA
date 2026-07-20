@@ -93,6 +93,7 @@ public:
 	const TArray<FName>& GetMissionStartUnlockedRoleIds() const { return MissionStartUnlockedRoleIds; }
 	const TArray<FName>& GetMissionStartUnlockedRoleModuleIds() const { return MissionStartUnlockedRoleModuleIds; }
 	const FPRRoleLoadout& GetMissionStartRoleLoadout() const { return MissionStartRoleLoadout; }
+	FPRLootProtectionState GetLootProtectionState(FName RewardBudgetId) const;
 
 	UFUNCTION(BlueprintPure, Category = "Lobby|Ship Repair")
 	bool IsRepairPersistencePending() const { return bRepairPersistencePending; }
@@ -219,6 +220,7 @@ private:
 
 	UPROPERTY()
 	FPRRoleLoadout MissionStartRoleLoadout;
+	TArray<FPRLootProtectionState> BoundLootProtectionStates;
 
 	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Lobby", meta = (AllowPrivateAccess = "true"))
 	FName SelectedRoleModule;

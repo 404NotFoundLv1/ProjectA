@@ -4,6 +4,7 @@ namespace
 {
 constexpr int32 MaxProcessedSettlementIds = 128;
 constexpr int32 MaxProcessedRepairTransactionIds = 128;
+constexpr int32 MaxLootProtectionStates = 64;
 
 void NormalizeNames(TArray<FName>& Names)
 {
@@ -237,6 +238,23 @@ void FPRProfileSnapshot::Normalize()
 	{
 		ProcessedRepairTransactionIds.RemoveAt(0, ProcessedRepairTransactionIds.Num() - MaxProcessedRepairTransactionIds);
 	}
+
+	TSet<FName> SeenRewardBudgets;
+	LootProtectionStates.RemoveAll([&SeenRewardBudgets](FPRLootProtectionState& State)
+	{
+		State.ConsecutiveBelowRare = FMath::Max(0, State.ConsecutiveBelowRare);
+		State.ConsecutiveSameItem = FMath::Max(0, State.ConsecutiveSameItem);
+		if (State.RewardBudgetId.IsNone() || SeenRewardBudgets.Contains(State.RewardBudgetId))
+		{
+			return true;
+		}
+		SeenRewardBudgets.Add(State.RewardBudgetId);
+		return false;
+	});
+	if (LootProtectionStates.Num() > MaxLootProtectionStates)
+	{
+		LootProtectionStates.RemoveAt(0, LootProtectionStates.Num() - MaxLootProtectionStates);
+	}
 }
 
 bool FPRProfileSnapshot::IsValid(FString* OutDiagnostic) const
@@ -335,6 +353,21 @@ bool FPRProfileSnapshot::IsValid(FString* OutDiagnostic) const
 			return false;
 		}
 		RepairTransactionIds.Add(TransactionId);
+	}
+	if (LootProtectionStates.Num() > MaxLootProtectionStates)
+	{
+		if (OutDiagnostic) { *OutDiagnostic = TEXT("Loot protection state exceeds its supported limit."); }
+		return false;
+	}
+	TSet<FName> RewardBudgetIds;
+	for (const FPRLootProtectionState& State : LootProtectionStates)
+	{
+		if (State.RewardBudgetId.IsNone() || State.ConsecutiveBelowRare < 0 || State.ConsecutiveSameItem < 0 || RewardBudgetIds.Contains(State.RewardBudgetId))
+		{
+			if (OutDiagnostic) { *OutDiagnostic = TEXT("Loot protection state contains an invalid or duplicate reward budget."); }
+			return false;
+		}
+		RewardBudgetIds.Add(State.RewardBudgetId);
 	}
 	return true;
 }

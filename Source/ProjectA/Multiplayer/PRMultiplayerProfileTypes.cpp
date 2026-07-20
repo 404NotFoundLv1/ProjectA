@@ -96,6 +96,20 @@ bool AreShipModulesValid(const TArray<FPRProfileShipModuleState>& ShipModules)
 	}
 	return true;
 }
+
+bool AreLootProtectionStatesValid(const TArray<FPRLootProtectionState>& States)
+{
+	TSet<FName> Seen;
+	for (const FPRLootProtectionState& State : States)
+	{
+		if (State.RewardBudgetId.IsNone() || State.ConsecutiveBelowRare < 0 || State.ConsecutiveSameItem < 0 || Seen.Contains(State.RewardBudgetId))
+		{
+			return false;
+		}
+		Seen.Add(State.RewardBudgetId);
+	}
+	return true;
+}
 }
 
 bool FPRMultiplayerProfileProjection::IsValid(FString* OutDiagnostic) const
@@ -117,6 +131,7 @@ bool FPRMultiplayerProfileProjection::IsValid(FString* OutDiagnostic) const
 		|| !IsEquipmentValid(Equipment)
 		|| !AreResourcesValid(ResourceWallet)
 		|| !AreShipModulesValid(ShipModules)
+		|| !AreLootProtectionStatesValid(LootProtectionStates)
 		|| !AreUniqueValidNames(UnlockedRoleIds)
 		|| !AreUniqueValidNames(UnlockedRoleModuleIds)
 		|| !AreProjectionRoleModuleEntriesStructurallyValid(EquippedRoleModules)
@@ -164,9 +179,15 @@ bool FPRPlayerSettlementReceipt::IsValid(FString* OutDiagnostic) const
 		if (OutDiagnostic) { *OutDiagnostic = TEXT("Settlement receipt contains invalid runtime data."); }
 		return false;
 	}
+	if (!AreItemsValid(GrantedWarehouseItems) || !UpdatedLootProtectionState.RewardBudgetId.IsNone() && (UpdatedLootProtectionState.ConsecutiveBelowRare < 0 || UpdatedLootProtectionState.ConsecutiveSameItem < 0))
+	{
+		if (OutDiagnostic) { *OutDiagnostic = TEXT("Settlement receipt contains invalid personal reward data."); }
+		return false;
+	}
 	FPRProfileSnapshot IdentitySnapshot;
 	IdentitySnapshot.BackpackItems = SettledBackpackItems;
 	IdentitySnapshot.Equipment = SettledEquipment;
+	IdentitySnapshot.WarehouseItems = GrantedWarehouseItems;
 	if (!IdentitySnapshot.HasValidItemIdentities(OutDiagnostic))
 	{
 		return false;

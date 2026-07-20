@@ -259,6 +259,7 @@ bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjectio
 	bMultiplayerProfileBound = true;
 	BoundStoryProgress = Projection.Story;
 	BoundShipModules = Projection.ShipModules;
+	BoundLootProtectionStates = Projection.LootProtectionStates;
 	bRepairPersistencePending = false;
 	PendingRepairTransactionId.Invalidate();
 	MissionStartBackpackItems = MoveTemp(NewMissionStartBackpackItems);
@@ -283,6 +284,7 @@ void APRPlayerState::ClearMultiplayerProfileBinding()
 	}
 	BoundStoryProgress = FPRProfileStoryProgress();
 	BoundShipModules.Reset();
+	BoundLootProtectionStates.Reset();
 	bRepairPersistencePending = false;
 	PendingRepairTransactionId.Invalidate();
 	MissionStartBackpackItems.Reset();
@@ -292,6 +294,15 @@ void APRPlayerState::ClearMultiplayerProfileBinding()
 	MissionStartUnlockedRoleModuleIds.Reset();
 	MissionStartRoleLoadout = FPRRoleLoadout();
 	ForceNetUpdate();
+}
+
+FPRLootProtectionState APRPlayerState::GetLootProtectionState(const FName RewardBudgetId) const
+{
+	const FPRLootProtectionState* State = BoundLootProtectionStates.FindByPredicate([RewardBudgetId](const FPRLootProtectionState& Candidate)
+	{
+		return Candidate.RewardBudgetId == RewardBudgetId;
+	});
+	return State ? *State : FPRLootProtectionState();
 }
 
 bool APRPlayerState::ApplyMissionCompletion(const UPRMissionProgressionDataAsset* Mission)
@@ -563,6 +574,7 @@ void APRPlayerState::CopyProjectRiftStateFrom(const APRPlayerState* SourcePlayer
 	BoundProfileId = SourcePlayerState->BoundProfileId;
 	BoundStoryProgress = SourcePlayerState->BoundStoryProgress;
 	BoundShipModules = SourcePlayerState->BoundShipModules;
+	BoundLootProtectionStates = SourcePlayerState->BoundLootProtectionStates;
 	bRepairPersistencePending = SourcePlayerState->bRepairPersistencePending;
 	PendingRepairTransactionId = SourcePlayerState->PendingRepairTransactionId;
 	MissionStartBackpackItems = SourcePlayerState->MissionStartBackpackItems;

@@ -18,6 +18,8 @@
 #include "Items/PRInventoryComponent.h"
 #include "Items/PRItemDataAsset.h"
 #include "Items/PRItemTypes.h"
+#include "Items/PRRewardBudgetDataAsset.h"
+#include "Items/PRRewardGenerationLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "Player/PRPlayerState.h"
 #include "Player/PRPlayerController.h"
@@ -152,6 +154,21 @@ bool APRRiftGameMode::StartRiftMission()
 
 	CurrentRunId = FGuid::NewGuid();
 	CurrentSettlementId = FGuid::NewGuid();
+	CurrentRunSeed = FMath::Rand();
+	EligibleRewardProfileIds.Reset();
+	if (const AGameStateBase* CurrentGameState = GameState)
+	{
+		for (const TObjectPtr<APlayerState>& RawPlayerState : CurrentGameState->PlayerArray)
+		{
+			if (const APRPlayerState* PlayerState = Cast<APRPlayerState>(RawPlayerState.Get()))
+			{
+				if (PlayerState->IsMultiplayerProfileBound())
+				{
+					EligibleRewardProfileIds.AddUnique(PlayerState->GetBoundProfileId());
+				}
+			}
+		}
+	}
 	FinalizedRunId.Invalidate();
 	bSettlementFinalizationInProgress = false;
 	PendingSettlementAcknowledgements.Reset();
@@ -186,6 +203,20 @@ bool APRRiftGameMode::StartRiftMission()
 	LogFlowPhase(TEXT("MissionStarted"));
 
 	return true;
+}
+
+int32 APRRiftGameMode::AllocateRewardSeed(
+	const EPRRewardSourceType SourceType,
+	const FName SourceId,
+	const FGuid RecipientProfileId,
+	const int32 Ordinal) const
+{
+	FPRRewardSourceContext Source;
+	Source.SourceType = SourceType;
+	Source.SourceId = SourceId;
+	Source.RecipientProfileId = RecipientProfileId;
+	Source.Ordinal = Ordinal;
+	return UPRRewardGenerationLibrary::DeriveSeed(CurrentRunSeed, Source);
 }
 
 void APRRiftGameMode::CompleteCurrentObjective()
@@ -520,6 +551,7 @@ FPRPlayerSettlementReceipt APRRiftGameMode::BuildPersonalSettlementReceipt(
 	Receipt.ProfileId = PlayerState->GetBoundProfileId();
 	Receipt.MissionId = MissionId;
 	Receipt.RunId = CurrentRunId;
+	Receipt.RunSeed = CurrentRunSeed;
 	Receipt.SettlementId = CurrentSettlementId;
 	Receipt.Result = Result;
 	Receipt.bExtracted = ExtractedPlayerStates.Contains(TObjectKey<APlayerState>(PlayerState));
@@ -563,6 +595,44 @@ FPRPlayerSettlementReceipt APRRiftGameMode::BuildPersonalSettlementReceipt(
 	else
 	{
 		Receipt.SettledRoleId = PlayerState->GetSelectedRoleModule();
+	}
+	if (Result == EPRRiftMissionResult::Success && Receipt.bExtracted && EligibleRewardProfileIds.Contains(Receipt.ProfileId))
+	{
+		if (UPRRewardBudgetDataAsset* RewardBudget = Mission->RewardBudget.LoadSynchronous())
+		{
+			FPRRewardSourceContext Source;
+			Source.SourceType = EPRRewardSourceType::MissionSettlement;
+			Source.SourceId = MissionId;
+			Source.RecipientProfileId = Receipt.ProfileId;
+			Source.Ordinal = 0;
+			Source.Seed = AllocateRewardSeed(Source.SourceType, Source.SourceId, Source.RecipientProfileId, Source.Ordinal);
+			const FPRPersonalRewardGenerationResult Generated = UPRRewardGenerationLibrary::GeneratePersonalSettlementReward(
+				RewardBudget,
+				Source,
+				PlayerState->GetLootProtectionState(RewardBudget->GetFName()),
+				GetMissionDifficultyPlayerCount());
+			if (Generated.bSuccess)
+			{
+				Receipt.GrantedWarehouseItems = Generated.GrantedWarehouseItems;
+				Receipt.UpdatedLootProtectionState = Generated.UpdatedProtectionState;
+				Receipt.RewardAuditEntries = Generated.AuditEntries;
+				if (Generated.CommonChipCount > 0)
+				{
+					const int32 ExistingIndex = Receipt.SettledResourceWallet.IndexOfByPredicate([](const FPRProfileResourceBalance& Balance)
+					{
+						return Balance.ResourceId == TEXT("CommonChip");
+					});
+					if (ExistingIndex == INDEX_NONE)
+					{
+						Receipt.SettledResourceWallet.Emplace(TEXT("CommonChip"), Generated.CommonChipCount);
+					}
+					else
+					{
+						Receipt.SettledResourceWallet[ExistingIndex].Count += Generated.CommonChipCount;
+					}
+				}
+			}
+		}
 	}
 	return Receipt;
 }
