@@ -4,9 +4,71 @@
 #include "Items/PREquipmentComponent.h"
 #include "Items/PREquipmentDataAsset.h"
 #include "Items/PRPickupActor.h"
+#include "Items/PRWarehouseComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Core/PRShipLobbyGameMode.h"
 #include "Player/PRPlayerState.h"
 #include "Weapons/PRWeaponComponent.h"
+
+namespace
+{
+void AddUniqueGuid(TArray<FGuid>& Guids, const FGuid& Guid)
+{
+	if (Guid.IsValid())
+	{
+		Guids.AddUnique(Guid);
+	}
+}
+
+bool BuildContainerAddCandidate(
+	TArray<FPRItemInstance>& InOutItems,
+	const FPRItemInstance& Incoming,
+	const int32 MaxStackCount,
+	TArray<FGuid>& OutChangedGuids,
+	TArray<FGuid>& OutCreatedGuids)
+{
+	if (!Incoming.IsValid() || !Incoming.HasValidIdentity() || MaxStackCount <= 0)
+	{
+		return false;
+	}
+
+	int32 Remaining = Incoming.Count;
+	for (FPRItemInstance& Existing : InOutItems)
+	{
+		if (!Existing.HasEquivalentStackingState(Incoming) || Existing.Count >= MaxStackCount)
+		{
+			continue;
+		}
+		const int32 Applied = FMath::Min(Remaining, MaxStackCount - Existing.Count);
+		Existing.Count += Applied;
+		Remaining -= Applied;
+		AddUniqueGuid(OutChangedGuids, Existing.InstanceGuid);
+		if (Remaining <= 0)
+		{
+			return true;
+		}
+	}
+
+	bool bPreserveIncomingIdentity = true;
+	while (Remaining > 0)
+	{
+		FPRItemInstance NewStack = Incoming;
+		NewStack.Count = FMath::Min(Remaining, MaxStackCount);
+		if (!bPreserveIncomingIdentity || InOutItems.ContainsByPredicate([&NewStack](const FPRItemInstance& Existing)
+		{
+			return Existing.InstanceGuid == NewStack.InstanceGuid;
+		}))
+		{
+			NewStack.InstanceGuid = FGuid::NewGuid();
+		}
+		InOutItems.Add(NewStack);
+		AddUniqueGuid(OutCreatedGuids, NewStack.InstanceGuid);
+		bPreserveIncomingIdentity = false;
+		Remaining -= NewStack.Count;
+	}
+	return true;
+}
+}
 
 UPRItemTransactionComponent::UPRItemTransactionComponent()
 {
@@ -610,6 +672,134 @@ FPRItemTransactionResult UPRItemTransactionComponent::ResolveRequest(const FPRIt
 			Result.CreatedInstanceGuids.Add(ChangedItem.InstanceGuid);
 		}
 		Result.Diagnostic = TEXT("Authoritative equipment transaction committed.");
+		CacheFinalResult(Result);
+		if (AActor* OwnerActor = GetOwner())
+		{
+			OwnerActor->ForceNetUpdate();
+		}
+		return Result;
+	}
+	if (Request.Intent == EPRItemTransactionIntent::StoreInWarehouse || Request.Intent == EPRItemTransactionIntent::RetrieveFromWarehouse)
+	{
+		if (!Request.InstanceGuid.IsValid() || Request.Count <= 0)
+		{
+			Result.Status = EPRItemTransactionStatus::InvalidRequest;
+			Result.Diagnostic = TEXT("Warehouse transfer requires a valid item identity and positive quantity.");
+			CacheFinalResult(Result);
+			return Result;
+		}
+
+		if (!GetWorld() || !GetWorld()->GetAuthGameMode<APRShipLobbyGameMode>())
+		{
+			Result.Status = EPRItemTransactionStatus::Unauthorized;
+			Result.Diagnostic = TEXT("Ship warehouse transfers are available only in the ship lobby.");
+			CacheFinalResult(Result);
+			return Result;
+		}
+
+		APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
+		UPRInventoryComponent* Inventory = PlayerState ? PlayerState->GetInventoryComponent() : nullptr;
+		UPRWarehouseComponent* Warehouse = PlayerState ? PlayerState->GetWarehouseComponent() : nullptr;
+		if (!Inventory || !Warehouse)
+		{
+			Result.Status = EPRItemTransactionStatus::InvalidState;
+			Result.Diagnostic = TEXT("The authoritative backpack or ship warehouse is unavailable.");
+			CacheFinalResult(Result);
+			return Result;
+		}
+
+		UPRInventoryComponent* Source = Request.Intent == EPRItemTransactionIntent::StoreInWarehouse
+			? Inventory : static_cast<UPRInventoryComponent*>(Warehouse);
+		UPRInventoryComponent* Target = Request.Intent == EPRItemTransactionIntent::StoreInWarehouse
+			? static_cast<UPRInventoryComponent*>(Warehouse) : Inventory;
+		const TArray<FPRItemInstance> PreviousSource = Source->GetInventoryItems();
+		const TArray<FPRItemInstance> PreviousTarget = Target->GetInventoryItems();
+		TArray<FPRItemInstance> CandidateSource = PreviousSource;
+		TArray<FPRItemInstance> CandidateTarget = PreviousTarget;
+		const int32 SourceIndex = CandidateSource.IndexOfByPredicate([&Request](const FPRItemInstance& Item)
+		{
+			return Item.InstanceGuid == Request.InstanceGuid;
+		});
+		if (SourceIndex == INDEX_NONE)
+		{
+			Result.Status = EPRItemTransactionStatus::NotFound;
+			Result.Diagnostic = TEXT("The requested item instance is not present in the source container.");
+			CacheFinalResult(Result);
+			return Result;
+		}
+
+		const FPRItemInstance SourceItem = CandidateSource[SourceIndex];
+		if (Request.Count > SourceItem.Count)
+		{
+			Result.Status = EPRItemTransactionStatus::InsufficientQuantity;
+			Result.Diagnostic = TEXT("The requested warehouse transfer quantity exceeds the source stack.");
+			CacheFinalResult(Result);
+			return Result;
+		}
+
+		FPRItemInstance MovingItem = SourceItem;
+		MovingItem.Count = Request.Count;
+		const bool bSplitSourceStack = Request.Count < SourceItem.Count;
+		if (bSplitSourceStack)
+		{
+			MovingItem.InstanceGuid = FGuid::NewGuid();
+			CandidateSource[SourceIndex].Count -= Request.Count;
+			AddUniqueGuid(Result.ChangedInstanceGuids, SourceItem.InstanceGuid);
+		}
+		else
+		{
+			CandidateSource.RemoveAt(SourceIndex);
+		}
+
+		TArray<FGuid> TargetChangedGuids;
+		TArray<FGuid> TargetCreatedGuids;
+		if (!BuildContainerAddCandidate(CandidateTarget, MovingItem, Target->GetMaxStackCount(MovingItem.ItemId), TargetChangedGuids, TargetCreatedGuids)
+			|| !Source->CanReplaceInventoryItems(CandidateSource)
+			|| !Target->CanReplaceInventoryItems(CandidateTarget))
+		{
+			Result.Status = EPRItemTransactionStatus::CapacityExceeded;
+			Result.Diagnostic = TEXT("The destination container cannot accept the validated warehouse transfer.");
+			CacheFinalResult(Result);
+			return Result;
+		}
+
+		const bool bMovedIdentityRetained = CandidateTarget.ContainsByPredicate([&MovingItem](const FPRItemInstance& Item)
+		{
+			return Item.InstanceGuid == MovingItem.InstanceGuid;
+		});
+		if (!Source->ReplaceInventoryItems(CandidateSource) || !Target->ReplaceInventoryItems(CandidateTarget))
+		{
+			Source->ReplaceInventoryItems(PreviousSource);
+			Target->ReplaceInventoryItems(PreviousTarget);
+			Result.Status = EPRItemTransactionStatus::InternalFailure;
+			Result.Diagnostic = TEXT("The warehouse transfer did not commit and both containers were restored.");
+			Result.ChangedInstanceGuids.Reset();
+			CacheFinalResult(Result);
+			return Result;
+		}
+
+		for (const FGuid Guid : TargetChangedGuids) { AddUniqueGuid(Result.ChangedInstanceGuids, Guid); }
+		for (const FGuid Guid : TargetCreatedGuids)
+		{
+			if (!bSplitSourceStack && Guid == SourceItem.InstanceGuid)
+			{
+				AddUniqueGuid(Result.ChangedInstanceGuids, Guid);
+			}
+			else
+			{
+				AddUniqueGuid(Result.CreatedInstanceGuids, Guid);
+			}
+		}
+		if (!bSplitSourceStack && !bMovedIdentityRetained)
+		{
+			AddUniqueGuid(Result.RemovedInstanceGuids, SourceItem.InstanceGuid);
+		}
+		Result.AppliedCount = Request.Count;
+		Result.Status = EPRItemTransactionStatus::Success;
+		Result.CurrentRevision = ++Revision;
+		Result.Diagnostic = Request.Intent == EPRItemTransactionIntent::StoreInWarehouse
+			? TEXT("Authoritative backpack-to-warehouse transaction committed.")
+			: TEXT("Authoritative warehouse-to-backpack transaction committed.");
 		CacheFinalResult(Result);
 		if (AActor* OwnerActor = GetOwner())
 		{

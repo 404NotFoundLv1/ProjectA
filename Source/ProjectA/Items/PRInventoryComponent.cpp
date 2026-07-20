@@ -239,10 +239,7 @@ bool UPRInventoryComponent::UseItem(const FName ItemId)
 
 bool UPRInventoryComponent::ReplaceInventoryItems(const TArray<FPRItemInstance>& Items)
 {
-	if (Items.Num() > MaxSlots || Items.ContainsByPredicate([this](const FPRItemInstance& Item)
-	{
-		return !Item.IsValid() || Item.Count > GetMaxStackCount(Item.ItemId);
-	}))
+	if (!CanReplaceInventoryItems(Items))
 	{
 		return false;
 	}
@@ -255,6 +252,31 @@ bool UPRInventoryComponent::ReplaceInventoryItems(const TArray<FPRItemInstance>&
 	}
 	InventoryList.MarkArrayDirty();
 	NotifyInventoryChanged();
+	return true;
+}
+
+bool UPRInventoryComponent::CanReplaceInventoryItems(const TArray<FPRItemInstance>& Items) const
+{
+	if (Items.Num() > MaxSlots || Items.ContainsByPredicate([this](const FPRItemInstance& Item)
+	{
+		return !Item.IsValid() || Item.Count > GetMaxStackCount(Item.ItemId);
+	}))
+	{
+		return false;
+	}
+
+	TSet<FGuid> SeenIdentities;
+	for (const FPRItemInstance& Item : Items)
+	{
+		if (Item.HasValidIdentity() && SeenIdentities.Contains(Item.InstanceGuid))
+		{
+			return false;
+		}
+		if (Item.HasValidIdentity())
+		{
+			SeenIdentities.Add(Item.InstanceGuid);
+		}
+	}
 	return true;
 }
 

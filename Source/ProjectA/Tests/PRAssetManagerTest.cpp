@@ -125,9 +125,9 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 	const UGeneralProjectSettings* ProjectSettings = GetDefault<UGeneralProjectSettings>();
 	TestNotNull(TEXT("General project settings exist"), ProjectSettings);
 	TestEqual(
-		TEXT("Project version is v0.7.5"),
+		TEXT("Project version is v0.7.6"),
 		ProjectSettings ? ProjectSettings->ProjectVersion : FString(),
-		FString(TEXT("0.7.5")));
+		FString(TEXT("0.7.6")));
 
 	TestTrue(TEXT("Global manager is UPRAssetManager"), UAssetManager::Get().IsA<UPRAssetManager>());
 	TestEqual(

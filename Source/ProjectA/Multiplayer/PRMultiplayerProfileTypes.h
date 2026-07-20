@@ -20,6 +20,9 @@ struct PROJECTA_API FPRMultiplayerProfileProjection
 	TArray<FPRItemInstance> BackpackItems;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Profile")
+	TArray<FPRItemInstance> WarehouseItems;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Profile")
 	TArray<FPRQuickSlotReference> QuickSlots;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Profile")

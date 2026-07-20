@@ -121,6 +121,7 @@ bool FPRMultiplayerProfileProjection::IsValid(FString* OutDiagnostic) const
 		return false;
 	}
 	if (BackpackItems.Num() > MaxProjectionBackpackEntries
+		|| WarehouseItems.Num() > MaxProjectionBackpackEntries
 		|| Equipment.Num() > MaxProjectionEquipmentEntries
 		|| ResourceWallet.Num() > MaxProjectionResourceEntries
 		|| ShipModules.Num() > MaxProjectionShipModuleEntries
@@ -128,6 +129,7 @@ bool FPRMultiplayerProfileProjection::IsValid(FString* OutDiagnostic) const
 		|| UnlockedRoleModuleIds.Num() > MaxProjectionRoleEntries
 		|| EquippedRoleModules.Num() > MaxProjectionRoleEntries
 		|| !AreItemsValid(BackpackItems)
+		|| !AreItemsValid(WarehouseItems)
 		|| !IsEquipmentValid(Equipment)
 		|| !AreResourcesValid(ResourceWallet)
 		|| !AreShipModulesValid(ShipModules)
@@ -142,6 +144,7 @@ bool FPRMultiplayerProfileProjection::IsValid(FString* OutDiagnostic) const
 	}
 	FPRProfileSnapshot IdentitySnapshot;
 	IdentitySnapshot.BackpackItems = BackpackItems;
+	IdentitySnapshot.WarehouseItems = WarehouseItems;
 	IdentitySnapshot.QuickSlots = QuickSlots;
 	IdentitySnapshot.Equipment = Equipment;
 	if (!IdentitySnapshot.HasValidItemIdentities(OutDiagnostic))

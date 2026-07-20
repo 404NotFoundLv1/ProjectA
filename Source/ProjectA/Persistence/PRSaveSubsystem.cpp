@@ -627,6 +627,7 @@ FPRProfileOperationResult UPRSaveSubsystem::BuildMultiplayerProfileProjection(FP
 	OutProjection.ProfileId = ActiveProfile->ProfileId;
 	OutProjection.DisplayName = ActiveProfile->DisplayName;
 	OutProjection.BackpackItems = ActiveProfile->Snapshot.BackpackItems;
+	OutProjection.WarehouseItems = ActiveProfile->Snapshot.WarehouseItems;
 	OutProjection.QuickSlots = ActiveProfile->Snapshot.QuickSlots;
 	OutProjection.Equipment = ActiveProfile->Snapshot.Equipment;
 	OutProjection.ResourceWallet = ActiveProfile->Snapshot.ResourceWallet;

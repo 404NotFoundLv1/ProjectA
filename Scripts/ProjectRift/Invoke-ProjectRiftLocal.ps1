@@ -3,6 +3,7 @@ param(
     [ValidateSet('Quick', 'Full', 'Build')][string]$Mode = 'Quick',
     [ValidateSet('Editor', 'Game', 'Package')][string]$Target = 'Editor',
     [ValidateSet('Development', 'Shipping')][string]$Configuration = 'Development',
+    [string]$AutomationFilter = 'ProjectRift.Smoke',
     [string]$EngineRoot,
     [switch]$NoReopenEditor
 )
@@ -23,7 +24,7 @@ Import-Module -Force -Name $modulePath
 
 $summary = [ordered]@{
     SchemaVersion = 1
-    ProjectVersion = '0.7.5'
+    ProjectVersion = '0.7.6'
     RunId = $runId
     Mode = $Mode
     Target = $Target
@@ -261,7 +262,7 @@ try {
         Invoke-LocalEditorBuild
         $fallbackStage = 'Automation'
         $fallbackExitCode = Get-ProjectRiftExitCode Automation
-        Invoke-LocalAutomation -Filter 'ProjectRift.Smoke' -Name 'quick'
+        Invoke-LocalAutomation -Filter $AutomationFilter -Name 'quick'
     } elseif ($Mode -eq 'Full') {
         $fallbackStage = 'Build'
         $fallbackExitCode = Get-ProjectRiftExitCode Build

@@ -14,6 +14,7 @@
 class UPRGASDebugWidget;
 class UPRInventoryComponent;
 class UPRInventoryWidget;
+class UPRInventoryViewModel;
 class UPRLobbyReadyDebugWidget;
 class UPRRiftSettlementWidget;
 class UPRShipRepairWidget;
@@ -112,6 +113,21 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
 	UPRInventoryWidget* GetInventoryWidget() const { return InventoryWidget.Get(); }
+
+	UFUNCTION(BlueprintPure, Category = "Inventory|Presentation")
+	UPRInventoryViewModel* GetInventoryViewModel() const { return InventoryViewModel.Get(); }
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Presentation")
+	void RebindInventoryPresentation();
+
+	UFUNCTION(BlueprintCallable, Category = "Warehouse", meta = (ClampMin = "1"))
+	void StoreInventoryInstanceInWarehouse(FGuid InstanceGuid, int32 Count = 1);
+
+	UFUNCTION(BlueprintCallable, Category = "Warehouse", meta = (ClampMin = "1"))
+	void RetrieveWarehouseInstance(FGuid InstanceGuid, int32 Count = 1);
+
+	UFUNCTION(BlueprintPure, Category = "Warehouse")
+	bool IsShipWarehouseAvailable() const;
 
 	UFUNCTION(BlueprintPure, Category = "Weapon|UI")
 	UPRWeaponHUDWidget* GetWeaponHUDWidget() const { return WeaponHUDWidget.Get(); }
@@ -429,6 +445,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPRInventoryWidget> InventoryWidget;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPRInventoryViewModel> InventoryViewModel;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon|UI")
 	TSubclassOf<UPRWeaponHUDWidget> WeaponHUDWidgetClass;

@@ -16,7 +16,9 @@ enum class EPRItemTransactionIntent : uint8
 	BeginReload,
 	Equip,
 	Unequip,
-	BeginUse
+	BeginUse,
+	StoreInWarehouse,
+	RetrieveFromWarehouse
 };
 
 UENUM(BlueprintType)

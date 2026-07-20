@@ -19,6 +19,7 @@ class UPRWeaponComponent;
 class UPRRoleComponent;
 class UPRDeployableComponent;
 class UPRQuickbarComponent;
+class UPRWarehouseComponent;
 
 USTRUCT(BlueprintType)
 struct PROJECTA_API FPRShipResourceStack
@@ -62,6 +63,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	UPRInventoryComponent* GetInventoryComponent() const { return InventoryComponent.Get(); }
+
+	UFUNCTION(BlueprintPure, Category = "Warehouse")
+	UPRWarehouseComponent* GetWarehouseComponent() const { return WarehouseComponent.Get(); }
 
 	UFUNCTION(BlueprintPure, Category = "Item Transaction")
 	UPRItemTransactionComponent* GetItemTransactionComponent() const { return ItemTransactionComponent.Get(); }
@@ -177,6 +181,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPRInventoryComponent> InventoryComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Warehouse", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPRWarehouseComponent> WarehouseComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Item Transaction", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPRItemTransactionComponent> ItemTransactionComponent;

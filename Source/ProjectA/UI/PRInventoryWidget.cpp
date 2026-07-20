@@ -9,8 +9,10 @@
 #include "Items/PRQuickbarComponent.h"
 #include "Items/PREquipmentComponent.h"
 #include "Items/PRWeaponDataAsset.h"
+#include "UI/PRInventoryViewModel.h"
 #include "Misc/Paths.h"
 #include "Player/PRPlayerState.h"
+#include "Player/PRPlayerController.h"
 #include "Weapons/PRWeaponComponent.h"
 #include "Styling/CoreStyle.h"
 #include "Engine/Texture2D.h"
@@ -68,11 +70,32 @@ void UPRInventoryWidget::BindInventory(UPRInventoryComponent* InInventoryCompone
 	RefreshInventory();
 }
 
+void UPRInventoryWidget::BindViewModel(UPRInventoryViewModel* InViewModel)
+{
+	if (UPRInventoryViewModel* Current = BoundViewModel.Get())
+	{
+		Current->OnViewChanged.RemoveDynamic(this, &UPRInventoryWidget::HandleViewModelChanged);
+	}
+	BoundViewModel = InViewModel;
+	if (InViewModel)
+	{
+		InViewModel->OnViewChanged.AddUniqueDynamic(this, &UPRInventoryWidget::HandleViewModelChanged);
+	}
+	RefreshInventory();
+}
+
 void UPRInventoryWidget::RefreshInventory()
 {
 	DisplayedItems.Reset();
 
-	if (UPRInventoryComponent* InventoryComponent = BoundInventory.Get())
+	if (UPRInventoryViewModel* ViewModel = BoundViewModel.Get())
+	{
+		for (const FPRInventoryPresentationRow& Row : ViewModel->GetVisibleRows())
+		{
+			DisplayedItems.Add(Row.Item);
+		}
+	}
+	else if (UPRInventoryComponent* InventoryComponent = BoundInventory.Get())
 	{
 		DisplayedItems = InventoryComponent->GetInventoryItems();
 	}
@@ -80,6 +103,14 @@ void UPRInventoryWidget::RefreshInventory()
 	if (!DisplayedItems.IsValidIndex(SelectedItemIndex))
 	{
 		SelectedItemIndex = INDEX_NONE;
+	}
+	if (UPRInventoryViewModel* ViewModel = BoundViewModel.Get())
+	{
+		const FGuid SelectedGuid = ViewModel->GetSelectedInstanceGuid();
+		SelectedItemIndex = DisplayedItems.IndexOfByPredicate([SelectedGuid](const FPRItemInstance& Item)
+		{
+			return Item.InstanceGuid == SelectedGuid;
+		});
 	}
 
 	RebuildItemList();
@@ -91,6 +122,10 @@ void UPRInventoryWidget::RefreshInventory()
 void UPRInventoryWidget::SelectDisplayedItem(const int32 ItemIndex)
 {
 	SelectedItemIndex = DisplayedItems.IsValidIndex(ItemIndex) ? ItemIndex : INDEX_NONE;
+	if (UPRInventoryViewModel* ViewModel = BoundViewModel.Get())
+	{
+		ViewModel->SelectInstance(HasSelectedItem() ? DisplayedItems[SelectedItemIndex].InstanceGuid : FGuid());
+	}
 	RebuildItemList();
 	RefreshSelectedItemDetails();
 }
@@ -279,7 +314,7 @@ FText UPRInventoryWidget::GetQuickbarSummaryText() const
 
 void UPRInventoryWidget::RequestUseSelectedItem()
 {
-	if (HasSelectedItem())
+	if (!IsPresentingWarehouse() && HasSelectedItem())
 	{
 		OnUseItemRequested.Broadcast(DisplayedItems[SelectedItemIndex].ItemId);
 	}
@@ -287,7 +322,7 @@ void UPRInventoryWidget::RequestUseSelectedItem()
 
 void UPRInventoryWidget::RequestUseDisplayedItem(const int32 ItemIndex)
 {
-	if (DisplayedItems.IsValidIndex(ItemIndex))
+	if (!IsPresentingWarehouse() && DisplayedItems.IsValidIndex(ItemIndex))
 	{
 		SelectedItemIndex = ItemIndex;
 		OnUseItemRequested.Broadcast(DisplayedItems[ItemIndex].ItemId);
@@ -298,7 +333,7 @@ void UPRInventoryWidget::RequestUseDisplayedItem(const int32 ItemIndex)
 
 void UPRInventoryWidget::RequestAssignSelectedItemToQuickbar(const int32 SlotIndex)
 {
-	if (HasSelectedItem() && SlotIndex >= 0 && SlotIndex < 4)
+	if (!IsPresentingWarehouse() && HasSelectedItem() && SlotIndex >= 0 && SlotIndex < 4)
 	{
 		OnQuickbarAssignRequested.Broadcast(SlotIndex, DisplayedItems[SelectedItemIndex].InstanceGuid);
 	}
@@ -314,7 +349,7 @@ void UPRInventoryWidget::RequestClearQuickbarSlot(const int32 SlotIndex)
 
 void UPRInventoryWidget::RequestDropSelectedItem(const int32 Count)
 {
-	if (HasSelectedItem() && Count > 0)
+	if (!IsPresentingWarehouse() && HasSelectedItem() && Count > 0)
 	{
 		OnDropItemRequested.Broadcast(DisplayedItems[SelectedItemIndex].ItemId, Count);
 	}
@@ -322,7 +357,7 @@ void UPRInventoryWidget::RequestDropSelectedItem(const int32 Count)
 
 void UPRInventoryWidget::RequestDropDisplayedItem(const int32 ItemIndex, const int32 Count)
 {
-	if (DisplayedItems.IsValidIndex(ItemIndex) && Count > 0)
+	if (!IsPresentingWarehouse() && DisplayedItems.IsValidIndex(ItemIndex) && Count > 0)
 	{
 		SelectedItemIndex = ItemIndex;
 		OnDropItemRequested.Broadcast(DisplayedItems[ItemIndex].ItemId, Count);
@@ -333,7 +368,7 @@ void UPRInventoryWidget::RequestDropDisplayedItem(const int32 ItemIndex, const i
 
 void UPRInventoryWidget::RequestEquipSelectedItem()
 {
-	if (!HasSelectedItem())
+	if (IsPresentingWarehouse() || !HasSelectedItem())
 	{
 		return;
 	}
@@ -366,6 +401,116 @@ void UPRInventoryWidget::RequestUnequipEquipmentSlot(const FName SlotId)
 	}
 }
 
+void UPRInventoryWidget::ShowBackpackPresentation()
+{
+	if (UPRInventoryViewModel* ViewModel = BoundViewModel.Get())
+	{
+		ViewModel->SetSource(EPRInventoryPresentationSource::Backpack);
+	}
+}
+
+void UPRInventoryWidget::ShowWarehousePresentation()
+{
+	if (UPRInventoryViewModel* ViewModel = BoundViewModel.Get(); ViewModel && Cast<APRPlayerController>(GetOwningPlayer())
+		&& Cast<APRPlayerController>(GetOwningPlayer())->IsShipWarehouseAvailable())
+	{
+		ViewModel->SetSource(EPRInventoryPresentationSource::Warehouse);
+	}
+}
+
+void UPRInventoryWidget::ChangePresentationPage(const int32 Delta)
+{
+	if (UPRInventoryViewModel* ViewModel = BoundViewModel.Get())
+	{
+		ViewModel->ChangePage(Delta);
+	}
+}
+
+void UPRInventoryWidget::CyclePresentationSort()
+{
+	UPRInventoryViewModel* ViewModel = BoundViewModel.Get();
+	if (!ViewModel)
+	{
+		return;
+	}
+	const int32 Current = static_cast<int32>(ViewModel->GetSortField());
+	const int32 Next = (Current + 1) % (static_cast<int32>(EPRInventorySortField::Level) + 1);
+	ViewModel->SetSort(static_cast<EPRInventorySortField>(Next), true);
+}
+
+void UPRInventoryWidget::CyclePresentationFilter()
+{
+	UPRInventoryViewModel* ViewModel = BoundViewModel.Get();
+	if (!ViewModel)
+	{
+		return;
+	}
+	const int32 Current = static_cast<int32>(ViewModel->GetFilter());
+	const int32 Next = (Current + 1) % (static_cast<int32>(EPRInventoryFilter::Ammunition) + 1);
+	ViewModel->SetFilter(static_cast<EPRInventoryFilter>(Next), FString());
+}
+
+void UPRInventoryWidget::MovePresentationFocus(const int32 Direction)
+{
+	if (UPRInventoryViewModel* ViewModel = BoundViewModel.Get())
+	{
+		ViewModel->SelectNextFocusable(Direction);
+	}
+}
+
+void UPRInventoryWidget::RequestTransferSelectedItem(const int32 Count)
+{
+	if (!HasSelectedItem() || Count <= 0)
+	{
+		return;
+	}
+	APRPlayerController* Controller = Cast<APRPlayerController>(GetOwningPlayer());
+	UPRInventoryViewModel* ViewModel = BoundViewModel.Get();
+	if (!Controller || !ViewModel || !Controller->IsShipWarehouseAvailable())
+	{
+		return;
+	}
+	if (ViewModel->GetSource() == EPRInventoryPresentationSource::Backpack)
+	{
+		Controller->StoreInventoryInstanceInWarehouse(GetSelectedItem().InstanceGuid, Count);
+	}
+	else
+	{
+		Controller->RetrieveWarehouseInstance(GetSelectedItem().InstanceGuid, Count);
+	}
+}
+
+void UPRInventoryWidget::BeginDropConfirmationSelectedItem(const int32 Count)
+{
+	PendingConfirmation = FPRInventoryConfirmationRequest();
+	if (IsPresentingWarehouse() || !HasSelectedItem() || Count <= 0)
+	{
+		return;
+	}
+	const FPRItemInstance Item = GetSelectedItem();
+	if (Count > Item.Count)
+	{
+		return;
+	}
+	PendingConfirmation.Action = EPRInventoryConfirmationAction::Drop;
+	PendingConfirmation.Item = Item;
+	PendingConfirmation.Count = Count;
+	PendingConfirmation.Prompt = FText::FromString(FString::Printf(TEXT("Drop %d x %s?"), Count, *GetItemDisplayName(Item).ToString()));
+	OnConfirmationRequested.Broadcast(PendingConfirmation);
+	RefreshSelectedItemDetails();
+}
+
+void UPRInventoryWidget::ConfirmPendingInventoryAction(const bool bAccepted)
+{
+	const FPRInventoryConfirmationRequest Confirmed = PendingConfirmation;
+	PendingConfirmation = FPRInventoryConfirmationRequest();
+	if (bAccepted && Confirmed.IsValid() && Confirmed.Action == EPRInventoryConfirmationAction::Drop && !IsPresentingWarehouse())
+	{
+		OnDropItemRequested.Broadcast(Confirmed.Item.ItemId, Confirmed.Count);
+	}
+	RefreshSelectedItemDetails();
+}
+
 TSharedRef<SWidget> UPRInventoryWidget::RebuildWidget()
 {
 	TSharedRef<SWidget> Widget = SNew(SBorder)
@@ -381,6 +526,60 @@ TSharedRef<SWidget> UPRInventoryWidget::RebuildWidget()
 				.ColorAndOpacity(FSlateColor(FLinearColor(0.95f, 0.96f, 0.92f, 1.0f)))
 				.Font(GetProjectRiftInventoryFont(18.0f))
 				.Text(FText::FromString(TEXT("Inventory")))
+			]
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.0f, 0.0f, 0.0f, 6.0f)
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0.0f, 0.0f, 3.0f, 0.0f)
+				[
+					SNew(SButton).OnClicked(FOnClicked::CreateUObject(this, &UPRInventoryWidget::HandleShowBackpackClicked))
+					[
+						SNew(STextBlock).Justification(ETextJustify::Center).Font(GetProjectRiftInventoryFont(11.0f)).Text(FText::FromString(TEXT("Backpack")))
+					]
+				]
+				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(3.0f, 0.0f, 3.0f, 0.0f)
+				[
+					SNew(SButton)
+					.IsEnabled_Lambda([this]()
+					{
+						const APRPlayerController* Controller = Cast<APRPlayerController>(GetOwningPlayer());
+						return Controller && Controller->IsShipWarehouseAvailable();
+					})
+					.OnClicked(FOnClicked::CreateUObject(this, &UPRInventoryWidget::HandleShowWarehouseClicked))
+					[
+						SNew(STextBlock).Justification(ETextJustify::Center).Font(GetProjectRiftInventoryFont(11.0f)).Text(FText::FromString(TEXT("Ship Warehouse")))
+					]
+				]
+				+ SHorizontalBox::Slot().AutoWidth().Padding(3.0f, 0.0f, 0.0f, 0.0f)
+				[
+					SNew(SButton).OnClicked(FOnClicked::CreateUObject(this, &UPRInventoryWidget::HandlePreviousPageClicked))
+					[
+						SNew(STextBlock).Font(GetProjectRiftInventoryFont(11.0f)).Text(FText::FromString(TEXT("<")))
+					]
+				]
+				+ SHorizontalBox::Slot().AutoWidth().Padding(3.0f, 0.0f, 0.0f, 0.0f)
+				[
+					SNew(SButton).OnClicked(FOnClicked::CreateUObject(this, &UPRInventoryWidget::HandleCycleSortClicked))
+					[
+						SNew(STextBlock).Font(GetProjectRiftInventoryFont(10.0f)).Text(FText::FromString(TEXT("Sort")))
+					]
+				]
+				+ SHorizontalBox::Slot().AutoWidth().Padding(3.0f, 0.0f, 0.0f, 0.0f)
+				[
+					SNew(SButton).OnClicked(FOnClicked::CreateUObject(this, &UPRInventoryWidget::HandleCycleFilterClicked))
+					[
+						SNew(STextBlock).Font(GetProjectRiftInventoryFont(10.0f)).Text(FText::FromString(TEXT("Filter")))
+					]
+				]
+				+ SHorizontalBox::Slot().AutoWidth().Padding(3.0f, 0.0f, 0.0f, 0.0f)
+				[
+					SNew(SButton).OnClicked(FOnClicked::CreateUObject(this, &UPRInventoryWidget::HandleNextPageClicked))
+					[
+						SNew(STextBlock).Font(GetProjectRiftInventoryFont(11.0f)).Text(FText::FromString(TEXT(">")))
+					]
+				]
 			]
 			+ SVerticalBox::Slot()
 			.AutoHeight()
@@ -525,6 +724,39 @@ TSharedRef<SWidget> UPRInventoryWidget::RebuildWidget()
 					]
 				]
 			]
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.0f, 8.0f, 0.0f, 0.0f)
+			[
+				SNew(SButton)
+				.OnClicked(FOnClicked::CreateUObject(this, &UPRInventoryWidget::HandleTransferSelectedClicked))
+				[
+					SNew(STextBlock)
+					.Justification(ETextJustify::Center)
+					.Font(GetProjectRiftInventoryFont(13.0f))
+					.Text(FText::FromString(TEXT("Store / Retrieve Selected")))
+				]
+			]
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.0f, 5.0f, 0.0f, 0.0f)
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0.0f, 0.0f, 3.0f, 0.0f)
+				[
+					SNew(SButton).OnClicked(FOnClicked::CreateUObject(this, &UPRInventoryWidget::HandleConfirmDropClicked))
+					[
+						SNew(STextBlock).Justification(ETextJustify::Center).Font(GetProjectRiftInventoryFont(12.0f)).Text(FText::FromString(TEXT("Confirm Drop")))
+					]
+				]
+				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(3.0f, 0.0f, 0.0f, 0.0f)
+				[
+					SNew(SButton).OnClicked(FOnClicked::CreateUObject(this, &UPRInventoryWidget::HandleCancelDropClicked))
+					[
+						SNew(STextBlock).Justification(ETextJustify::Center).Font(GetProjectRiftInventoryFont(12.0f)).Text(FText::FromString(TEXT("Cancel")))
+					]
+				]
+			]
 		];
 
 	RebuildItemList();
@@ -549,6 +781,7 @@ void UPRInventoryWidget::ReleaseSlateResources(const bool bReleaseChildren)
 
 void UPRInventoryWidget::NativeDestruct()
 {
+	BindViewModel(nullptr);
 	if (UPRWeaponComponent* Weapon = GetBoundWeaponComponent())
 	{
 		Weapon->OnWeaponStateChanged.RemoveDynamic(this, &UPRInventoryWidget::HandleWeaponStateChanged);
@@ -583,6 +816,11 @@ void UPRInventoryWidget::HandleEquipmentChanged()
 	RefreshEquipmentSummary();
 }
 
+void UPRInventoryWidget::HandleViewModelChanged()
+{
+	RefreshInventory();
+}
+
 FReply UPRInventoryWidget::HandleItemClicked(const int32 ItemIndex)
 {
 	SelectDisplayedItem(ItemIndex);
@@ -595,11 +833,7 @@ FReply UPRInventoryWidget::HandleUseSelectedClicked()
 	return FReply::Handled();
 }
 
-FReply UPRInventoryWidget::HandleDropSelectedClicked()
-{
-	RequestDropSelectedItem(1);
-	return FReply::Handled();
-}
+FReply UPRInventoryWidget::HandleDropSelectedClicked() { BeginDropConfirmationSelectedItem(1); return FReply::Handled(); }
 
 FReply UPRInventoryWidget::HandleEquipSelectedClicked()
 {
@@ -618,6 +852,16 @@ FReply UPRInventoryWidget::HandleUnequipEquipmentSlotClicked(const FName SlotId)
 	RequestUnequipEquipmentSlot(SlotId);
 	return FReply::Handled();
 }
+
+FReply UPRInventoryWidget::HandleShowBackpackClicked() { ShowBackpackPresentation(); return FReply::Handled(); }
+FReply UPRInventoryWidget::HandleShowWarehouseClicked() { ShowWarehousePresentation(); return FReply::Handled(); }
+FReply UPRInventoryWidget::HandlePreviousPageClicked() { ChangePresentationPage(-1); return FReply::Handled(); }
+FReply UPRInventoryWidget::HandleNextPageClicked() { ChangePresentationPage(1); return FReply::Handled(); }
+FReply UPRInventoryWidget::HandleCycleSortClicked() { CyclePresentationSort(); return FReply::Handled(); }
+FReply UPRInventoryWidget::HandleCycleFilterClicked() { CyclePresentationFilter(); return FReply::Handled(); }
+FReply UPRInventoryWidget::HandleTransferSelectedClicked() { RequestTransferSelectedItem(1); return FReply::Handled(); }
+FReply UPRInventoryWidget::HandleConfirmDropClicked() { ConfirmPendingInventoryAction(true); return FReply::Handled(); }
+FReply UPRInventoryWidget::HandleCancelDropClicked() { ConfirmPendingInventoryAction(false); return FReply::Handled(); }
 
 void UPRInventoryWidget::RebuildItemList()
 {
@@ -726,6 +970,10 @@ FString UPRInventoryWidget::BuildItemSummary(const FPRItemInstance& Item) const
 
 FText UPRInventoryWidget::BuildSelectedItemDetails() const
 {
+	if (PendingConfirmation.IsValid())
+	{
+		return FText::FromString(PendingConfirmation.Prompt.ToString() + LINE_TERMINATOR + TEXT("Confirm or Cancel to continue."));
+	}
 	if (!HasSelectedItem())
 	{
 		return DisplayedItems.IsEmpty()
@@ -734,4 +982,10 @@ FText UPRInventoryWidget::BuildSelectedItemDetails() const
 	}
 
 	return GetItemTooltipText(DisplayedItems[SelectedItemIndex]);
+}
+
+bool UPRInventoryWidget::IsPresentingWarehouse() const
+{
+	const UPRInventoryViewModel* ViewModel = BoundViewModel.Get();
+	return ViewModel && ViewModel->GetSource() == EPRInventoryPresentationSource::Warehouse;
 }

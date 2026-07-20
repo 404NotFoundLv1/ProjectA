@@ -46,6 +46,7 @@
 #include "UI/PRDiagnosticsWidget.h"
 #include "UI/PRGASDebugWidget.h"
 #include "UI/PRInventoryWidget.h"
+#include "UI/PRInventoryViewModel.h"
 #include "UI/PRLobbyReadyDebugWidget.h"
 #include "UI/PRRiftSettlementWidget.h"
 #include "UI/PRRoleLoadoutWidget.h"
@@ -309,6 +310,7 @@ void APRPlayerController::OnRep_PlayerState()
 {
 	Super::OnRep_PlayerState();
 
+	RebindInventoryPresentation();
 	RefreshInventoryDisplay();
 	SubmitLocalMultiplayerProfile();
 }
@@ -489,6 +491,7 @@ void APRPlayerController::RefreshInventoryDisplay()
 		return;
 	}
 
+	RebindInventoryPresentation();
 	UPRInventoryComponent* InventoryComponent = GetLocalInventoryComponent();
 	if (InventoryWidget->GetBoundInventory() != InventoryComponent)
 	{
@@ -498,6 +501,64 @@ void APRPlayerController::RefreshInventoryDisplay()
 	{
 		InventoryWidget->RefreshInventory();
 	}
+}
+
+void APRPlayerController::RebindInventoryPresentation()
+{
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
+	if (!InventoryViewModel)
+	{
+		InventoryViewModel = NewObject<UPRInventoryViewModel>(this);
+	}
+	InventoryViewModel->BindPlayerState(GetPlayerState<APRPlayerState>());
+	if (InventoryWidget)
+	{
+		InventoryWidget->BindViewModel(InventoryViewModel);
+	}
+}
+
+void APRPlayerController::StoreInventoryInstanceInWarehouse(const FGuid InstanceGuid, const int32 Count)
+{
+	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	UPRItemTransactionComponent* Transactions = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetItemTransactionComponent() : nullptr;
+	if (!Transactions || !InstanceGuid.IsValid() || Count <= 0)
+	{
+		return;
+	}
+	FPRItemTransactionRequest Request;
+	Request.Header.TransactionId = FGuid::NewGuid();
+	Request.Header.ExpectedRevision = Transactions->GetRevision();
+	Request.Intent = EPRItemTransactionIntent::StoreInWarehouse;
+	Request.InstanceGuid = InstanceGuid;
+	Request.Count = Count;
+	if (HasAuthority()) { Transactions->ExecuteAuthoritativeTransaction(Request); }
+	else { Transactions->ServerSubmitItemTransaction(Request); }
+}
+
+void APRPlayerController::RetrieveWarehouseInstance(const FGuid InstanceGuid, const int32 Count)
+{
+	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	UPRItemTransactionComponent* Transactions = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetItemTransactionComponent() : nullptr;
+	if (!Transactions || !InstanceGuid.IsValid() || Count <= 0)
+	{
+		return;
+	}
+	FPRItemTransactionRequest Request;
+	Request.Header.TransactionId = FGuid::NewGuid();
+	Request.Header.ExpectedRevision = Transactions->GetRevision();
+	Request.Intent = EPRItemTransactionIntent::RetrieveFromWarehouse;
+	Request.InstanceGuid = InstanceGuid;
+	Request.Count = Count;
+	if (HasAuthority()) { Transactions->ExecuteAuthoritativeTransaction(Request); }
+	else { Transactions->ServerSubmitItemTransaction(Request); }
+}
+
+bool APRPlayerController::IsShipWarehouseAvailable() const
+{
+	return IsShipLobbyDebugWorld(GetWorld());
 }
 
 bool APRPlayerController::IsInventoryVisible() const
@@ -2199,6 +2260,7 @@ void APRPlayerController::CreateInventoryUI()
 		InventoryWidget->SetDesiredSizeInViewport(FVector2D(560.0, 540.0));
 		InventoryWidget->SetAnchorsInViewport(FAnchors(0.5f, 0.5f));
 		InventoryWidget->SetAlignmentInViewport(FVector2D(0.5f, 0.5f));
+		RebindInventoryPresentation();
 		RefreshInventoryDisplay();
 	}
 }
@@ -2218,6 +2280,11 @@ void APRPlayerController::DestroyInventoryUI()
 		InventoryWidget->OnUnequipEquipmentRequested.RemoveDynamic(this, &APRPlayerController::HandleEquipmentUnequipRequested);
 		InventoryWidget->RemoveFromParent();
 		InventoryWidget = nullptr;
+	}
+	if (InventoryViewModel)
+	{
+		InventoryViewModel->UnbindPlayerState();
+		InventoryViewModel = nullptr;
 	}
 }
 

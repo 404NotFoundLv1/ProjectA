@@ -10,6 +10,7 @@ class STextBlock;
 class UPRItemDataAsset;
 class UPREquipmentComponent;
 class UPRInventoryComponent;
+class UPRInventoryViewModel;
 class UPRWeaponComponent;
 class UTexture2D;
 
@@ -20,6 +21,35 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPRInventoryQuickbarAssignRequested
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPRInventoryQuickbarClearRequestedSignature, int32, SlotIndex);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPRInventoryPrimaryUnequipRequestedSignature);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPRInventoryEquipmentUnequipRequestedSignature, FName, SlotId);
+
+UENUM(BlueprintType)
+enum class EPRInventoryConfirmationAction : uint8
+{
+	None,
+	Drop
+};
+
+USTRUCT(BlueprintType)
+struct PROJECTA_API FPRInventoryConfirmationRequest
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory|Confirmation")
+	EPRInventoryConfirmationAction Action = EPRInventoryConfirmationAction::None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory|Confirmation")
+	FPRItemInstance Item;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory|Confirmation")
+	int32 Count = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory|Confirmation")
+	FText Prompt;
+
+	bool IsValid() const { return Action != EPRInventoryConfirmationAction::None && Item.HasValidIdentity() && Count > 0; }
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPRInventoryConfirmationRequestedSignature, const FPRInventoryConfirmationRequest&, Request);
 
 /**
  * Lightweight runtime inventory panel backed by the replicated owner inventory.
@@ -32,6 +62,12 @@ class PROJECTA_API UPRInventoryWidget : public UUserWidget
 public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	void BindInventory(UPRInventoryComponent* InInventoryComponent);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Presentation")
+	void BindViewModel(UPRInventoryViewModel* InViewModel);
+
+	UFUNCTION(BlueprintPure, Category = "Inventory|Presentation")
+	UPRInventoryViewModel* GetBoundViewModel() const { return BoundViewModel.Get(); }
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	void RefreshInventory();
@@ -108,6 +144,42 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Equipment")
 	void RequestUnequipEquipmentSlot(FName SlotId);
 
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Presentation")
+	void ShowBackpackPresentation();
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Presentation")
+	void ShowWarehousePresentation();
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Presentation")
+	void ChangePresentationPage(int32 Delta);
+
+	/** Cycles the stable presentation sort without changing authoritative container order. */
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Presentation")
+	void CyclePresentationSort();
+
+	/** Cycles the item-type presentation filter; warehouse actions remain unavailable outside the ship lobby. */
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Presentation")
+	void CyclePresentationFilter();
+
+	/** Shared mouse/controller navigation helper for native and Blueprint inventory panels. */
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Presentation")
+	void MovePresentationFocus(int32 Direction);
+
+	UFUNCTION(BlueprintCallable, Category = "Warehouse", meta = (ClampMin = "1"))
+	void RequestTransferSelectedItem(int32 Count = 1);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Confirmation", meta = (ClampMin = "1"))
+	void BeginDropConfirmationSelectedItem(int32 Count = 1);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Confirmation")
+	void ConfirmPendingInventoryAction(bool bAccepted);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Confirmation")
+	void CancelPendingInventoryAction() { ConfirmPendingInventoryAction(false); }
+
+	UFUNCTION(BlueprintPure, Category = "Inventory|Confirmation")
+	FPRInventoryConfirmationRequest GetPendingConfirmation() const { return PendingConfirmation; }
+
 	UPROPERTY(BlueprintAssignable, Category = "Inventory|UI")
 	FPRInventoryItemUseRequestedSignature OnUseItemRequested;
 
@@ -129,6 +201,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Inventory|Equipment")
 	FPRInventoryEquipmentUnequipRequestedSignature OnUnequipEquipmentRequested;
 
+	UPROPERTY(BlueprintAssignable, Category = "Inventory|Confirmation")
+	FPRInventoryConfirmationRequestedSignature OnConfirmationRequested;
+
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual void ReleaseSlateResources(bool bReleaseChildren) override;
@@ -144,12 +219,24 @@ private:
 	UFUNCTION()
 	void HandleEquipmentChanged();
 
+	UFUNCTION()
+	void HandleViewModelChanged();
+
 	FReply HandleItemClicked(int32 ItemIndex);
 	FReply HandleUseSelectedClicked();
 	FReply HandleDropSelectedClicked();
 	FReply HandleEquipSelectedClicked();
 	FReply HandleUnequipPrimaryClicked();
 	FReply HandleUnequipEquipmentSlotClicked(FName SlotId);
+	FReply HandleShowBackpackClicked();
+	FReply HandleShowWarehouseClicked();
+	FReply HandlePreviousPageClicked();
+	FReply HandleNextPageClicked();
+	FReply HandleCycleSortClicked();
+	FReply HandleCycleFilterClicked();
+	FReply HandleTransferSelectedClicked();
+	FReply HandleConfirmDropClicked();
+	FReply HandleCancelDropClicked();
 	void RebuildItemList();
 	void RefreshSelectedItemDetails();
 	void RefreshShipResourceSummary();
@@ -160,8 +247,11 @@ private:
 	UPRItemDataAsset* FindItemData(const FPRItemInstance& Item) const;
 	FString BuildItemSummary(const FPRItemInstance& Item) const;
 	FText BuildSelectedItemDetails() const;
+	bool IsPresentingWarehouse() const;
 
 	TWeakObjectPtr<UPRInventoryComponent> BoundInventory;
+	TWeakObjectPtr<UPRInventoryViewModel> BoundViewModel;
+	FPRInventoryConfirmationRequest PendingConfirmation;
 
 	UPROPERTY(Transient)
 	TArray<FPRItemInstance> DisplayedItems;

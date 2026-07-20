@@ -3,6 +3,7 @@
 #include "Core/PRAssetManager.h"
 #include "Items/PRInventoryComponent.h"
 #include "Items/PRQuickbarComponent.h"
+#include "Items/PRWarehouseComponent.h"
 #include "Items/PREquipmentTypes.h"
 #include "Player/PRPlayerState.h"
 #include "Roles/PRRoleComponent.h"
@@ -73,10 +74,11 @@ bool FPRProfileRuntimeBridge::CaptureFromPlayerState(
 	FString& OutDiagnostic)
 {
 	const UPRInventoryComponent* Inventory = PlayerState ? PlayerState->GetInventoryComponent() : nullptr;
+	const UPRWarehouseComponent* Warehouse = PlayerState ? PlayerState->GetWarehouseComponent() : nullptr;
 	const UPRWeaponComponent* Weapon = PlayerState ? PlayerState->GetWeaponComponent() : nullptr;
 	const UPRRoleComponent* RoleComponent = PlayerState ? PlayerState->GetRoleComponent() : nullptr;
 	const UPRQuickbarComponent* Quickbar = PlayerState ? PlayerState->GetQuickbarComponent() : nullptr;
-	if (!PlayerState || !Inventory || !Weapon || !RoleComponent || !Quickbar)
+	if (!PlayerState || !Inventory || !Warehouse || !Weapon || !RoleComponent || !Quickbar)
 	{
 		OutDiagnostic = TEXT("PlayerState, inventory, weapon, role, or quickbar component is unavailable.");
 		return false;
@@ -85,6 +87,7 @@ bool FPRProfileRuntimeBridge::CaptureFromPlayerState(
 	{
 		return false;
 	}
+	InOutSnapshot.WarehouseItems = Warehouse->GetWarehouseItems();
 	InOutSnapshot.QuickSlots = Quickbar->GetQuickSlots();
 
 	InOutSnapshot.Equipment.RemoveAll([](const FPRProfileEquipmentEntry& Entry)
@@ -134,10 +137,11 @@ bool FPRProfileRuntimeBridge::ApplyToPlayerState(
 	FString& OutDiagnostic)
 {
 	UPRInventoryComponent* Inventory = PlayerState ? PlayerState->GetInventoryComponent() : nullptr;
+	UPRWarehouseComponent* Warehouse = PlayerState ? PlayerState->GetWarehouseComponent() : nullptr;
 	UPRWeaponComponent* Weapon = PlayerState ? PlayerState->GetWeaponComponent() : nullptr;
 	UPRRoleComponent* RoleComponent = PlayerState ? PlayerState->GetRoleComponent() : nullptr;
 	UPRQuickbarComponent* Quickbar = PlayerState ? PlayerState->GetQuickbarComponent() : nullptr;
-	if (!PlayerState || !Inventory || !Weapon || !RoleComponent || !Quickbar)
+	if (!PlayerState || !Inventory || !Warehouse || !Weapon || !RoleComponent || !Quickbar)
 	{
 		OutDiagnostic = TEXT("PlayerState, inventory, weapon, role, or quickbar component is unavailable.");
 		return false;
@@ -160,6 +164,7 @@ bool FPRProfileRuntimeBridge::ApplyToPlayerState(
 		return false;
 	}
 	const TArray<FPRProfileEquipmentEntry> PreviousEquipment = Weapon->GetEquipmentEntries();
+	const TArray<FPRItemInstance> PreviousWarehouse = Warehouse->GetWarehouseItems();
 	const TArray<FPRShipResourceStack> PreviousResources = PlayerState->GetShipResources();
 	FName PreviousRoleId;
 	TArray<FName> PreviousUnlockedRoleIds;
@@ -178,6 +183,7 @@ bool FPRProfileRuntimeBridge::ApplyToPlayerState(
 	auto RestorePreviousState = [&]()
 	{
 		Inventory->ReplaceInventoryItems(PreviousBackpack);
+		Warehouse->ReplaceWarehouseItems(PreviousWarehouse);
 		PlayerState->ReplaceShipResources(PreviousResources);
 		FString RestoreDiagnostic;
 		Weapon->ReplaceEquipmentEntries(PreviousEquipment, RestoreDiagnostic);
@@ -189,6 +195,7 @@ bool FPRProfileRuntimeBridge::ApplyToPlayerState(
 	};
 
 	if (!Inventory->ReplaceInventoryItems(Snapshot.BackpackItems)
+		|| !Warehouse->ReplaceWarehouseItems(Snapshot.WarehouseItems)
 		|| !PlayerState->ReplaceShipResources(Resources)
 		|| !Weapon->ReplaceEquipmentEntries(Snapshot.Equipment, OutDiagnostic)
 		|| !Weapon->EnsureStarterWeapon(TEXT("TestRifle"), OutDiagnostic))

@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.6] - 2026-07-21
+
+- Added event-driven inventory presentation ViewModel APIs, native fallback controls, stable GUID selection, paging, sort/filter contracts, equipment comparison data, and controller rebind support.
+- Added owner-only ship warehouse runtime state, lobby-only atomic backpack transfers, profile/travel persistence, and anti-duplication regression coverage.
+
 ## [0.7.5] - 2026-07-20
 
 - Added server-authoritative crafting, dismantling, and bounded equipment upgrades with atomic profile receipts and durable v9 replay protection.

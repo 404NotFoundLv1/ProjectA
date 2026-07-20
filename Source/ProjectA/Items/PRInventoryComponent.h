@@ -86,6 +86,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Inventory")
 	bool ReplaceInventoryItems(const TArray<FPRItemInstance>& Items);
 
+	/** Validates a full authoritative replacement without changing replicated state. */
+	bool CanReplaceInventoryItems(const TArray<FPRItemInstance>& Items) const;
+
 	const TArray<FPRItemInstance>& GetItems() const { return CachedItems; }
 
 	UFUNCTION(BlueprintPure, Category = "Inventory")
@@ -112,6 +115,10 @@ private:
 	void NotifyInventoryChanged();
 	void RefreshCachedItems();
 	static bool CanStackItemInstances(const FPRItemInstance& ExistingItem, const FPRItemInstance& IncomingItem);
+
+protected:
+	/** Used by specialized owner-only containers such as the ship warehouse. */
+	void SetMaximumSlots(const int32 InMaxSlots) { MaxSlots = FMath::Max(1, InMaxSlots); }
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory", meta = (AllowPrivateAccess = "true", ClampMin = "1"))
 	int32 MaxSlots;

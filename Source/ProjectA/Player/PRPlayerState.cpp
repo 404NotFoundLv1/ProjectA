@@ -7,6 +7,7 @@
 #include "Items/PREquipmentComponent.h"
 #include "Items/PRItemTransactionComponent.h"
 #include "Items/PRQuickbarComponent.h"
+#include "Items/PRWarehouseComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "ProjectA.h"
 #include "Progression/PRMissionProgressionDataAsset.h"
@@ -47,6 +48,7 @@ APRPlayerState::APRPlayerState()
 	AbilitySystemComponent = CreateDefaultSubobject<UPRAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
 	AttributeSet = CreateDefaultSubobject<UPRAttributeSet>(TEXT("AttributeSet"));
 	InventoryComponent = CreateDefaultSubobject<UPRInventoryComponent>(TEXT("InventoryComponent"));
+	WarehouseComponent = CreateDefaultSubobject<UPRWarehouseComponent>(TEXT("WarehouseComponent"));
 	ItemTransactionComponent = CreateDefaultSubobject<UPRItemTransactionComponent>(TEXT("ItemTransactionComponent"));
 	EquipmentComponent = CreateDefaultSubobject<UPREquipmentComponent>(TEXT("EquipmentComponent"));
 	WeaponComponent = CreateDefaultSubobject<UPRWeaponComponent>(TEXT("WeaponComponent"));
@@ -142,7 +144,7 @@ void APRPlayerState::SetReady(const bool bReady)
 
 bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjection& Projection, FString& OutDiagnostic)
 {
-	if (!Projection.IsValid(&OutDiagnostic) || !InventoryComponent || !WeaponComponent || !RoleComponent)
+	if (!Projection.IsValid(&OutDiagnostic) || !InventoryComponent || !WarehouseComponent || !WeaponComponent || !RoleComponent)
 	{
 		UE_LOG(LogProjectA, Warning, TEXT("Multiplayer profile bind rejected before mutation. Profile=%s Diagnostic=%s"), *Projection.ProfileId.ToString(EGuidFormats::Digits), *OutDiagnostic);
 		return false;
@@ -168,6 +170,7 @@ bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjectio
 		return false;
 	}
 	const TArray<FPRProfileEquipmentEntry> PreviousEquipment = WeaponComponent->GetEquipmentEntries();
+	const TArray<FPRItemInstance> PreviousWarehouse = WarehouseComponent->GetWarehouseItems();
 	const TArray<FPRShipResourceStack> PreviousResources = ShipResources;
 	FName PreviousRoleId;
 	TArray<FName> PreviousUnlockedRoleIds;
@@ -181,6 +184,7 @@ bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjectio
 	auto RestorePreviousRuntimeState = [&]()
 	{
 		InventoryComponent->ReplaceInventoryItems(PreviousBackpack);
+		WarehouseComponent->ReplaceWarehouseItems(PreviousWarehouse);
 		ReplaceShipResources(PreviousResources);
 		FString RestoreDiagnostic;
 		WeaponComponent->ReplaceEquipmentEntries(PreviousEquipment, RestoreDiagnostic);
@@ -191,6 +195,7 @@ bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjectio
 			PreviousUnlockedModuleIds);
 	};
 	if (!InventoryComponent->ReplaceInventoryItems(Projection.BackpackItems)
+		|| !WarehouseComponent->ReplaceWarehouseItems(Projection.WarehouseItems)
 		|| !ReplaceShipResources(RuntimeResources)
 		|| !WeaponComponent->ReplaceEquipmentEntries(Projection.Equipment, OutDiagnostic)
 		|| !WeaponComponent->EnsureStarterWeapon(TEXT("TestRifle"), OutDiagnostic))
@@ -303,6 +308,10 @@ void APRPlayerState::ClearMultiplayerProfileBinding()
 	{
 		QuickbarComponent->ResetForNewProfileBinding();
 	}
+	if (WarehouseComponent)
+	{
+		WarehouseComponent->ReplaceWarehouseItems({});
+	}
 	BoundStoryProgress = FPRProfileStoryProgress();
 	BoundShipModules.Reset();
 	BoundLootProtectionStates.Reset();
@@ -356,6 +365,7 @@ bool APRPlayerState::BuildBoundShipRepairSnapshot(FPRProfileSnapshot& OutSnapsho
 		return false;
 	}
 	OutSnapshot.Equipment = WeaponComponent->GetEquipmentEntries();
+	OutSnapshot.WarehouseItems = WarehouseComponent ? WarehouseComponent->GetWarehouseItems() : TArray<FPRItemInstance>();
 	OutSnapshot.ShipModules = BoundShipModules;
 	OutSnapshot.Story = BoundStoryProgress;
 	if (!RoleComponent)
@@ -651,6 +661,14 @@ void APRPlayerState::CopyProjectRiftStateFrom(const APRPlayerState* SourcePlayer
 		if (!InventoryComponent->ReplaceInventoryItems(SourcePlayerState->InventoryComponent->GetInventoryItems()))
 		{
 			UE_LOG(LogProjectA, Error, TEXT("Inventory state failed to copy during seamless PlayerState replacement. Source=%s Target=%s"),
+				*GetNameSafe(SourcePlayerState), *GetNameSafe(this));
+		}
+	}
+	if (WarehouseComponent && SourcePlayerState->WarehouseComponent)
+	{
+		if (!WarehouseComponent->ReplaceWarehouseItems(SourcePlayerState->WarehouseComponent->GetWarehouseItems()))
+		{
+			UE_LOG(LogProjectA, Error, TEXT("Warehouse state failed to copy during seamless PlayerState replacement. Source=%s Target=%s"),
 				*GetNameSafe(SourcePlayerState), *GetNameSafe(this));
 		}
 	}
