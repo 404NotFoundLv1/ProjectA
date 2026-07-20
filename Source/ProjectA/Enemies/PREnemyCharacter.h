@@ -117,8 +117,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Loot")
 	TSubclassOf<APRPickupActor> PickupActorClass;
 
+	/** Optional legacy deterministic roll for focused tests. Negative values use the server-owned LootSeed path. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Loot")
-	float DeathLootRollOverride = 0.0f;
+	float DeathLootRollOverride = -1.0f;
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Enemy|Scaling")
 	float SpawnHealthMultiplier = 1.0f;

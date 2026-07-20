@@ -8,6 +8,8 @@
 #include "Abilities/PREquipmentGameplayEffects.h"
 #include "Abilities/PRAttributeSet.h"
 #include "Abilities/PRTemporaryShieldGameplayEffect.h"
+#include "Core/PRAssetManager.h"
+#include "Items/PRAffixDefinitionDataAsset.h"
 #include "Items/PREquipmentComponent.h"
 #include "Items/PREquipmentDataAsset.h"
 #include "Items/PRInventoryComponent.h"
@@ -24,7 +26,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 namespace
 {
-void RequireFunction(FAutomationTestBase& Test, UClass* Owner, const TCHAR* Name)
+void RequireEquipmentRuntimeFunction(FAutomationTestBase& Test, UClass* Owner, const TCHAR* Name)
 {
 	Test.TestNotNull(FString::Printf(TEXT("Equipment component exposes %s"), Name), Owner ? Owner->FindFunctionByName(Name) : nullptr);
 }
@@ -61,11 +63,11 @@ bool FPREquipmentRuntimeTest::RunTest(const FString& Parameters)
 
 	const UActorComponent* ComponentCDO = Cast<UActorComponent>(EquipmentComponentClass->GetDefaultObject());
 	TestTrue(TEXT("Equipment component replicates"), ComponentCDO && ComponentCDO->GetIsReplicated());
-	RequireFunction(*this, EquipmentComponentClass, TEXT("GetEquippedItem"));
-	RequireFunction(*this, EquipmentComponentClass, TEXT("GetPublicAppearanceEntries"));
-	RequireFunction(*this, EquipmentComponentClass, TEXT("ReplaceEquipmentEntries"));
-	RequireFunction(*this, EquipmentComponentClass, TEXT("RefreshGrantedHandles"));
-	RequireFunction(*this, EquipmentComponentClass, TEXT("ClearGrantedHandles"));
+	RequireEquipmentRuntimeFunction(*this, EquipmentComponentClass, TEXT("GetEquippedItem"));
+	RequireEquipmentRuntimeFunction(*this, EquipmentComponentClass, TEXT("GetPublicAppearanceEntries"));
+	RequireEquipmentRuntimeFunction(*this, EquipmentComponentClass, TEXT("ReplaceEquipmentEntries"));
+	RequireEquipmentRuntimeFunction(*this, EquipmentComponentClass, TEXT("RefreshGrantedHandles"));
+	RequireEquipmentRuntimeFunction(*this, EquipmentComponentClass, TEXT("ClearGrantedHandles"));
 
 	const FArrayProperty* PrivateEntries = FindFProperty<FArrayProperty>(EquipmentComponentClass, TEXT("EquipmentEntries"));
 	const FArrayProperty* PublicEntries = FindFProperty<FArrayProperty>(EquipmentComponentClass, TEXT("PublicAppearanceEntries"));
@@ -140,6 +142,85 @@ bool FPREquipmentRuntimeTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Unequipping preserves the current health percentage"), AttributeSet->GetHealth(), 50.0f);
 	TestEqual(TEXT("Unequip removes granted effects"), CountActiveEffectsByClass(*AbilitySystemComponent, UPRTemporaryShieldGameplayEffect::StaticClass()), 0);
 	TestEqual(TEXT("Unequip removes granted abilities"), CountGrantedAbilitiesBySource(*AbilitySystemComponent, ArmorDefinition), 0);
+
+	UPRAssetManager* AssetManager = UPRAssetManager::Get();
+	TArray<UPRAffixDefinitionDataAsset*> AffixCatalog;
+	TestTrue(TEXT("Runtime affix test loads the validated catalog"), AssetManager && AssetManager->LoadAffixCatalog(AffixCatalog));
+	UPRAffixDefinitionDataAsset* const* VitalAffixEntry = AffixCatalog.FindByPredicate([](const UPRAffixDefinitionDataAsset* Candidate)
+	{
+		return Candidate
+			&& Candidate->AllowedSlots.Contains(EPREquipmentSlot::Armor)
+			&& Candidate->Attribute == EPRAffixAttribute::MaxHealth
+			&& Candidate->ModifierType == EPRAffixModifierType::Additive;
+	});
+	UPRAffixDefinitionDataAsset* VitalAffix = VitalAffixEntry ? *VitalAffixEntry : nullptr;
+	TestNotNull(TEXT("Catalog provides an additive MaxHealth armor affix"), VitalAffix);
+	if (!VitalAffix)
+	{
+		return false;
+	}
+
+	UPREquipmentDataAsset* AffixArmorDefinition = NewObject<UPREquipmentDataAsset>(PlayerState);
+	AffixArmorDefinition->ItemId = TEXT("RuntimeAffixArmor");
+	AffixArmorDefinition->ItemType = EPRItemType::Equipment;
+	AffixArmorDefinition->bCanEquip = true;
+	AffixArmorDefinition->EquipmentSlot = EPREquipmentSlot::Armor;
+	InventoryComponent->SetItemDataAssets({ ArmorDefinition, AffixArmorDefinition });
+	FPRProfileEquipmentEntry AffixArmorEntry;
+	AffixArmorEntry.SlotId = ProjectRiftEquipmentSlots::Armor;
+	AffixArmorEntry.Item.InstanceGuid = FGuid::NewGuid();
+	AffixArmorEntry.Item.ItemId = AffixArmorDefinition->ItemId;
+	AffixArmorEntry.Item.Count = 1;
+	AffixArmorEntry.Item.LootSeed = 1701;
+	AffixArmorEntry.Item.AffixGenerationVersion = 1;
+	AffixArmorEntry.Item.Affixes = { VitalAffix->AffixId };
+	AffixArmorEntry.Item.RolledAffixes = {
+		FPRAffixRoll{ VitalAffix->AffixId, VitalAffix->Attribute, VitalAffix->ModifierType, VitalAffix->MinMagnitude }
+	};
+	AttributeSet->SetMaxHealth(100.0f);
+	AttributeSet->SetHealth(50.0f);
+	TestTrue(TEXT("A final affix roll can be equipped"), EquipmentComponent->ReplaceEquipmentEntries({ AffixArmorEntry }, Diagnostic));
+	TestEqual(TEXT("Additive MaxHealth affix changes the aggregated maximum"), AttributeSet->GetMaxHealth(), 100.0f + VitalAffix->MinMagnitude);
+	TestEqual(TEXT("Additive MaxHealth affix preserves health percentage"), AttributeSet->GetHealth(), 50.0f + VitalAffix->MinMagnitude * 0.5f);
+	TestEqual(TEXT("Exactly one native affix effect is active"), CountActiveEffectsByClass(*AbilitySystemComponent, VitalAffix->ModifierEffectClass), 1);
+	TestTrue(TEXT("Unequipping final affix roll removes its tracked handle"), EquipmentComponent->ReplaceEquipmentEntries({}, Diagnostic));
+	TestEqual(TEXT("Unequipping final affix restores maximum health"), AttributeSet->GetMaxHealth(), 100.0f);
+	TestEqual(TEXT("Unequipping final affix restores current health ratio"), AttributeSet->GetHealth(), 50.0f);
+
+	UPRAffixDefinitionDataAsset* const* VitalPercentAffixEntry = AffixCatalog.FindByPredicate([](const UPRAffixDefinitionDataAsset* Candidate)
+	{
+		return Candidate
+			&& Candidate->AllowedSlots.Contains(EPREquipmentSlot::Armor)
+			&& Candidate->Attribute == EPRAffixAttribute::MaxHealth
+			&& Candidate->ModifierType == EPRAffixModifierType::Percentage;
+	});
+	UPRAffixDefinitionDataAsset* VitalPercentAffix = VitalPercentAffixEntry ? *VitalPercentAffixEntry : nullptr;
+	TestNotNull(TEXT("Catalog provides a percentage MaxHealth armor affix"), VitalPercentAffix);
+	if (!VitalPercentAffix)
+	{
+		return false;
+	}
+	FPRProfileEquipmentEntry PercentAffixArmorEntry = AffixArmorEntry;
+	PercentAffixArmorEntry.Item.InstanceGuid = FGuid::NewGuid();
+	PercentAffixArmorEntry.Item.Affixes = { VitalPercentAffix->AffixId };
+	PercentAffixArmorEntry.Item.RolledAffixes = {
+		FPRAffixRoll{ VitalPercentAffix->AffixId, VitalPercentAffix->Attribute, VitalPercentAffix->ModifierType, VitalPercentAffix->MinMagnitude }
+	};
+	TestTrue(TEXT("A percentage final affix roll can be equipped"), EquipmentComponent->ReplaceEquipmentEntries({ PercentAffixArmorEntry }, Diagnostic));
+	TestTrue(TEXT("Percentage MaxHealth affix applies its explicit multiplier"), FMath::IsNearlyEqual(AttributeSet->GetMaxHealth(), 100.0f * (1.0f + VitalPercentAffix->MinMagnitude)));
+	TestTrue(TEXT("Percentage MaxHealth affix preserves health percentage"), FMath::IsNearlyEqual(AttributeSet->GetHealth(), 50.0f * (1.0f + VitalPercentAffix->MinMagnitude)));
+	TestTrue(TEXT("Unequipping percentage final affix removes its tracked handle"), EquipmentComponent->ReplaceEquipmentEntries({}, Diagnostic));
+	TestEqual(TEXT("Unequipping percentage final affix restores maximum health"), AttributeSet->GetMaxHealth(), 100.0f);
+
+	FPRProfileEquipmentEntry UnknownAffixEntry = AffixArmorEntry;
+	UnknownAffixEntry.Item.InstanceGuid = FGuid::NewGuid();
+	UnknownAffixEntry.Item.Affixes = { TEXT("Affix.Future.Unknown") };
+	UnknownAffixEntry.Item.RolledAffixes = {
+		FPRAffixRoll{ TEXT("Affix.Future.Unknown"), EPRAffixAttribute::MaxHealth, EPRAffixModifierType::Additive, 99.0f }
+	};
+	TestTrue(TEXT("Unknown final affix remains equipable without inventing a grant"), EquipmentComponent->ReplaceEquipmentEntries({ UnknownAffixEntry }, Diagnostic));
+	TestEqual(TEXT("Unknown final affix grants no MaxHealth modification"), AttributeSet->GetMaxHealth(), 100.0f);
+	TestTrue(TEXT("Unknown final affix can be unequipped safely"), EquipmentComponent->ReplaceEquipmentEntries({}, Diagnostic));
 
 	ArmorEntry.SlotId = ProjectRiftEquipmentSlots::Chip;
 	TestFalse(TEXT("A mismatched slot is rejected"), EquipmentComponent->ReplaceEquipmentEntries({ ArmorEntry }, Diagnostic));

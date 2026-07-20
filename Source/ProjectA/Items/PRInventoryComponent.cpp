@@ -359,9 +359,5 @@ void UPRInventoryComponent::RefreshCachedItems()
 
 bool UPRInventoryComponent::CanStackItemInstances(const FPRItemInstance& ExistingItem, const FPRItemInstance& IncomingItem)
 {
-	return ExistingItem.ItemId == IncomingItem.ItemId
-		&& ExistingItem.Level == IncomingItem.Level
-		&& ExistingItem.Rarity == IncomingItem.Rarity
-		&& FMath::IsNearlyEqual(ExistingItem.Durability, IncomingItem.Durability)
-		&& ExistingItem.Affixes == IncomingItem.Affixes;
+	return ExistingItem.HasEquivalentStackingState(IncomingItem);
 }

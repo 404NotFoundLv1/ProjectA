@@ -1,6 +1,7 @@
 #include "Core/PRAssetManager.h"
 
 #include "Items/PRItemDataAsset.h"
+#include "Items/PRAffixDefinitionDataAsset.h"
 #include "Items/PRLootTableDataAsset.h"
 #include "Progression/PRMissionProgressionDataAsset.h"
 #include "Roles/PRRoleDataAsset.h"
@@ -35,6 +36,13 @@ FPrimaryAssetId UPRAssetManager::MakeItemPrimaryAssetId(const FName ItemId)
 	return ItemId.IsNone()
 		? FPrimaryAssetId()
 		: FPrimaryAssetId(UPRItemDataAsset::ItemPrimaryAssetType, ItemId);
+}
+
+FPrimaryAssetId UPRAssetManager::MakeAffixPrimaryAssetId(const FName AffixId)
+{
+	return AffixId.IsNone()
+		? FPrimaryAssetId()
+		: FPrimaryAssetId(UPRAffixDefinitionDataAsset::AffixPrimaryAssetType, AffixId);
 }
 
 FPrimaryAssetId UPRAssetManager::MakeLootTablePrimaryAssetId(const FName AssetName)
@@ -77,6 +85,7 @@ void UPRAssetManager::StartInitialLoading()
 	Super::StartInitialLoading();
 
 	ValidatePrimaryAssetType(UPRItemDataAsset::ItemPrimaryAssetType);
+	ValidatePrimaryAssetType(UPRAffixDefinitionDataAsset::AffixPrimaryAssetType);
 	ValidatePrimaryAssetType(UPRLootTableDataAsset::LootTablePrimaryAssetType);
 	ValidatePrimaryAssetType(UPRMissionProgressionDataAsset::MissionPrimaryAssetType);
 	ValidatePrimaryAssetType(UPRRoleDataAsset::RolePrimaryAssetType);
@@ -106,6 +115,41 @@ UPRItemDataAsset* UPRAssetManager::LoadItemDataSync(const FName ItemId)
 	return Cast<UPRItemDataAsset>(LoadPrimaryAssetSync(
 		MakeItemPrimaryAssetId(ItemId),
 		UPRItemDataAsset::StaticClass()));
+}
+
+UPRAffixDefinitionDataAsset* UPRAssetManager::LoadAffixSync(const FName AffixId)
+{
+	return Cast<UPRAffixDefinitionDataAsset>(LoadPrimaryAssetSync(
+		MakeAffixPrimaryAssetId(AffixId),
+		UPRAffixDefinitionDataAsset::StaticClass()));
+}
+
+bool UPRAssetManager::LoadAffixCatalog(TArray<UPRAffixDefinitionDataAsset*>& OutAffixes)
+{
+	OutAffixes.Reset();
+	TArray<FPrimaryAssetId> AssetIds;
+	GetPrimaryAssetIdList(UPRAffixDefinitionDataAsset::AffixPrimaryAssetType, AssetIds);
+	AssetIds.Sort([](const FPrimaryAssetId& A, const FPrimaryAssetId& B)
+	{
+		return A.PrimaryAssetName.LexicalLess(B.PrimaryAssetName);
+	});
+	TSet<FName> SeenIds;
+	for (const FPrimaryAssetId& AssetId : AssetIds)
+	{
+		UPRAffixDefinitionDataAsset* Affix = Cast<UPRAffixDefinitionDataAsset>(LoadPrimaryAssetSync(
+			AssetId,
+			UPRAffixDefinitionDataAsset::StaticClass()));
+		FString Diagnostic;
+		if (!Affix || SeenIds.Contains(Affix->AffixId) || !Affix->ValidateDefinition(Diagnostic))
+		{
+			UE_LOG(LogProjectA, Warning, TEXT("ProjectRift affix catalog entry is invalid. Asset=%s Diagnostic=%s"), *AssetId.ToString(), *Diagnostic);
+			OutAffixes.Reset();
+			return false;
+		}
+		SeenIds.Add(Affix->AffixId);
+		OutAffixes.Add(Affix);
+	}
+	return true;
 }
 
 UPRLootTableDataAsset* UPRAssetManager::LoadLootTableSync(const FName AssetName)

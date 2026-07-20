@@ -2,13 +2,18 @@
 
 #include "Abilities/PRAbilitySystemComponent.h"
 #include "Abilities/PRAttributeSet.h"
+#include "Abilities/PRAffixGameplayEffects.h"
 #include "AbilitySystemComponent.h"
 #include "Characters/PRCharacter.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameplayEffect.h"
 #include "Items/PRInventoryComponent.h"
+#include "Items/PRAffixDefinitionDataAsset.h"
+#include "Items/PRAffixGenerationLibrary.h"
 #include "Items/PREquipmentDataAsset.h"
 #include "Items/PREquipmentVisualActor.h"
+#include "Core/PRAssetManager.h"
+#include "Core/PRGameplayTags.h"
 #include "Player/PRPlayerState.h"
 #include "Net/UnrealNetwork.h"
 
@@ -288,6 +293,81 @@ bool UPREquipmentComponent::ApplyGrantsForEntry(
 			return false;
 		}
 		OutHandles.GrantedAbilityHandles.Add(Handle);
+	}
+
+	// Legacy v5 equipment did not have value rolls and therefore never receives implicit grants.
+	if (Entry.Item.AffixGenerationVersion == 0 && Entry.Item.RolledAffixes.IsEmpty())
+	{
+		return true;
+	}
+	if (Entry.Item.AffixGenerationVersion != UPRAffixGenerationLibrary::CurrentGenerationVersion
+		|| Entry.Item.RolledAffixes.Num() != Entry.Item.Affixes.Num())
+	{
+		// Preserve a future final-roll payload without inventing gameplay behavior for it.
+		return Entry.Item.AffixGenerationVersion > UPRAffixGenerationLibrary::CurrentGenerationVersion;
+	}
+	if (Entry.Item.RolledAffixes.IsEmpty())
+	{
+		return true;
+	}
+
+	UPRAssetManager* AssetManager = UPRAssetManager::Get();
+	TArray<UPRAffixDefinitionDataAsset*> AffixCatalog;
+	if (!AssetManager || !AssetManager->LoadAffixCatalog(AffixCatalog))
+	{
+		return false;
+	}
+	for (int32 Index = 0; Index < Entry.Item.RolledAffixes.Num(); ++Index)
+	{
+		const FPRAffixRoll& Roll = Entry.Item.RolledAffixes[Index];
+		if (!Roll.IsValid() || Entry.Item.Affixes[Index] != Roll.AffixId)
+		{
+			return false;
+		}
+		UPRAffixDefinitionDataAsset* const* DefinitionEntry = AffixCatalog.FindByPredicate([&Roll](const UPRAffixDefinitionDataAsset* Candidate)
+		{
+			return Candidate && Candidate->AffixId == Roll.AffixId;
+		});
+		const UPRAffixDefinitionDataAsset* AffixDefinition = DefinitionEntry ? *DefinitionEntry : nullptr;
+		if (!AffixDefinition)
+		{
+			// The item remains authoritative and serializable even when this client/build lacks its definition.
+			continue;
+		}
+		const UPRAffixModifierGameplayEffect* AffixEffect = AffixDefinition->ModifierEffectClass
+			? Cast<UPRAffixModifierGameplayEffect>(AffixDefinition->ModifierEffectClass->GetDefaultObject())
+			: nullptr;
+		if (!AffixDefinition->AllowedSlots.Contains(Definition->EquipmentSlot)
+			|| AffixDefinition->Attribute != Roll.Attribute || AffixDefinition->ModifierType != Roll.ModifierType
+			|| !AffixEffect || AffixEffect->GetAffixAttribute() != Roll.Attribute
+			|| AffixEffect->GetAffixModifierType() != Roll.ModifierType)
+		{
+			return false;
+		}
+		const float AppliedMagnitude = Roll.ModifierType == EPRAffixModifierType::Percentage
+			? 1.0f + Roll.Magnitude
+			: Roll.Magnitude;
+		if (!FMath::IsFinite(AppliedMagnitude) || AppliedMagnitude <= 0.0f)
+		{
+			return false;
+		}
+		FGameplayEffectContextHandle Context = AbilitySystemComponent->MakeEffectContext();
+		Context.AddSourceObject(const_cast<UPRAffixDefinitionDataAsset*>(AffixDefinition));
+		const FGameplayEffectSpecHandle SpecHandle = AbilitySystemComponent->MakeOutgoingSpec(
+			AffixDefinition->ModifierEffectClass,
+			FMath::Max(1, Entry.Item.Level),
+			Context);
+		if (!SpecHandle.IsValid())
+		{
+			return false;
+		}
+		SpecHandle.Data->SetSetByCallerMagnitude(ProjectRiftGameplayTags::Data_Affix_Magnitude, AppliedMagnitude);
+		const FActiveGameplayEffectHandle ActiveHandle = AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+		if (!ActiveHandle.IsValid())
+		{
+			return false;
+		}
+		OutHandles.ActiveEffectHandles.Add(ActiveHandle);
 	}
 	return true;
 }

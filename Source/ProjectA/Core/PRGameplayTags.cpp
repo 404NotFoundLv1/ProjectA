@@ -23,6 +23,12 @@ namespace ProjectRiftGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_Ability_EnergyRegen, "Data.Ability.EnergyRegen", "SetByCaller role energy regeneration per period");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_ShieldRepair, "Data.ShieldRepair", "SetByCaller friendly shield restoration amount");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_Healing, "Data.Healing", "SetByCaller friendly health restoration amount");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_Affix_Magnitude, "Data.Affix.Magnitude", "SetByCaller equipment affix magnitude");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Affix_Exclusive_Vital, "Affix.Exclusive.Vital", "Prevents multiple health affix variants on one item");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Affix_Exclusive_Shield, "Affix.Exclusive.Shield", "Prevents multiple shield affix variants on one item");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Affix_Exclusive_Energy, "Affix.Exclusive.Energy", "Prevents multiple energy affix variants on one item");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Affix_Exclusive_Attack, "Affix.Exclusive.Attack", "Prevents multiple attack affix variants on one item");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Affix_Exclusive_Mobility, "Affix.Exclusive.Mobility", "Prevents multiple movement affix variants on one item");
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Damage_Type_Physical, "Damage.Type.Physical", "Physical damage type");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Damage_Type_Pollution, "Damage.Type.Pollution", "Pollution damage type");

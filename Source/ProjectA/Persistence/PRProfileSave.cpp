@@ -128,6 +128,11 @@ FPRProfileOperationResult UPRProfileSave::MigrateToLatest()
 			AssignMigratedItemIdentities(ProfileId, Snapshot);
 			SaveVersion = 5;
 			break;
+		case 5:
+			// v0.7.2 adds final affix payloads. Existing ID-only affixes remain legacy and receive no fabricated rolls.
+			Snapshot.Normalize();
+			SaveVersion = 6;
+			break;
 		default:
 			return FPRProfileOperationResult::MakeFailure(
 				EPRProfileOperationStatus::MigrationFailed,

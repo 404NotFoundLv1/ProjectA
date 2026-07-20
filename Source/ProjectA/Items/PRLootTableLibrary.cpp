@@ -70,3 +70,44 @@ APRPickupActor* UPRLootTableLibrary::SpawnLootPickupFromTable(
 
 	return PickupActor;
 }
+
+APRPickupActor* UPRLootTableLibrary::SpawnSeededLootPickupFromTable(
+	UObject* WorldContextObject,
+	const UPRLootTableDataAsset* LootTable,
+	TSubclassOf<APRPickupActor> PickupActorClass,
+	const FVector SpawnLocation,
+	const FRotator SpawnRotation,
+	const int32 LootSeed)
+{
+	if (!WorldContextObject || !LootTable || !LootTable->IsValidLootTable())
+	{
+		return nullptr;
+	}
+	UWorld* World = GEngine
+		? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull)
+		: WorldContextObject->GetWorld();
+	if (!World || World->GetNetMode() == NM_Client)
+	{
+		return nullptr;
+	}
+	if (!PickupActorClass)
+	{
+		PickupActorClass = APRPickupActor::StaticClass();
+	}
+	FPRItemInstance RolledItem;
+	FString Diagnostic;
+	if (!LootTable->RollSeededLoot(LootSeed, RolledItem, Diagnostic) || !RolledItem.IsValid())
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Seeded loot generation failed. Table=%s Seed=%d Diagnostic=%s"), *GetNameSafe(LootTable), LootSeed, *Diagnostic);
+		return nullptr;
+	}
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	APRPickupActor* PickupActor = World->SpawnActor<APRPickupActor>(PickupActorClass, SpawnLocation, SpawnRotation, SpawnParameters);
+	if (!PickupActor)
+	{
+		return nullptr;
+	}
+	PickupActor->SetItemInstance(RolledItem);
+	return PickupActor;
+}

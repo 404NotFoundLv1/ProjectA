@@ -528,11 +528,7 @@ FPRItemTransactionResult UPRItemTransactionComponent::ResolveRequest(const FPRIt
 		{
 			const FPRItemInstance DestinationItem = DropDestination->GetItemInstance();
 			const bool bMatchesSourceContents = DestinationItem.IsValid()
-				&& DestinationItem.ItemId == SourceItem.ItemId
-				&& DestinationItem.Level == SourceItem.Level
-				&& DestinationItem.Rarity == SourceItem.Rarity
-				&& FMath::IsNearlyEqual(DestinationItem.Durability, SourceItem.Durability)
-				&& DestinationItem.Affixes == SourceItem.Affixes
+				&& DestinationItem.HasEquivalentStackingState(SourceItem)
 				&& DestinationItem.Count == Request.Count;
 			const bool bTransfersWholeInstance = SourceItem.Count == Request.Count;
 			const bool bIdentityMatchesTransfer = DestinationItem.HasValidIdentity()

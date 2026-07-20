@@ -60,7 +60,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FPRItemInstanceIdentityTest::RunTest(const FString& Parameters)
 {
-	TestEqual(TEXT("Player profile schema is v5"), UPRProfileSave::LatestSaveVersion, 5);
+	TestEqual(TEXT("Player profile schema is v6"), UPRProfileSave::LatestSaveVersion, 6);
 
 	const FStructProperty* InstanceGuidProperty = FindInstanceGuidProperty();
 	TestNotNull(TEXT("Item instances expose InstanceGuid"), InstanceGuidProperty);
@@ -74,10 +74,10 @@ bool FPRItemInstanceIdentityTest::RunTest(const FString& Parameters)
 	UPRProfileSave* SecondMigration = MakeLegacyIdentityProfile(LegacyProfileId);
 	const FPRProfileOperationResult FirstResult = FirstMigration->MigrateToLatest();
 	const FPRProfileOperationResult SecondResult = SecondMigration->MigrateToLatest();
-	TestTrue(TEXT("First v4 profile migrates to v5"), FirstResult.IsSuccess());
-	TestTrue(TEXT("Second equivalent v4 profile migrates to v5"), SecondResult.IsSuccess());
-	TestEqual(TEXT("First migration reaches v5"), FirstMigration->SaveVersion, 5);
-	TestEqual(TEXT("Second migration reaches v5"), SecondMigration->SaveVersion, 5);
+	TestTrue(TEXT("First v4 profile migrates to v6"), FirstResult.IsSuccess());
+	TestTrue(TEXT("Second equivalent v4 profile migrates to v6"), SecondResult.IsSuccess());
+	TestEqual(TEXT("First migration reaches v6"), FirstMigration->SaveVersion, 6);
+	TestEqual(TEXT("Second migration reaches v6"), SecondMigration->SaveVersion, 6);
 
 	FGuid FirstBackpackGuid;
 	FGuid SecondBackpackGuid;
@@ -105,7 +105,7 @@ bool FPRItemInstanceIdentityTest::RunTest(const FString& Parameters)
 	}
 
 	UPRProfileSave* InvalidV5Profile = MakeLegacyIdentityProfile(FGuid::NewGuid());
-	InvalidV5Profile->SaveVersion = 5;
+	InvalidV5Profile->SaveVersion = 6;
 	FGuid DuplicateGuid = FGuid::NewGuid();
 	if (FStructProperty* MutableInstanceGuidProperty = FindFProperty<FStructProperty>(FPRItemInstance::StaticStruct(), TEXT("InstanceGuid")))
 	{
@@ -113,7 +113,7 @@ bool FPRItemInstanceIdentityTest::RunTest(const FString& Parameters)
 		*MutableInstanceGuidProperty->ContainerPtrToValuePtr<FGuid>(&InvalidV5Profile->Snapshot.WarehouseItems[0]) = DuplicateGuid;
 	}
 	const FPRProfileOperationResult InvalidV5Result = InvalidV5Profile->MigrateToLatest();
-	TestFalse(TEXT("v5 profile rejects duplicate instance GUIDs"), InvalidV5Result.IsSuccess());
+	TestFalse(TEXT("v6 profile rejects duplicate instance GUIDs"), InvalidV5Result.IsSuccess());
 
 	return true;
 }

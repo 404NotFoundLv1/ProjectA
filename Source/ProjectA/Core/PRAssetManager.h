@@ -5,6 +5,7 @@
 #include "PRAssetManager.generated.h"
 
 class UPRItemDataAsset;
+class UPRAffixDefinitionDataAsset;
 class UPRLootTableDataAsset;
 class UPRMissionProgressionDataAsset;
 class UPRRoleDataAsset;
@@ -23,6 +24,7 @@ class PROJECTA_API UPRAssetManager : public UAssetManager
 public:
 	static UPRAssetManager* Get();
 	static FPrimaryAssetId MakeItemPrimaryAssetId(FName ItemId);
+	static FPrimaryAssetId MakeAffixPrimaryAssetId(FName AffixId);
 	static FPrimaryAssetId MakeLootTablePrimaryAssetId(FName AssetName);
 	static FPrimaryAssetId MakeMissionPrimaryAssetId(FName MissionId);
 	static FPrimaryAssetId MakeRolePrimaryAssetId(FName RoleId);
@@ -34,6 +36,8 @@ public:
 	UPRItemDataAsset* GetLoadedItemData(FName ItemId) const;
 	UPRLootTableDataAsset* GetLoadedLootTable(FName AssetName) const;
 	UPRItemDataAsset* LoadItemDataSync(FName ItemId);
+	UPRAffixDefinitionDataAsset* LoadAffixSync(FName AffixId);
+	bool LoadAffixCatalog(TArray<UPRAffixDefinitionDataAsset*>& OutAffixes);
 	UPRLootTableDataAsset* LoadLootTableSync(FName AssetName);
 	UPRMissionProgressionDataAsset* LoadMissionSync(FName MissionId);
 	UPRRoleDataAsset* LoadRoleSync(FName RoleId);

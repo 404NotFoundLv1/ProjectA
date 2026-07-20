@@ -1,10 +1,14 @@
 #include "Items/PRLootTableDataAsset.h"
 
+#include "Core/PRAssetManager.h"
+#include "Items/PRAffixDefinitionDataAsset.h"
+#include "Items/PREquipmentDataAsset.h"
+
 const FPrimaryAssetType UPRLootTableDataAsset::LootTablePrimaryAssetType(TEXT("ProjectRiftLootTable"));
 
 namespace
 {
-FPRLootTableEntry MakeLootEntry(const FName ItemId, const float Weight, const EPRItemRarity Rarity = EPRItemRarity::Common)
+FPRLootTableEntry MakeLootEntry(const FName ItemId, const float Weight, const EPRItemRarity Rarity = EPRItemRarity::Common, const bool bGenerateEquipmentAffixes = false)
 {
 	FPRLootTableEntry Entry;
 	Entry.Item.ItemId = ItemId;
@@ -13,6 +17,7 @@ FPRLootTableEntry MakeLootEntry(const FName ItemId, const float Weight, const EP
 	Entry.Item.Rarity = Rarity;
 	Entry.Item.Durability = 1.0f;
 	Entry.Weight = Weight;
+	Entry.bGenerateEquipmentAffixes = bGenerateEquipmentAffixes;
 	return Entry;
 }
 }
@@ -20,6 +25,7 @@ FPRLootTableEntry MakeLootEntry(const FName ItemId, const float Weight, const EP
 UPRLootTableDataAsset::UPRLootTableDataAsset()
 {
 	Entries = MakeDefaultTestEntries();
+	EquipmentRarityRules = UPRAffixGenerationLibrary::MakeDefaultRarityRules();
 }
 
 TArray<FPRLootTableEntry> UPRLootTableDataAsset::MakeDefaultTestEntries()
@@ -28,7 +34,7 @@ TArray<FPRLootTableEntry> UPRLootTableDataAsset::MakeDefaultTestEntries()
 	DefaultEntries.Add(MakeLootEntry(TEXT("HealthInjector"), 40.0f, EPRItemRarity::Common));
 	DefaultEntries.Add(MakeLootEntry(TEXT("ShieldPack"), 30.0f, EPRItemRarity::Common));
 	DefaultEntries.Add(MakeLootEntry(TEXT("EnergyCrystal"), 20.0f, EPRItemRarity::Uncommon));
-	DefaultEntries.Add(MakeLootEntry(TEXT("CommonChip"), 10.0f, EPRItemRarity::Common));
+	DefaultEntries.Add(MakeLootEntry(TEXT("DA_TestChip"), 10.0f, EPRItemRarity::Common, true));
 	return DefaultEntries;
 }
 
@@ -105,4 +111,61 @@ bool UPRLootTableDataAsset::RollRandomLoot(FPRItemInstance& OutItem) const
 	}
 
 	return RollLoot(FMath::FRandRange(0.0f, TotalWeight), OutItem);
+}
+
+bool UPRLootTableDataAsset::RollSeededLoot(const int32 LootSeed, FPRItemInstance& OutItem, FString& OutDiagnostic) const
+{
+	OutItem = FPRItemInstance();
+	OutDiagnostic.Reset();
+	const float TotalWeight = GetTotalWeight();
+	if (TotalWeight <= 0.0f)
+	{
+		OutDiagnostic = TEXT("Loot table has no valid weighted entries.");
+		return false;
+	}
+	FRandomStream Stream(LootSeed);
+	const float Roll = Stream.FRandRange(0.0f, TotalWeight);
+	float AccumulatedWeight = 0.0f;
+	const FPRLootTableEntry* SelectedEntry = nullptr;
+	for (const FPRLootTableEntry& Entry : Entries)
+	{
+		if (!Entry.IsValid())
+		{
+			continue;
+		}
+		SelectedEntry = &Entry;
+		AccumulatedWeight += Entry.Weight;
+		if (Roll < AccumulatedWeight)
+		{
+			break;
+		}
+	}
+	if (!SelectedEntry)
+	{
+		OutDiagnostic = TEXT("Loot table did not select an entry.");
+		return false;
+	}
+	OutItem = SelectedEntry->Item;
+	if (!SelectedEntry->bGenerateEquipmentAffixes)
+	{
+		return true;
+	}
+	UPRAssetManager* AssetManager = UPRAssetManager::Get();
+	UPREquipmentDataAsset* Equipment = AssetManager ? Cast<UPREquipmentDataAsset>(AssetManager->LoadItemDataSync(OutItem.ItemId)) : nullptr;
+	TArray<UPRAffixDefinitionDataAsset*> AffixCatalog;
+	if (!Equipment || !AssetManager || !AssetManager->LoadAffixCatalog(AffixCatalog))
+	{
+		OutItem = FPRItemInstance();
+		OutDiagnostic = TEXT("Seeded equipment loot requires a loaded equipment definition and valid affix catalog.");
+		return false;
+	}
+	FPRAffixGenerationResult Generated = UPRAffixGenerationLibrary::GenerateEquipmentInstance(Equipment, LootSeed, AffixCatalog, EquipmentRarityRules);
+	if (!Generated.bSuccess)
+	{
+		OutItem = FPRItemInstance();
+		OutDiagnostic = Generated.Diagnostic;
+		return false;
+	}
+	OutItem = Generated.Item;
+	return true;
 }

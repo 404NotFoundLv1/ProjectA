@@ -13,7 +13,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 namespace
 {
 template <typename PropertyType>
-PropertyType* RequireProperty(FAutomationTestBase& Test, UStruct* Owner, const TCHAR* Name)
+PropertyType* RequireEquipmentProperty(FAutomationTestBase& Test, UStruct* Owner, const TCHAR* Name)
 {
 	PropertyType* Property = Owner ? FindFProperty<PropertyType>(Owner, Name) : nullptr;
 	Test.TestNotNull(FString::Printf(TEXT("%s exists"), Name), Property);
@@ -40,8 +40,8 @@ bool FPREquipmentContractTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Equipment data derives from item data"), EquipmentDataClass && ItemDataClass && EquipmentDataClass->IsChildOf(ItemDataClass));
 	TestTrue(TEXT("Weapon data derives from equipment data"), WeaponDataClass && EquipmentDataClass && WeaponDataClass->IsChildOf(EquipmentDataClass));
 	TestNotNull(TEXT("EquipmentSlot exists"), EquipmentDataClass ? FindFProperty<FProperty>(EquipmentDataClass, TEXT("EquipmentSlot")) : nullptr);
-	RequireProperty<FArrayProperty>(*this, EquipmentDataClass, TEXT("GrantedEffects"));
-	RequireProperty<FArrayProperty>(*this, EquipmentDataClass, TEXT("GrantedAbilities"));
+	RequireEquipmentProperty<FArrayProperty>(*this, EquipmentDataClass, TEXT("GrantedEffects"));
+	RequireEquipmentProperty<FArrayProperty>(*this, EquipmentDataClass, TEXT("GrantedAbilities"));
 
 	UClass* EquipmentComponentClass = FindObject<UClass>(nullptr, TEXT("/Script/ProjectA.PREquipmentComponent"));
 	TestNotNull(TEXT("Equipment component is reflected"), EquipmentComponentClass);
@@ -58,11 +58,11 @@ bool FPREquipmentContractTest::RunTest(const FString& Parameters)
 	}
 
 	UScriptStruct* RequestStruct = FindObject<UScriptStruct>(nullptr, TEXT("/Script/ProjectA.PRItemTransactionRequest"));
-	RequireProperty<FNameProperty>(*this, RequestStruct, TEXT("SlotId"));
+	RequireEquipmentProperty<FNameProperty>(*this, RequestStruct, TEXT("SlotId"));
 	UScriptStruct* AppearanceStruct = FindObject<UScriptStruct>(nullptr, TEXT("/Script/ProjectA.PREquipmentAppearanceEntry"));
 	TestNotNull(TEXT("Public equipment appearance entry is reflected"), AppearanceStruct);
-	RequireProperty<FNameProperty>(*this, AppearanceStruct, TEXT("SlotId"));
-	RequireProperty<FNameProperty>(*this, AppearanceStruct, TEXT("ItemId"));
+	RequireEquipmentProperty<FNameProperty>(*this, AppearanceStruct, TEXT("SlotId"));
+	RequireEquipmentProperty<FNameProperty>(*this, AppearanceStruct, TEXT("ItemId"));
 
 	return true;
 }

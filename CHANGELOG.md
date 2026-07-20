@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.7.2] - 2026-07-20
+
+- Added deterministic server-seeded Common, Uncommon, Rare, and Prototype equipment generation with persisted final affix rolls.
+- Added 12 localized, slot-filtered affix definitions, mutual-exclusion tags, explicit persistent GAS modifier effects, and exact equip/unequip handle cleanup.
+- Added v6 profile migration that preserves legacy ID-only affixes without fabricating values, plus owner-only inventory affix details and base-to-current GAS diagnostics.
+
 ## [0.7.1] - 2026-07-19
 
 - Added replicated Weapon, Armor, Chip and Tool equipment slots backed by the authoritative item transaction layer.

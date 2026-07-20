@@ -286,13 +286,30 @@ APRPickupActor* APREnemyCharacter::SpawnDeathLoot()
 		LootTableToUse = NewObject<UPRLootTableDataAsset>(this);
 	}
 
-	APRPickupActor* LootPickup = UPRLootTableLibrary::SpawnLootPickupFromTable(
-		this,
-		LootTableToUse,
-		PickupActorClass,
-		GetActorLocation() + FVector(0.0f, 0.0f, 28.0f),
-		FRotator::ZeroRotator,
-		DeathLootRollOverride);
+	const FVector SpawnLocation = GetActorLocation() + FVector(0.0f, 0.0f, 28.0f);
+	APRPickupActor* LootPickup = nullptr;
+	if (DeathLootRollOverride >= 0.0f)
+	{
+		// Retained solely for deterministic legacy test setups.
+		LootPickup = UPRLootTableLibrary::SpawnLootPickupFromTable(
+			this,
+			LootTableToUse,
+			PickupActorClass,
+			SpawnLocation,
+			FRotator::ZeroRotator,
+			DeathLootRollOverride);
+	}
+	else
+	{
+		// The authoritative server owns the seed; generated equipment persists the final result.
+		LootPickup = UPRLootTableLibrary::SpawnSeededLootPickupFromTable(
+			this,
+			LootTableToUse,
+			PickupActorClass,
+			SpawnLocation,
+			FRotator::ZeroRotator,
+			FMath::Rand());
+	}
 
 	bDeathLootSpawned = LootPickup != nullptr;
 	return LootPickup;

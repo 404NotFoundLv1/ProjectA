@@ -3,6 +3,8 @@
 #include "Fonts/CompositeFont.h"
 #include "Fonts/SlateFontInfo.h"
 #include "Items/PRInventoryComponent.h"
+#include "Items/PRAffixDefinitionDataAsset.h"
+#include "Core/PRAssetManager.h"
 #include "Items/PRItemDataAsset.h"
 #include "Items/PREquipmentComponent.h"
 #include "Items/PRWeaponDataAsset.h"
@@ -138,6 +140,8 @@ FText UPRInventoryWidget::GetItemRarityText(const EPRItemRarity Rarity) const
 		return FText::FromString(TEXT("Epic"));
 	case EPRItemRarity::Legendary:
 		return FText::FromString(TEXT("Legendary"));
+	case EPRItemRarity::Prototype:
+		return FText::FromString(TEXT("Prototype"));
 	case EPRItemRarity::Common:
 	default:
 		return FText::FromString(TEXT("Common"));
@@ -156,6 +160,8 @@ FLinearColor UPRInventoryWidget::GetItemRarityColor(const EPRItemRarity Rarity) 
 		return FLinearColor(0.74f, 0.48f, 0.95f, 1.0f);
 	case EPRItemRarity::Legendary:
 		return FLinearColor(1.0f, 0.74f, 0.28f, 1.0f);
+	case EPRItemRarity::Prototype:
+		return FLinearColor(1.0f, 0.38f, 0.72f, 1.0f);
 	case EPRItemRarity::Common:
 	default:
 		return FLinearColor(0.86f, 0.88f, 0.84f, 1.0f);
@@ -179,7 +185,25 @@ FText UPRInventoryWidget::GetItemTooltipText(const FPRItemInstance& Item) const
 		}
 	}
 
-	if (!Item.Affixes.IsEmpty())
+	if (!Item.RolledAffixes.IsEmpty())
+	{
+		Lines.Add(FString::Printf(TEXT("Loot seed: %d"), Item.LootSeed));
+		for (const FPRAffixRoll& Roll : Item.RolledAffixes)
+		{
+			const UPRAffixDefinitionDataAsset* Affix = UPRAssetManager::Get()
+				? UPRAssetManager::Get()->LoadAffixSync(Roll.AffixId)
+				: nullptr;
+			const FString Label = Affix && !Affix->DisplayName.IsEmpty() ? Affix->DisplayName.ToString() : Roll.AffixId.ToString();
+			const bool bPercent = Roll.ModifierType == EPRAffixModifierType::Percentage || Roll.Attribute == EPRAffixAttribute::PollutionResistance;
+			const float DisplayMagnitude = bPercent ? Roll.Magnitude * 100.0f : Roll.Magnitude;
+			Lines.Add(FString::Printf(TEXT("%s %+0.2f%s"), *Label, DisplayMagnitude, bPercent ? TEXT("%") : TEXT("")));
+			if (Affix && !Affix->Description.IsEmpty())
+			{
+				Lines.Add(FString::Printf(TEXT("  %s"), *Affix->Description.ToString()));
+			}
+		}
+	}
+	else if (!Item.Affixes.IsEmpty())
 	{
 		TArray<FString> AffixNames;
 		AffixNames.Reserve(Item.Affixes.Num());

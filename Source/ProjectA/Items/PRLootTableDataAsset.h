@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "Items/PRAffixGenerationLibrary.h"
 #include "Items/PRItemTypes.h"
 #include "PRLootTableDataAsset.generated.h"
 
@@ -15,6 +16,9 @@ struct PROJECTA_API FPRLootTableEntry
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Loot", meta = (ClampMin = "0.0"))
 	float Weight = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Loot")
+	bool bGenerateEquipmentAffixes = false;
 
 	bool IsValid() const
 	{
@@ -50,6 +54,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Loot")
 	bool RollRandomLoot(FPRItemInstance& OutItem) const;
 
+	bool RollSeededLoot(int32 LootSeed, FPRItemInstance& OutItem, FString& OutDiagnostic) const;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot")
 	TArray<FPRLootTableEntry> Entries;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot|Affixes")
+	TArray<FPRRarityGenerationRule> EquipmentRarityRules;
 };

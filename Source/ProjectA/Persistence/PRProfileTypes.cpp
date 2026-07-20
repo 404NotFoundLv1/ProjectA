@@ -19,9 +19,39 @@ void NormalizeNames(TArray<FName>& Names)
 	});
 }
 
+bool IsProfileItemAffixStateValid(const FPRItemInstance& Item)
+{
+	if (Item.AffixGenerationVersion < 0)
+	{
+		return false;
+	}
+	if (Item.AffixGenerationVersion == 0)
+	{
+		return Item.RolledAffixes.IsEmpty();
+	}
+	if (Item.AffixGenerationVersion != 1 || Item.Affixes.Num() != Item.RolledAffixes.Num())
+	{
+		return false;
+	}
+	TSet<FName> SeenAffixIds;
+	for (int32 Index = 0; Index < Item.RolledAffixes.Num(); ++Index)
+	{
+		const FPRAffixRoll& Roll = Item.RolledAffixes[Index];
+		if (!Roll.IsValid() || Item.Affixes[Index] != Roll.AffixId || SeenAffixIds.Contains(Roll.AffixId))
+		{
+			return false;
+		}
+		SeenAffixIds.Add(Roll.AffixId);
+	}
+	return true;
+}
+
 bool AreProfileItemsValid(const TArray<FPRItemInstance>& Items)
 {
-	return !Items.ContainsByPredicate([](const FPRItemInstance& Item) { return !Item.IsValid(); });
+	return !Items.ContainsByPredicate([](const FPRItemInstance& Item)
+	{
+		return !Item.IsValid() || !IsProfileItemAffixStateValid(Item);
+	});
 }
 
 bool AreProfileNamesValid(const TArray<FName>& Names)
@@ -142,7 +172,7 @@ void FPRProfileSnapshot::Normalize()
 	TSet<FName> EquipmentSlots;
 	Equipment.RemoveAll([&EquipmentSlots](const FPRProfileEquipmentEntry& Entry)
 	{
-		if (Entry.SlotId.IsNone() || !Entry.Item.IsValid() || EquipmentSlots.Contains(Entry.SlotId))
+		if (Entry.SlotId.IsNone() || !Entry.Item.IsValid() || !IsProfileItemAffixStateValid(Entry.Item) || EquipmentSlots.Contains(Entry.SlotId))
 		{
 			return true;
 		}
