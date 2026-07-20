@@ -30,6 +30,7 @@ public class ProjectA : ModuleRules
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
+			"AssetRegistry",
 			"OnlineSubsystem",
 			"Json",
 			"JsonUtilities"

@@ -124,7 +124,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FPRRewardPersistenceContractTest::RunTest(const FString& Parameters)
 {
-	TestEqual(TEXT("Personal reward protection remains available after schema v8"), UPRProfileSave::LatestSaveVersion, 8);
+	TestEqual(TEXT("Personal reward protection remains available after schema v9"), UPRProfileSave::LatestSaveVersion, 9);
 	TestNotNull(TEXT("Profile snapshot persists protection per reward budget"), FindFProperty<FArrayProperty>(FPRProfileSnapshot::StaticStruct(), TEXT("LootProtectionStates")));
 
 	UScriptStruct* ReceiptStruct = FPRPlayerSettlementReceipt::StaticStruct();

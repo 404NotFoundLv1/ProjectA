@@ -3,6 +3,7 @@
 #include "Misc/AutomationTest.h"
 
 #include "Core/PRAssetManager.h"
+#include "Crafting/PRCraftingRecipeDataAsset.h"
 #include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
 #include "GeneralProjectSettings.h"
@@ -124,9 +125,9 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 	const UGeneralProjectSettings* ProjectSettings = GetDefault<UGeneralProjectSettings>();
 	TestNotNull(TEXT("General project settings exist"), ProjectSettings);
 	TestEqual(
-		TEXT("Project version is v0.7.4"),
+		TEXT("Project version is v0.7.5"),
 		ProjectSettings ? ProjectSettings->ProjectVersion : FString(),
-		FString(TEXT("0.7.4")));
+		FString(TEXT("0.7.5")));
 
 	TestTrue(TEXT("Global manager is UPRAssetManager"), UAssetManager::Get().IsA<UPRAssetManager>());
 	TestEqual(
@@ -251,6 +252,14 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 	TArray<UPRShipRepairDataAsset*> ShipRepairCatalog;
 	TestTrue(TEXT("AssetManager builds a valid ship repair catalog"), Manager->LoadShipRepairCatalog(ShipRepairCatalog));
 	TestEqual(TEXT("Loaded ship repair catalog contains one contract"), ShipRepairCatalog.Num(), 1);
+
+	TArray<UPRCraftingRecipeDataAsset*> CraftingCatalog;
+	TestTrue(TEXT("AssetManager builds a valid crafting recipe catalog"), Manager->LoadCraftingRecipeCatalog(CraftingCatalog));
+	TestEqual(TEXT("Crafting catalog contains the ten v0.7.5 recipes"), CraftingCatalog.Num(), 10);
+	UPRCraftingRecipeDataAsset* CraftedArmor = Manager->LoadCraftingRecipeSync(TEXT("Recipe.Craft.TestArmor"));
+	TestNotNull(TEXT("Test armor recipe loads by its stable id"), CraftedArmor);
+	TestEqual(TEXT("Test armor recipe uses the real authored equipment item id"), CraftedArmor ? CraftedArmor->OutputItemId : NAME_None, FName(TEXT("DA_TestArmor")));
+	TestTrue(TEXT("Crafted armor recipe has deterministic uncommon affix policy"), CraftedArmor && CraftedArmor->EquipmentRarity == EPRItemRarity::Uncommon && CraftedArmor->EquipmentAffixCount == 1);
 
 	AddExpectedError(
 		TEXT("Primary asset is not registered"),

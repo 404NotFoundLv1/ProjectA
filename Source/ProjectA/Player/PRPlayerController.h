@@ -6,6 +6,7 @@
 #include "Multiplayer/PRMultiplayerProfileTypes.h"
 #include "Roles/PRRoleTypes.h"
 #include "Ship/PRShipRepairTypes.h"
+#include "Crafting/PRCraftingTypes.h"
 #include "ProjectAPlayerController.h"
 #include "TimerManager.h"
 #include "PRPlayerController.generated.h"
@@ -16,6 +17,8 @@ class UPRInventoryWidget;
 class UPRLobbyReadyDebugWidget;
 class UPRRiftSettlementWidget;
 class UPRShipRepairWidget;
+class UPRCraftingWidget;
+class APRCraftingStation;
 class UPRRoleLoadoutWidget;
 class UPRDiagnosticsWidget;
 class UPRWeaponHUDWidget;
@@ -146,6 +149,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Ship Repair|UI")
 	UPRShipRepairWidget* GetShipRepairWidget() const { return ShipRepairWidget.Get(); }
 
+	UFUNCTION(BlueprintCallable, Category = "Crafting|UI")
+	void ShowCraftingPanel();
+
+	UFUNCTION(BlueprintCallable, Category = "Crafting|UI")
+	void HideCraftingPanel();
+
+	UFUNCTION(BlueprintPure, Category = "Crafting|UI")
+	bool IsCraftingPanelVisible() const;
+
 	UFUNCTION(BlueprintCallable, Category = "Roles|UI")
 	void ToggleRoleLoadoutPanel();
 
@@ -169,6 +181,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Rift|Objective")
 	APRRiftObjectiveActor* FindBestRiftObjectiveCandidate() const;
+
+	APRCraftingStation* FindBestCraftingStationCandidate() const;
 
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	AActor* FindFocusedInteractionTarget() const;
@@ -272,6 +286,30 @@ public:
 	UFUNCTION(Client, Reliable, Category = "Lobby|Ship Repair")
 	void ClientShipRepairFailed(FName RepairProjectId, const FString& Diagnostic);
 
+	UFUNCTION(BlueprintCallable, Category = "Lobby|Crafting")
+	void RequestCraftRecipe(FName RecipeId);
+
+	UFUNCTION(BlueprintCallable, Category = "Lobby|Crafting")
+	void RequestDismantle(FGuid InstanceGuid);
+
+	UFUNCTION(BlueprintCallable, Category = "Lobby|Crafting")
+	void RequestUpgrade(FGuid InstanceGuid);
+
+	UFUNCTION(BlueprintCallable, Category = "Lobby|Crafting")
+	void RetryPendingCraftingSave();
+
+	UFUNCTION(Server, Reliable, Category = "Lobby|Crafting")
+	void ServerRequestCrafting(EPRCraftingOperation Operation, FName RecipeId, FGuid TargetInstanceGuid);
+
+	UFUNCTION(Client, Reliable, Category = "Lobby|Crafting")
+	void ClientReceiveCraftingReceipt(const FPRCraftingReceipt& Receipt);
+
+	UFUNCTION(Server, Reliable, Category = "Lobby|Crafting")
+	void ServerAcknowledgeCrafting(FGuid TransactionId, bool bSaveSucceeded);
+
+	UFUNCTION(Client, Reliable, Category = "Lobby|Crafting")
+	void ClientCraftingFailed(const FString& Diagnostic);
+
 	UFUNCTION(BlueprintPure, Category = "Lobby|Profile")
 	FString GetMultiplayerProfileStatus() const { return MultiplayerProfileStatus; }
 
@@ -280,6 +318,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Lobby|Ship Repair")
 	FString GetShipRepairSaveStatus() const { return ShipRepairSaveStatus; }
+
+	UFUNCTION(BlueprintPure, Category = "Lobby|Crafting")
+	FString GetCraftingSaveStatus() const { return CraftingSaveStatus; }
 
 	UFUNCTION(BlueprintCallable, Category = "Lobby|Debug")
 	void RefreshLobbyReadyDebugDisplay();
@@ -315,6 +356,8 @@ private:
 	void DestroyRiftSettlementUI();
 	void CreateShipRepairUI();
 	void DestroyShipRepairUI();
+	void CreateCraftingUI();
+	void DestroyCraftingUI();
 	void CreateRoleLoadoutUI();
 	void DestroyRoleLoadoutUI();
 	void ApplyInventoryInputMode();
@@ -411,6 +454,12 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UPRShipRepairWidget> ShipRepairWidget;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Crafting|UI")
+	TSubclassOf<UPRCraftingWidget> CraftingWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPRCraftingWidget> CraftingWidget;
+
 	UPROPERTY(EditDefaultsOnly, Category = "Roles|UI")
 	TSubclassOf<UPRRoleLoadoutWidget> RoleLoadoutWidgetClass;
 
@@ -421,6 +470,8 @@ private:
 	bool bSavedMouseCursorVisibilityForInventory = false;
 	bool bShipRepairInputModeActive = false;
 	bool bSavedMouseCursorVisibilityForShipRepair = false;
+	bool bCraftingInputModeActive = false;
+	bool bSavedMouseCursorVisibilityForCrafting = false;
 	bool bRoleLoadoutInputModeActive = false;
 	bool bSavedMouseCursorVisibilityForRoleLoadout = false;
 	bool bDiagnosticsInputModeActive = false;
@@ -451,4 +502,5 @@ private:
 	FString MultiplayerProfileStatus = TEXT("Not bound");
 	FString PersonalSettlementSaveStatus = TEXT("Waiting");
 	FString ShipRepairSaveStatus = TEXT("Idle");
+	FString CraftingSaveStatus = TEXT("Idle");
 };

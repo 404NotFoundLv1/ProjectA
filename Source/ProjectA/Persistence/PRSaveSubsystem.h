@@ -5,6 +5,7 @@
 #include "Persistence/PRSaveStorage.h"
 #include "Multiplayer/PRMultiplayerProfileTypes.h"
 #include "Ship/PRShipRepairTypes.h"
+#include "Crafting/PRCraftingTypes.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "PRSaveSubsystem.generated.h"
 
@@ -88,6 +89,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Profile|Ship Repair")
 	FPRProfileOperationResult RetryPendingShipRepairReceipt();
 
+	UFUNCTION(BlueprintCallable, Category = "Profile|Crafting")
+	FPRProfileOperationResult ApplyCraftingReceipt(const FPRCraftingReceipt& Receipt);
+
+	UFUNCTION(BlueprintPure, Category = "Profile|Crafting")
+	bool HasPendingCraftingReceipt() const { return bHasPendingCraftingReceipt; }
+
+	FPRCraftingReceipt GetPendingCraftingReceipt() const { return PendingCraftingReceipt; }
+
+	FPRProfileOperationResult RetryPendingCraftingReceipt();
+
 	UFUNCTION(BlueprintCallable, Category = "Profile|Development")
 	FPRProfileOperationResult PrepareShipRepairAcceptanceForDevelopment();
 
@@ -149,6 +160,8 @@ private:
 	bool bHasPendingSettlementReceipt = false;
 	FPRShipRepairReceipt PendingShipRepairReceipt;
 	bool bHasPendingShipRepairReceipt = false;
+	FPRCraftingReceipt PendingCraftingReceipt;
+	bool bHasPendingCraftingReceipt = false;
 	bool bUsingIsolatedDevelopmentRoot = false;
 	bool bGauntletSmokeInitializationRejected = false;
 };

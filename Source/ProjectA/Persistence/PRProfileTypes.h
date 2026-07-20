@@ -59,6 +59,9 @@ struct PROJECTA_API FPRProfileOperationResult
 	bool bAlreadyProcessedRepairTransaction = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Profile")
+	bool bAlreadyProcessedCraftingTransaction = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Profile")
 	FString Diagnostic;
 
 	bool IsSuccess() const { return Status == EPRProfileOperationStatus::Success; }
@@ -210,6 +213,10 @@ struct PROJECTA_API FPRProfileSnapshot
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Profile|Ship Repair")
 	TArray<FGuid> ProcessedRepairTransactionIds;
+
+	/** Durable craft/dismantle/upgrade replay ledger. v9+. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Profile|Crafting")
+	TArray<FGuid> ProcessedCraftingTransactionIds;
 
 	/** Persistent per-budget pity and repeat-protection state. v7+ only. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Profile|Rewards")

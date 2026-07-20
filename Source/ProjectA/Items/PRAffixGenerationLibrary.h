@@ -58,5 +58,13 @@ public:
 		int32 LootSeed,
 		const TArray<UPRAffixDefinitionDataAsset*>& Definitions,
 		const TArray<FPRRarityGenerationRule>& RarityRules);
-};
 
+	/** Uses the recipe-authored rarity and affix count while retaining deterministic server rolls. */
+	UFUNCTION(BlueprintCallable, Category = "Loot|Affix")
+	static FPRAffixGenerationResult GenerateEquipmentInstanceWithFixedRarity(
+		const UPREquipmentDataAsset* EquipmentDefinition,
+		int32 LootSeed,
+		const TArray<UPRAffixDefinitionDataAsset*>& Definitions,
+		EPRItemRarity Rarity,
+		int32 AffixCount);
+};

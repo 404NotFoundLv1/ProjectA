@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.7.5] - 2026-07-20
+
+- Added server-authoritative crafting, dismantling, and bounded equipment upgrades with atomic profile receipts and durable v9 replay protection.
+- Added recipe definitions, crafting station/widget entry points, fixed-rarity deterministic crafted equipment rolls, and explicit dismantle/upgrade authoring fields.
+- Added per-upgrade GAS attribute handles so equipment level changes apply and clean up with the equipped instance.
+
 ## [0.7.4] - 2026-07-20
 
 - Added a PlayerState-owned, owner-only replicated four-slot quickbar referencing authoritative item-instance GUIDs, including timed server use transactions, cancellation, cooldown state, and save migration to profile schema v8.

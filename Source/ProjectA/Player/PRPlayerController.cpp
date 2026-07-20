@@ -13,6 +13,8 @@
 #include "Core/PRShipLobbyGameMode.h"
 #include "Core/PRRiftGameMode.h"
 #include "Core/PRRiftObjectiveActor.h"
+#include "Crafting/PRCraftingStation.h"
+#include "Misc/Crc.h"
 #include "Deployables/PRDeployableComponent.h"
 #include "Diagnostics/PRDiagnosticsLog.h"
 #include "Engine/Engine.h"
@@ -38,6 +40,8 @@
 #include "Persistence/PRSaveSubsystem.h"
 #include "Progression/PRMissionProgressionDataAsset.h"
 #include "Ship/PRShipRepairDataAsset.h"
+#include "Crafting/PRCraftingLibrary.h"
+#include "Crafting/PRCraftingRecipeDataAsset.h"
 #include "UI/PRDebugUILayout.h"
 #include "UI/PRDiagnosticsWidget.h"
 #include "UI/PRGASDebugWidget.h"
@@ -46,6 +50,7 @@
 #include "UI/PRRiftSettlementWidget.h"
 #include "UI/PRRoleLoadoutWidget.h"
 #include "UI/PRShipRepairWidget.h"
+#include "UI/PRCraftingWidget.h"
 #include "UI/PRWeaponHUDWidget.h"
 #include "UI/PRQuickbarHUDWidget.h"
 #include "Roles/PRRoleComponent.h"
@@ -160,6 +165,7 @@ APRPlayerController::APRPlayerController()
 	QuickbarHUDWidgetClass = UPRQuickbarHUDWidget::StaticClass();
 	RiftSettlementWidgetClass = UPRRiftSettlementWidget::StaticClass();
 	ShipRepairWidgetClass = UPRShipRepairWidget::StaticClass();
+	CraftingWidgetClass = UPRCraftingWidget::StaticClass();
 	RoleLoadoutWidgetClass = UPRRoleLoadoutWidget::StaticClass();
 	DiagnosticsWidgetClass = UPRDiagnosticsWidget::StaticClass();
 	HealthInjectorEffectClass = UPRHealthConsumableGameplayEffect::StaticClass();
@@ -207,6 +213,7 @@ void APRPlayerController::BeginPlay()
 		CreateQuickbarHUD();
 		CreateRiftSettlementUI();
 		CreateShipRepairUI();
+		CreateCraftingUI();
 		CreateRoleLoadoutUI();
 		SubmitLocalMultiplayerProfile();
 
@@ -226,6 +233,7 @@ void APRPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	DestroyRiftSettlementUI();
 	DestroyShipRepairUI();
+	DestroyCraftingUI();
 	DestroyRoleLoadoutUI();
 	DestroyInventoryUI();
 	DestroyWeaponHUD();
@@ -259,6 +267,7 @@ void APRPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &APRPlayerController::CancelPendingDeployable);
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &APRPlayerController::HideRoleLoadoutPanel);
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &APRPlayerController::HideShipRepairPanel);
+		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &APRPlayerController::HideCraftingPanel);
 #if !UE_BUILD_SHIPPING
 		InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &APRPlayerController::ToggleDiagnosticsPanel);
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &APRPlayerController::HideDiagnosticsPanel);
@@ -357,6 +366,11 @@ void APRPlayerController::TryPickup()
 	}
 
 	APRRiftObjectiveActor* ObjectiveCandidate = Cast<APRRiftObjectiveActor>(FocusedTarget);
+	if (Cast<APRCraftingStation>(FocusedTarget))
+	{
+		ShowCraftingPanel();
+		return;
+	}
 	if (ObjectiveCandidate)
 	{
 		if (HasAuthority())
@@ -941,7 +955,8 @@ AActor* APRPlayerController::FindFocusedInteractionTarget() const
 	}
 	APRPickupActor* PickupCandidate = FindBestPickupCandidate();
 	APRRiftObjectiveActor* ObjectiveCandidate = FindBestRiftObjectiveCandidate();
-	if (!PickupCandidate && !ObjectiveCandidate)
+	APRCraftingStation* CraftingCandidate = FindBestCraftingStationCandidate();
+	if (!PickupCandidate && !ObjectiveCandidate && !CraftingCandidate)
 	{
 		return nullptr;
 	}
@@ -953,10 +968,37 @@ AActor* APRPlayerController::FindFocusedInteractionTarget() const
 	const float ObjectiveDistanceSquared = ObjectiveCandidate
 		? FVector::DistSquared(PawnLocation, ObjectiveCandidate->GetActorLocation())
 		: TNumericLimits<float>::Max();
+	const float CraftingDistanceSquared = CraftingCandidate
+		? FVector::DistSquared(PawnLocation, CraftingCandidate->GetActorLocation())
+		: TNumericLimits<float>::Max();
 
-	return PickupDistanceSquared <= ObjectiveDistanceSquared
-		? static_cast<AActor*>(PickupCandidate)
-		: static_cast<AActor*>(ObjectiveCandidate);
+	if (CraftingDistanceSquared <= PickupDistanceSquared && CraftingDistanceSquared <= ObjectiveDistanceSquared)
+	{
+		return CraftingCandidate;
+	}
+	return PickupDistanceSquared <= ObjectiveDistanceSquared ? static_cast<AActor*>(PickupCandidate) : static_cast<AActor*>(ObjectiveCandidate);
+}
+
+APRCraftingStation* APRPlayerController::FindBestCraftingStationCandidate() const
+{
+	const APawn* ControlledPawn = GetPawn();
+	UWorld* World = GetWorld();
+	if (!ControlledPawn || !World)
+	{
+		return nullptr;
+	}
+	APRCraftingStation* BestStation = nullptr;
+	float BestDistanceSquared = TNumericLimits<float>::Max();
+	for (TActorIterator<APRCraftingStation> It(World); It; ++It)
+	{
+		const float DistanceSquared = FVector::DistSquared(ControlledPawn->GetActorLocation(), It->GetActorLocation());
+		if (DistanceSquared <= FMath::Square(It->GetInteractionRadius()) && DistanceSquared < BestDistanceSquared)
+		{
+			BestStation = *It;
+			BestDistanceSquared = DistanceSquared;
+		}
+	}
+	return BestStation;
 }
 
 APRCharacter* APRPlayerController::FindBestReviveCandidate() const
@@ -1651,6 +1693,94 @@ void APRPlayerController::ClientShipRepairFailed_Implementation(const FName Repa
 	}
 }
 
+void APRPlayerController::RequestCraftRecipe(const FName RecipeId)
+{
+	ServerRequestCrafting(EPRCraftingOperation::Craft, RecipeId, FGuid());
+}
+
+void APRPlayerController::RequestDismantle(const FGuid InstanceGuid)
+{
+	ServerRequestCrafting(EPRCraftingOperation::Dismantle, NAME_None, InstanceGuid);
+}
+
+void APRPlayerController::RequestUpgrade(const FGuid InstanceGuid)
+{
+	ServerRequestCrafting(EPRCraftingOperation::Upgrade, NAME_None, InstanceGuid);
+}
+
+void APRPlayerController::RetryPendingCraftingSave()
+{
+	UPRSaveSubsystem* Saves = GetGameInstance() ? GetGameInstance()->GetSubsystem<UPRSaveSubsystem>() : nullptr;
+	if (!Saves || !Saves->HasPendingCraftingReceipt()) { return; }
+	const FPRCraftingReceipt Receipt = Saves->GetPendingCraftingReceipt();
+	const FPRProfileOperationResult Result = Saves->RetryPendingCraftingReceipt();
+	CraftingSaveStatus = Result.IsSuccess() ? TEXT("Saved after retry") : Result.Diagnostic;
+	ServerAcknowledgeCrafting(Receipt.TransactionId, Result.IsSuccess());
+}
+
+void APRPlayerController::ServerRequestCrafting_Implementation(const EPRCraftingOperation Operation, const FName RecipeId, const FGuid TargetInstanceGuid)
+{
+	UWorld* World = GetWorld();
+	APRShipLobbyGameMode* Lobby = World ? World->GetAuthGameMode<APRShipLobbyGameMode>() : nullptr;
+	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	if (!Lobby || !ProjectRiftPlayerState || !ProjectRiftPlayerState->IsMultiplayerProfileBound() || ProjectRiftPlayerState->IsReady()
+		|| ProjectRiftPlayerState->IsRepairPersistencePending() || ProjectRiftPlayerState->IsCraftingPersistencePending())
+	{
+		ClientCraftingFailed(TEXT("Crafting is unavailable until the ship-lobby profile is bound and all saves finish.")); return;
+	}
+	FPRProfileSnapshot Snapshot; FString Diagnostic;
+	if (!ProjectRiftPlayerState->BuildBoundShipRepairSnapshot(Snapshot, Diagnostic)) { ClientCraftingFailed(Diagnostic); return; }
+	UPRAssetManager* Assets = UPRAssetManager::Get();
+	FPRCraftingEvaluation Evaluation; bool bApplied = false; const int32 Seed = static_cast<int32>(FCrc::StrCrc32(*FString::Printf(TEXT("ProjectRift.Craft.v1|%s|%s|%s"), *ProjectRiftPlayerState->GetBoundProfileId().ToString(EGuidFormats::Digits), *RecipeId.ToString(), *TargetInstanceGuid.ToString(EGuidFormats::Digits))));
+	if (Operation == EPRCraftingOperation::Craft)
+	{
+		UPRCraftingRecipeDataAsset* Recipe = Assets ? Assets->LoadCraftingRecipeSync(RecipeId) : nullptr;
+		UPRItemDataAsset* Output = Recipe && Assets ? Assets->LoadItemDataSync(Recipe->OutputItemId) : nullptr;
+		TArray<UPRAffixDefinitionDataAsset*> Affixes; FPRItemInstance Crafted;
+		bApplied = Recipe && Output && Assets && Assets->LoadAffixCatalog(Affixes) && UPRCraftingLibrary::ApplyRecipeToSnapshot(Recipe, Output, Seed, Affixes, Snapshot, Crafted, Evaluation);
+	}
+	else
+	{
+		const FPRItemInstance* Item = Snapshot.BackpackItems.FindByPredicate([&TargetInstanceGuid](const FPRItemInstance& Candidate) { return Candidate.InstanceGuid == TargetInstanceGuid; });
+		if (!Item) { for (const FPRProfileEquipmentEntry& Entry : Snapshot.Equipment) { if (Entry.Item.InstanceGuid == TargetInstanceGuid) { Item = &Entry.Item; break; } } }
+		UPRItemDataAsset* Definition = Item && Assets ? Assets->LoadItemDataSync(Item->ItemId) : nullptr;
+		bApplied = Operation == EPRCraftingOperation::Dismantle
+			? UPRCraftingLibrary::ApplyDismantleToSnapshot(TargetInstanceGuid, Definition, Snapshot, Evaluation)
+			: UPRCraftingLibrary::ApplyUpgradeToSnapshot(TargetInstanceGuid, Cast<UPREquipmentDataAsset>(Definition), Snapshot, Evaluation);
+	}
+	if (!bApplied) { ClientCraftingFailed(Evaluation.Diagnostic.IsEmpty() ? TEXT("Crafting operation was rejected.") : Evaluation.Diagnostic); return; }
+	FPRCraftingReceipt Receipt;
+	Receipt.ProfileId = ProjectRiftPlayerState->GetBoundProfileId(); Receipt.TransactionId = FGuid::NewGuid(); Receipt.Operation = Operation; Receipt.RecipeId = RecipeId; Receipt.TargetInstanceGuid = TargetInstanceGuid; Receipt.CraftSeed = Seed;
+	Receipt.SettledResourceWallet = Snapshot.ResourceWallet; Receipt.SettledBackpackItems = Snapshot.BackpackItems; Receipt.SettledEquipment = Snapshot.Equipment;
+	if (!ProjectRiftPlayerState->ApplyCraftingState(Receipt, Diagnostic)) { ClientCraftingFailed(Diagnostic); return; }
+	ProjectRiftPlayerState->SetCraftingPersistencePending(Receipt.TransactionId, true);
+	Lobby->RefreshTeamMissionState();
+	ClientReceiveCraftingReceipt(Receipt);
+}
+
+void APRPlayerController::ClientReceiveCraftingReceipt_Implementation(const FPRCraftingReceipt& Receipt)
+{
+	CraftingSaveStatus = TEXT("Saving crafting result");
+	UPRSaveSubsystem* Saves = GetGameInstance() ? GetGameInstance()->GetSubsystem<UPRSaveSubsystem>() : nullptr;
+	const FPRProfileOperationResult Result = Saves ? Saves->ApplyCraftingReceipt(Receipt) : FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::IOError, TEXT("Save subsystem unavailable."), Receipt.ProfileId);
+	CraftingSaveStatus = Result.IsSuccess() ? (Result.bAlreadyProcessedCraftingTransaction ? TEXT("Already saved") : TEXT("Saved")) : Result.Diagnostic;
+	ServerAcknowledgeCrafting(Receipt.TransactionId, Result.IsSuccess());
+}
+
+void APRPlayerController::ServerAcknowledgeCrafting_Implementation(const FGuid TransactionId, const bool bSaveSucceeded)
+{
+	APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+	if (ProjectRiftPlayerState && ProjectRiftPlayerState->GetPendingCraftingTransactionId() == TransactionId && bSaveSucceeded)
+	{
+		ProjectRiftPlayerState->SetCraftingPersistencePending(TransactionId, false);
+	}
+}
+
+void APRPlayerController::ClientCraftingFailed_Implementation(const FString& Diagnostic)
+{
+	CraftingSaveStatus = Diagnostic;
+}
+
 bool APRPlayerController::TryUseInventoryItemOnServer(const FName ItemId)
 {
 	if (!HasAuthority())
@@ -2225,6 +2355,68 @@ void APRPlayerController::DestroyShipRepairUI()
 	{
 		ShipRepairWidget->RemoveFromParent();
 		ShipRepairWidget = nullptr;
+	}
+}
+
+void APRPlayerController::ShowCraftingPanel()
+{
+	if (!IsLocalPlayerController()) { return; }
+	CreateCraftingUI();
+	if (CraftingWidget)
+	{
+		CraftingWidget->SetVisibility(ESlateVisibility::Visible);
+		if (!bCraftingInputModeActive)
+		{
+			bSavedMouseCursorVisibilityForCrafting = bShowMouseCursor;
+			bCraftingInputModeActive = true;
+		}
+		FInputModeGameAndUI InputMode;
+		InputMode.SetWidgetToFocus(CraftingWidget->TakeWidget());
+		InputMode.SetHideCursorDuringCapture(false);
+		SetInputMode(InputMode);
+		bShowMouseCursor = true;
+	}
+}
+
+void APRPlayerController::HideCraftingPanel()
+{
+	if (CraftingWidget) { CraftingWidget->SetVisibility(ESlateVisibility::Collapsed); }
+	if (bCraftingInputModeActive)
+	{
+		bCraftingInputModeActive = false;
+		FInputModeGameOnly InputMode;
+		SetInputMode(InputMode);
+		bShowMouseCursor = bSavedMouseCursorVisibilityForCrafting;
+	}
+}
+
+bool APRPlayerController::IsCraftingPanelVisible() const
+{
+	return CraftingWidget && CraftingWidget->GetVisibility() == ESlateVisibility::Visible;
+}
+
+void APRPlayerController::CreateCraftingUI()
+{
+	if (!IsLocalPlayerController() || CraftingWidget) { return; }
+	if (!CraftingWidgetClass) { CraftingWidgetClass = UPRCraftingWidget::StaticClass(); }
+	CraftingWidget = CreateWidget<UPRCraftingWidget>(this, CraftingWidgetClass);
+	if (CraftingWidget)
+	{
+		CraftingWidget->SetVisibility(ESlateVisibility::Collapsed);
+		CraftingWidget->AddToPlayerScreen(42);
+		CraftingWidget->SetPositionInViewport(FVector2D::ZeroVector, false);
+		CraftingWidget->SetDesiredSizeInViewport(FVector2D(720.0, 520.0));
+		CraftingWidget->SetAnchorsInViewport(FAnchors(0.5f, 0.5f));
+		CraftingWidget->SetAlignmentInViewport(FVector2D(0.5f, 0.5f));
+	}
+}
+
+void APRPlayerController::DestroyCraftingUI()
+{
+	if (CraftingWidget)
+	{
+		CraftingWidget->RemoveFromParent();
+		CraftingWidget = nullptr;
 	}
 }
 

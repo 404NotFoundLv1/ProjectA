@@ -145,6 +145,12 @@ FPRProfileOperationResult UPRProfileSave::MigrateToLatest()
 			Snapshot.Normalize();
 			SaveVersion = 8;
 			break;
+		case 8:
+			// v0.7.5 adds durable crafting transaction replay protection.
+			Snapshot.ProcessedCraftingTransactionIds.Reset();
+			Snapshot.Normalize();
+			SaveVersion = 9;
+			break;
 		default:
 			return FPRProfileOperationResult::MakeFailure(
 				EPRProfileOperationStatus::MigrationFailed,

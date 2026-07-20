@@ -146,53 +146,65 @@ FPRAffixGenerationResult UPRAffixGenerationLibrary::GenerateEquipmentInstance(
 		return Result;
 	}
 
-	TArray<const UPRAffixDefinitionDataAsset*> AllCandidates;
+	return GenerateEquipmentInstanceWithFixedRarity(
+		EquipmentDefinition,
+		LootSeed,
+		Definitions,
+		RarityRule->Rarity,
+		RarityRule->AffixCount);
+
+}
+
+FPRAffixGenerationResult UPRAffixGenerationLibrary::GenerateEquipmentInstanceWithFixedRarity(
+	const UPREquipmentDataAsset* EquipmentDefinition,
+	const int32 LootSeed,
+	const TArray<UPRAffixDefinitionDataAsset*>& Definitions,
+	const EPRItemRarity Rarity,
+	const int32 AffixCount)
+{
+	FPRAffixGenerationResult Result;
+	if (!IsGeneratedRarity(Rarity) || AffixCount < 0 || AffixCount > 3)
+	{
+		Result.Diagnostic = TEXT("Crafted equipment has an invalid fixed rarity or affix count.");
+		return Result;
+	}
+	if (!EquipmentDefinition || EquipmentDefinition->ItemId.IsNone() || EquipmentDefinition->EquipmentSlot == EPREquipmentSlot::None)
+	{
+		Result.Diagnostic = TEXT("Equipment definition is missing an item id or concrete equipment slot.");
+		return Result;
+	}
+	TArray<const UPRAffixDefinitionDataAsset*> Candidates;
 	TSet<FName> SeenIds;
 	for (const UPRAffixDefinitionDataAsset* Definition : Definitions)
 	{
-		if (!Definition || SeenIds.Contains(Definition->AffixId) || !IsDefinitionCompatible(*Definition, EquipmentDefinition->EquipmentSlot))
+		if (Definition && !SeenIds.Contains(Definition->AffixId) && IsDefinitionCompatible(*Definition, EquipmentDefinition->EquipmentSlot))
 		{
-			continue;
+			SeenIds.Add(Definition->AffixId);
+			Candidates.Add(Definition);
 		}
-		SeenIds.Add(Definition->AffixId);
-		AllCandidates.Add(Definition);
 	}
-	AllCandidates.Sort([](const UPRAffixDefinitionDataAsset& A, const UPRAffixDefinitionDataAsset& B)
-	{
-		return A.AffixId.LexicalLess(B.AffixId);
-	});
-
+	Candidates.Sort([](const UPRAffixDefinitionDataAsset& A, const UPRAffixDefinitionDataAsset& B) { return A.AffixId.LexicalLess(B.AffixId); });
 	Result.Item.ItemId = EquipmentDefinition->ItemId;
 	Result.Item.Count = 1;
 	Result.Item.Level = 1;
 	Result.Item.Durability = 1.0f;
-	Result.Item.Rarity = RarityRule->Rarity;
+	Result.Item.Rarity = Rarity;
 	Result.Item.LootSeed = LootSeed;
 	Result.Item.AffixGenerationVersion = CurrentGenerationVersion;
-	if (RarityRule->AffixCount == 0)
-	{
-		Result.bSuccess = true;
-		return Result;
-	}
-
 	FRandomStream SelectionStream(DeriveSeed(LootSeed, EquipmentDefinition->ItemId.ToString() + TEXT("|Selection")));
 	FGameplayTagContainer UsedExclusionTags;
-	for (int32 Index = 0; Index < RarityRule->AffixCount; ++Index)
+	for (int32 Index = 0; Index < AffixCount; ++Index)
 	{
-		TArray<const UPRAffixDefinitionDataAsset*> EligibleCandidates;
-		for (const UPRAffixDefinitionDataAsset* Candidate : AllCandidates)
+		TArray<const UPRAffixDefinitionDataAsset*> Eligible;
+		for (const UPRAffixDefinitionDataAsset* Candidate : Candidates)
 		{
-			if (Candidate && !Result.Item.Affixes.Contains(Candidate->AffixId)
-				&& !Candidate->MutuallyExclusiveTags.HasAny(UsedExclusionTags))
-			{
-				EligibleCandidates.Add(Candidate);
-			}
+			if (!Result.Item.Affixes.Contains(Candidate->AffixId) && !Candidate->MutuallyExclusiveTags.HasAny(UsedExclusionTags)) { Eligible.Add(Candidate); }
 		}
-		const UPRAffixDefinitionDataAsset* Selected = SelectDefinition(EligibleCandidates, SelectionStream);
+		const UPRAffixDefinitionDataAsset* Selected = SelectDefinition(Eligible, SelectionStream);
 		if (!Selected)
 		{
-			Result.Diagnostic = TEXT("Not enough compatible affix definitions for the requested rarity.");
 			Result.Item = FPRItemInstance();
+			Result.Diagnostic = TEXT("Not enough compatible affix definitions for the fixed recipe output.");
 			return Result;
 		}
 		FRandomStream MagnitudeStream(DeriveSeed(LootSeed, EquipmentDefinition->ItemId.ToString() + TEXT("|Magnitude|") + Selected->AffixId.ToString()));
@@ -207,4 +219,3 @@ FPRAffixGenerationResult UPRAffixGenerationLibrary::GenerateEquipmentInstance(
 	Result.bSuccess = true;
 	return Result;
 }
-

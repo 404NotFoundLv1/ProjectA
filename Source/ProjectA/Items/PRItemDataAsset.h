@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "Crafting/PRCraftingTypes.h"
 #include "Items/PRItemTypes.h"
 #include "Items/PRItemUseTypes.h"
 #include "PRItemDataAsset.generated.h"
@@ -49,6 +50,13 @@ public:
 	/** Reserved for the later crafting system; task-critical items set this false now. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
 	bool bCanCraft = true;
+
+	/** Only explicitly configured equipment may be dismantled in the ship lobby. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|Crafting")
+	bool bCanDismantle = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|Crafting")
+	FPRDismantleResult DismantleResult;
 
 	/** Mission-local task carriers are removed before the settlement snapshot is persisted. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")

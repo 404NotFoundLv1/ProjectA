@@ -109,6 +109,8 @@ void APRPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME_CONDITION(APRPlayerState, BoundShipModules, COND_OwnerOnly);
 	DOREPLIFETIME(APRPlayerState, bRepairPersistencePending);
 	DOREPLIFETIME_CONDITION(APRPlayerState, PendingRepairTransactionId, COND_OwnerOnly);
+	DOREPLIFETIME(APRPlayerState, bCraftingPersistencePending);
+	DOREPLIFETIME_CONDITION(APRPlayerState, PendingCraftingTransactionId, COND_OwnerOnly);
 	DOREPLIFETIME(APRPlayerState, SelectedRoleModule);
 	DOREPLIFETIME(APRPlayerState, PlayerDisplayName);
 	DOREPLIFETIME(APRPlayerState, ShipResources);
@@ -116,7 +118,7 @@ void APRPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 
 void APRPlayerState::SetReady(const bool bReady)
 {
-	if (bReady && (!bMultiplayerProfileBound || bRepairPersistencePending
+	if (bReady && (!bMultiplayerProfileBound || bRepairPersistencePending || bCraftingPersistencePending
 		|| !RoleComponent || !RoleComponent->IsLoadoutValid(SelectedRoleModule, RoleComponent->GetCurrentLoadout())))
 	{
 		UE_LOG(LogProjectA, Warning, TEXT("Ready state rejected because profile binding or repair persistence is incomplete. Player=%s"), *GetPlayerDisplayName());
@@ -142,6 +144,7 @@ bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjectio
 {
 	if (!Projection.IsValid(&OutDiagnostic) || !InventoryComponent || !WeaponComponent || !RoleComponent)
 	{
+		UE_LOG(LogProjectA, Warning, TEXT("Multiplayer profile bind rejected before mutation. Profile=%s Diagnostic=%s"), *Projection.ProfileId.ToString(EGuidFormats::Digits), *OutDiagnostic);
 		return false;
 	}
 	if (bMultiplayerProfileBound && BoundProfileId == Projection.ProfileId)
@@ -161,6 +164,7 @@ bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjectio
 	TArray<FPRItemInstance> PreviousBackpack;
 	if (!WeaponComponent->BuildPersistentBackpack(PreviousBackpack, OutDiagnostic))
 	{
+		UE_LOG(LogProjectA, Warning, TEXT("Multiplayer profile bind could not capture current backpack. Profile=%s Diagnostic=%s"), *Projection.ProfileId.ToString(EGuidFormats::Digits), *OutDiagnostic);
 		return false;
 	}
 	const TArray<FPRProfileEquipmentEntry> PreviousEquipment = WeaponComponent->GetEquipmentEntries();
@@ -192,6 +196,7 @@ bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjectio
 		|| !WeaponComponent->EnsureStarterWeapon(TEXT("TestRifle"), OutDiagnostic))
 	{
 		RestorePreviousRuntimeState();
+		UE_LOG(LogProjectA, Warning, TEXT("Multiplayer profile bind runtime transaction failed. Profile=%s Diagnostic=%s"), *Projection.ProfileId.ToString(EGuidFormats::Digits), *OutDiagnostic);
 		OutDiagnostic = TEXT("PlayerState rejected validated multiplayer profile runtime data.");
 		return false;
 	}
@@ -212,9 +217,10 @@ bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjectio
 	if (bNeedsLegacyDefault)
 	{
 		if (!RoleComponent->EnsureDefaultLoadoutForSelectedRole())
-		{
-			RestorePreviousRuntimeState();
-			OutDiagnostic = TEXT("Legacy profile role defaults could not be applied.");
+	{
+		RestorePreviousRuntimeState();
+		UE_LOG(LogProjectA, Warning, TEXT("Multiplayer profile bind could not apply legacy role defaults. Profile=%s"), *Projection.ProfileId.ToString(EGuidFormats::Digits));
+		OutDiagnostic = TEXT("Legacy profile role defaults could not be applied.");
 			return false;
 		}
 	}
@@ -244,6 +250,7 @@ bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjectio
 		|| (bNeedsLegacyDefault && !RoleComponent->IsLoadoutValid(AppliedRoleId, AppliedLoadout)))
 	{
 		RestorePreviousRuntimeState();
+		UE_LOG(LogProjectA, Warning, TEXT("Multiplayer profile bind rejected role state. Profile=%s"), *Projection.ProfileId.ToString(EGuidFormats::Digits));
 		OutDiagnostic = TEXT("PlayerState rejected multiplayer role state.");
 		return false;
 	}
@@ -251,6 +258,7 @@ bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjectio
 	if (!WeaponComponent->BuildPersistentBackpack(NewMissionStartBackpackItems, OutDiagnostic))
 	{
 		RestorePreviousRuntimeState();
+		UE_LOG(LogProjectA, Warning, TEXT("Multiplayer profile bind could not capture new backpack. Profile=%s Diagnostic=%s"), *Projection.ProfileId.ToString(EGuidFormats::Digits), *OutDiagnostic);
 		return false;
 	}
 	if (ItemTransactionComponent)
@@ -269,6 +277,8 @@ bool APRPlayerState::BindMultiplayerProfile(const FPRMultiplayerProfileProjectio
 	BoundLootProtectionStates = Projection.LootProtectionStates;
 	bRepairPersistencePending = false;
 	PendingRepairTransactionId.Invalidate();
+	bCraftingPersistencePending = false;
+	PendingCraftingTransactionId.Invalidate();
 	MissionStartBackpackItems = MoveTemp(NewMissionStartBackpackItems);
 	MissionStartResourceWallet = Projection.ResourceWallet;
 	MissionStartRoleId = AppliedRoleId;
@@ -298,6 +308,8 @@ void APRPlayerState::ClearMultiplayerProfileBinding()
 	BoundLootProtectionStates.Reset();
 	bRepairPersistencePending = false;
 	PendingRepairTransactionId.Invalidate();
+	bCraftingPersistencePending = false;
+	PendingCraftingTransactionId.Invalidate();
 	MissionStartBackpackItems.Reset();
 	MissionStartResourceWallet.Reset();
 	MissionStartRoleId = NAME_None;
@@ -409,6 +421,44 @@ void APRPlayerState::SetRepairPersistencePending(const FGuid TransactionId, cons
 	{
 		bRepairPersistencePending = false;
 		PendingRepairTransactionId.Invalidate();
+	}
+	ForceNetUpdate();
+}
+
+bool APRPlayerState::ApplyCraftingState(const FPRCraftingReceipt& Receipt, FString& OutDiagnostic)
+{
+	if (!bMultiplayerProfileBound || Receipt.ProfileId != BoundProfileId || !Receipt.IsValid(&OutDiagnostic))
+	{
+		if (OutDiagnostic.IsEmpty()) { OutDiagnostic = TEXT("Crafting receipt does not match the bound profile."); }
+		return false;
+	}
+	TArray<FPRShipResourceStack> RuntimeResources;
+	for (const FPRProfileResourceBalance& Balance : Receipt.SettledResourceWallet) { RuntimeResources.Emplace(Balance.ResourceId, Balance.Count); }
+	if (!ReplaceShipResources(RuntimeResources) || !WeaponComponent || !WeaponComponent->ReplacePersistentBackpack(Receipt.SettledBackpackItems, OutDiagnostic)
+		|| !WeaponComponent->ReplaceEquipmentEntries(Receipt.SettledEquipment, OutDiagnostic))
+	{
+		if (OutDiagnostic.IsEmpty()) { OutDiagnostic = TEXT("PlayerState rejected the crafted inventory state."); }
+		return false;
+	}
+	MissionStartResourceWallet = Receipt.SettledResourceWallet;
+	MissionStartBackpackItems = Receipt.SettledBackpackItems;
+	ForceNetUpdate();
+	return true;
+}
+
+void APRPlayerState::SetCraftingPersistencePending(const FGuid TransactionId, const bool bPending)
+{
+	if (bPending)
+	{
+		if (!bMultiplayerProfileBound || !TransactionId.IsValid()) { return; }
+		bCraftingPersistencePending = true;
+		PendingCraftingTransactionId = TransactionId;
+		bIsReady = false;
+	}
+	else if (!TransactionId.IsValid() || PendingCraftingTransactionId == TransactionId)
+	{
+		bCraftingPersistencePending = false;
+		PendingCraftingTransactionId.Invalidate();
 	}
 	ForceNetUpdate();
 }
@@ -588,6 +638,8 @@ void APRPlayerState::CopyProjectRiftStateFrom(const APRPlayerState* SourcePlayer
 	BoundLootProtectionStates = SourcePlayerState->BoundLootProtectionStates;
 	bRepairPersistencePending = SourcePlayerState->bRepairPersistencePending;
 	PendingRepairTransactionId = SourcePlayerState->PendingRepairTransactionId;
+	bCraftingPersistencePending = SourcePlayerState->bCraftingPersistencePending;
+	PendingCraftingTransactionId = SourcePlayerState->PendingCraftingTransactionId;
 	MissionStartBackpackItems = SourcePlayerState->MissionStartBackpackItems;
 	MissionStartResourceWallet = SourcePlayerState->MissionStartResourceWallet;
 	MissionStartRoleId = SourcePlayerState->MissionStartRoleId;

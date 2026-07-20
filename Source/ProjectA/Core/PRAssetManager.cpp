@@ -8,7 +8,10 @@
 #include "Roles/PRRoleDataAsset.h"
 #include "Roles/PRRoleModuleDataAsset.h"
 #include "Ship/PRShipRepairDataAsset.h"
+#include "Crafting/PRCraftingRecipeDataAsset.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "Engine/StreamableManager.h"
+#include "Modules/ModuleManager.h"
 #include "ProjectA.h"
 
 UPRAssetManager* UPRAssetManager::Get()
@@ -88,9 +91,43 @@ FPrimaryAssetId UPRAssetManager::MakeShipRepairPrimaryAssetId(const FName Repair
 		: FPrimaryAssetId(UPRShipRepairDataAsset::ShipRepairPrimaryAssetType, RepairProjectId);
 }
 
+FPrimaryAssetId UPRAssetManager::MakeCraftingRecipePrimaryAssetId(const FName RecipeId)
+{
+	return RecipeId.IsNone()
+		? FPrimaryAssetId()
+		: FPrimaryAssetId(UPRCraftingRecipeDataAsset::CraftingRecipePrimaryAssetType, RecipeId);
+}
+
 void UPRAssetManager::StartInitialLoading()
 {
 	Super::StartInitialLoading();
+
+	// The asset manager starts before the editor's first registry scan has
+	// completed.  Registering primary-asset paths only here leaves every
+	// ProjectRift catalog empty in editor automation and in a cold launch.
+	// Refresh once the registry is authoritative instead.
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
+	if (AssetRegistryModule.Get().IsLoadingAssets())
+	{
+		AssetRegistryModule.Get().OnFilesLoaded().AddUObject(this, &UPRAssetManager::RefreshPrimaryAssetCatalogs);
+	}
+	else
+	{
+		RefreshPrimaryAssetCatalogs();
+	}
+}
+
+void UPRAssetManager::RefreshPrimaryAssetCatalogs()
+{
+	ScanPathsForPrimaryAssets(UPRItemDataAsset::ItemPrimaryAssetType, { TEXT("/Game/ProjectRift/Items") }, UPRItemDataAsset::StaticClass(), false);
+	ScanPathsForPrimaryAssets(UPRAffixDefinitionDataAsset::AffixPrimaryAssetType, { TEXT("/Game/ProjectRift/Affixes") }, UPRAffixDefinitionDataAsset::StaticClass(), false);
+	ScanPathsForPrimaryAssets(UPRLootTableDataAsset::LootTablePrimaryAssetType, { TEXT("/Game/ProjectRift/Items"), TEXT("/Game/ProjectRift/Rewards") }, UPRLootTableDataAsset::StaticClass(), false);
+	ScanPathsForPrimaryAssets(UPRRewardBudgetDataAsset::RewardBudgetPrimaryAssetType, { TEXT("/Game/ProjectRift/Rewards") }, UPRRewardBudgetDataAsset::StaticClass(), false);
+	ScanPathsForPrimaryAssets(UPRMissionProgressionDataAsset::MissionPrimaryAssetType, { TEXT("/Game/ProjectRift/Missions") }, UPRMissionProgressionDataAsset::StaticClass(), false);
+	ScanPathsForPrimaryAssets(UPRRoleDataAsset::RolePrimaryAssetType, { TEXT("/Game/ProjectRift/Roles") }, UPRRoleDataAsset::StaticClass(), false);
+	ScanPathsForPrimaryAssets(UPRRoleModuleDataAsset::RoleModulePrimaryAssetType, { TEXT("/Game/ProjectRift/RoleModules") }, UPRRoleModuleDataAsset::StaticClass(), false);
+	ScanPathsForPrimaryAssets(UPRShipRepairDataAsset::ShipRepairPrimaryAssetType, { TEXT("/Game/ProjectRift/ShipRepairs") }, UPRShipRepairDataAsset::StaticClass(), false);
+	ScanPathsForPrimaryAssets(UPRCraftingRecipeDataAsset::CraftingRecipePrimaryAssetType, { TEXT("/Game/ProjectRift/Crafting") }, UPRCraftingRecipeDataAsset::StaticClass(), false);
 
 	ValidatePrimaryAssetType(UPRItemDataAsset::ItemPrimaryAssetType);
 	ValidatePrimaryAssetType(UPRAffixDefinitionDataAsset::AffixPrimaryAssetType);
@@ -100,6 +137,7 @@ void UPRAssetManager::StartInitialLoading()
 	ValidatePrimaryAssetType(UPRRoleDataAsset::RolePrimaryAssetType);
 	ValidatePrimaryAssetType(UPRRoleModuleDataAsset::RoleModulePrimaryAssetType);
 	ValidatePrimaryAssetType(UPRShipRepairDataAsset::ShipRepairPrimaryAssetType);
+	ValidatePrimaryAssetType(UPRCraftingRecipeDataAsset::CraftingRecipePrimaryAssetType);
 
 	TArray<UPRRoleDataAsset*> Roles;
 	TArray<UPRRoleModuleDataAsset*> RoleModules;
@@ -273,6 +311,44 @@ bool UPRAssetManager::LoadShipRepairCatalog(TArray<UPRShipRepairDataAsset*>& Out
 	if (!UPRShipRepairDataAsset::ValidateCatalog(OutCatalog, &Diagnostic))
 	{
 		UE_LOG(LogProjectA, Warning, TEXT("ProjectRift ship repair catalog is invalid: %s"), *Diagnostic);
+		OutCatalog.Reset();
+		return false;
+	}
+	return true;
+}
+
+UPRCraftingRecipeDataAsset* UPRAssetManager::LoadCraftingRecipeSync(const FName RecipeId)
+{
+	return Cast<UPRCraftingRecipeDataAsset>(LoadPrimaryAssetSync(
+		MakeCraftingRecipePrimaryAssetId(RecipeId),
+		UPRCraftingRecipeDataAsset::StaticClass()));
+}
+
+bool UPRAssetManager::LoadCraftingRecipeCatalog(TArray<UPRCraftingRecipeDataAsset*>& OutCatalog)
+{
+	OutCatalog.Reset();
+	TArray<FPrimaryAssetId> AssetIds;
+	GetPrimaryAssetIdList(UPRCraftingRecipeDataAsset::CraftingRecipePrimaryAssetType, AssetIds);
+	AssetIds.Sort([](const FPrimaryAssetId& A, const FPrimaryAssetId& B)
+	{
+		return A.PrimaryAssetName.LexicalLess(B.PrimaryAssetName);
+	});
+	for (const FPrimaryAssetId& AssetId : AssetIds)
+	{
+		UPRCraftingRecipeDataAsset* Recipe = Cast<UPRCraftingRecipeDataAsset>(LoadPrimaryAssetSync(
+			AssetId,
+			UPRCraftingRecipeDataAsset::StaticClass()));
+		if (!Recipe)
+		{
+			OutCatalog.Reset();
+			return false;
+		}
+		OutCatalog.Add(Recipe);
+	}
+	FString Diagnostic;
+	if (!UPRCraftingRecipeDataAsset::ValidateCatalog(OutCatalog, Diagnostic))
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("ProjectRift crafting recipe catalog is invalid: %s"), *Diagnostic);
 		OutCatalog.Reset();
 		return false;
 	}

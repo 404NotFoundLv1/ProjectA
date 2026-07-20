@@ -4,6 +4,7 @@ namespace
 {
 constexpr int32 MaxProcessedSettlementIds = 128;
 constexpr int32 MaxProcessedRepairTransactionIds = 128;
+constexpr int32 MaxProcessedCraftingTransactionIds = 128;
 constexpr int32 MaxLootProtectionStates = 64;
 
 void NormalizeNames(TArray<FName>& Names)
@@ -262,6 +263,17 @@ void FPRProfileSnapshot::Normalize()
 	{
 		ProcessedRepairTransactionIds.RemoveAt(0, ProcessedRepairTransactionIds.Num() - MaxProcessedRepairTransactionIds);
 	}
+	TSet<FGuid> SeenCraftingTransactionIds;
+	ProcessedCraftingTransactionIds.RemoveAll([&SeenCraftingTransactionIds](const FGuid& TransactionId)
+	{
+		if (!TransactionId.IsValid() || SeenCraftingTransactionIds.Contains(TransactionId)) { return true; }
+		SeenCraftingTransactionIds.Add(TransactionId);
+		return false;
+	});
+	if (ProcessedCraftingTransactionIds.Num() > MaxProcessedCraftingTransactionIds)
+	{
+		ProcessedCraftingTransactionIds.RemoveAt(0, ProcessedCraftingTransactionIds.Num() - MaxProcessedCraftingTransactionIds);
+	}
 
 	TSet<FName> SeenRewardBudgets;
 	LootProtectionStates.RemoveAll([&SeenRewardBudgets](FPRLootProtectionState& State)
@@ -389,6 +401,21 @@ bool FPRProfileSnapshot::IsValid(FString* OutDiagnostic) const
 	{
 		if (OutDiagnostic) { *OutDiagnostic = TEXT("Processed repair transaction ledger exceeds its supported limit."); }
 		return false;
+	}
+	if (ProcessedCraftingTransactionIds.Num() > MaxProcessedCraftingTransactionIds)
+	{
+		if (OutDiagnostic) { *OutDiagnostic = TEXT("Crafting transaction ledger exceeds its maximum size."); }
+		return false;
+	}
+	TSet<FGuid> CraftingTransactionIds;
+	for (const FGuid& TransactionId : ProcessedCraftingTransactionIds)
+	{
+		if (!TransactionId.IsValid() || CraftingTransactionIds.Contains(TransactionId))
+		{
+			if (OutDiagnostic) { *OutDiagnostic = TEXT("Crafting transaction ledger contains an invalid or duplicate id."); }
+			return false;
+		}
+		CraftingTransactionIds.Add(TransactionId);
 	}
 	TSet<FGuid> RepairTransactionIds;
 	for (const FGuid& TransactionId : ProcessedRepairTransactionIds)

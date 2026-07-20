@@ -12,6 +12,7 @@ class UPRMissionProgressionDataAsset;
 class UPRRoleDataAsset;
 class UPRRoleModuleDataAsset;
 class UPRShipRepairDataAsset;
+class UPRCraftingRecipeDataAsset;
 struct FStreamableHandle;
 
 DECLARE_DELEGATE_OneParam(FPRItemDataLoadComplete, UPRItemDataAsset*);
@@ -32,6 +33,7 @@ public:
 	static FPrimaryAssetId MakeRolePrimaryAssetId(FName RoleId);
 	static FPrimaryAssetId MakeRoleModulePrimaryAssetId(FName ModuleId);
 	static FPrimaryAssetId MakeShipRepairPrimaryAssetId(FName RepairProjectId);
+	static FPrimaryAssetId MakeCraftingRecipePrimaryAssetId(FName RecipeId);
 
 	virtual void StartInitialLoading() override;
 
@@ -48,10 +50,13 @@ public:
 	bool LoadRoleCatalog(TArray<UPRRoleDataAsset*>& OutRoles, TArray<UPRRoleModuleDataAsset*>& OutModules);
 	UPRShipRepairDataAsset* LoadShipRepairSync(FName RepairProjectId);
 	bool LoadShipRepairCatalog(TArray<UPRShipRepairDataAsset*>& OutCatalog);
+	UPRCraftingRecipeDataAsset* LoadCraftingRecipeSync(FName RecipeId);
+	bool LoadCraftingRecipeCatalog(TArray<UPRCraftingRecipeDataAsset*>& OutCatalog);
 	TSharedPtr<FStreamableHandle> LoadItemDataAsync(FName ItemId, FPRItemDataLoadComplete Completion);
 	TSharedPtr<FStreamableHandle> LoadLootTableAsync(FName AssetName, FPRLootTableLoadComplete Completion);
 
 private:
+	void RefreshPrimaryAssetCatalogs();
 	UObject* LoadPrimaryAssetSync(const FPrimaryAssetId& AssetId, UClass* ExpectedClass);
 	void ValidatePrimaryAssetType(const FPrimaryAssetType& AssetType) const;
 };

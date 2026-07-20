@@ -14,10 +14,16 @@
 #include "Items/PRWeaponDataAsset.h"
 #include "Net/UnrealNetwork.h"
 #include "Player/PRPlayerState.h"
+#include "ProjectA.h"
 #include "Weapons/PRWeaponActor.h"
 
 namespace
 {
+bool IsAuthorityOrOfflineTest(const APRPlayerState* PlayerState)
+{
+	return PlayerState && (PlayerState->HasAuthority() || PlayerState->GetWorld() == nullptr);
+}
+
 bool AddItemToSnapshot(TArray<FPRItemInstance>& Items, const FPRItemInstance& Item, const int32 MaxStack)
 {
 	if (!Item.IsValid() || MaxStack <= 0)
@@ -493,7 +499,12 @@ bool UPRWeaponComponent::SetPrimaryEquipment(const FPRItemInstance& Item)
 		Entries[Index].Item = Item;
 	}
 	FString Diagnostic;
-	return EquipmentComponent->ReplaceEquipmentEntries(Entries, Diagnostic);
+	const bool bApplied = EquipmentComponent->ReplaceEquipmentEntries(Entries, Diagnostic);
+	if (!bApplied)
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Primary equipment entry could not be applied. Owner=%s Diagnostic=%s"), *GetNameSafe(GetOwner()), *Diagnostic);
+	}
+	return bApplied;
 }
 
 bool UPRWeaponComponent::ClearPrimaryEquipment()
@@ -715,6 +726,18 @@ bool UPRWeaponComponent::ReplaceEquipmentEntries(const TArray<FPRProfileEquipmen
 	return true;
 }
 
+bool UPRWeaponComponent::ReplacePersistentBackpack(const TArray<FPRItemInstance>& InBackpack, FString& OutDiagnostic)
+{
+	APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
+	UPRInventoryComponent* Inventory = PlayerState ? PlayerState->GetInventoryComponent() : nullptr;
+	if (!IsAuthorityOrOfflineTest(PlayerState) || !Inventory || !Inventory->ReplaceInventoryItems(InBackpack))
+	{
+		OutDiagnostic = TEXT("Persistent backpack could not be applied on the authoritative PlayerState.");
+		return false;
+	}
+	return true;
+}
+
 bool UPRWeaponComponent::BuildPersistentBackpack(TArray<FPRItemInstance>& OutBackpack, FString& OutDiagnostic) const
 {
 	const APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
@@ -745,7 +768,7 @@ bool UPRWeaponComponent::EnsureStarterWeapon(const FName StarterWeaponItemId, FS
 	APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
 	UPRInventoryComponent* Inventory = PlayerState ? PlayerState->GetInventoryComponent() : nullptr;
 	UPRWeaponDataAsset* WeaponData = Inventory ? Cast<UPRWeaponDataAsset>(Inventory->FindItemData(StarterWeaponItemId)) : nullptr;
-	if (!PlayerState || !PlayerState->HasAuthority() || !Inventory || !WeaponData)
+	if (!IsAuthorityOrOfflineTest(PlayerState) || !Inventory || !WeaponData)
 	{
 		OutDiagnostic = TEXT("Starter weapon data is unavailable.");
 		return false;
@@ -778,10 +801,14 @@ bool UPRWeaponComponent::EnsureStarterWeapon(const FName StarterWeaponItemId, FS
 	if (FindPrimaryEquipmentIndex() == INDEX_NONE)
 	{
 		EquippedWeapon = Weapon;
-		if (!SetPrimaryEquipment(Weapon) || !LoadMagazineFromInventory(WeaponData))
+		const bool bSetPrimaryEquipment = SetPrimaryEquipment(Weapon);
+		const bool bLoadedMagazine = bSetPrimaryEquipment && LoadMagazineFromInventory(WeaponData);
+		if (!bSetPrimaryEquipment || !bLoadedMagazine)
 		{
 			RestoreTransaction(OldInventory, OldEquipment, OldWeapon, OldMagazine);
-			OutDiagnostic = TEXT("Starter magazine initialization failed.");
+			OutDiagnostic = bSetPrimaryEquipment
+				? TEXT("Starter magazine initialization failed.")
+				: TEXT("Starter primary equipment could not be initialized.");
 			return false;
 		}
 	}

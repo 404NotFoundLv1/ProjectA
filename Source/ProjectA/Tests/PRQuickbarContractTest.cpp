@@ -56,7 +56,7 @@ bool FPRQuickbarContractTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Quickbar HUD widget class exists"), QuickbarWidgetClass);
 	RequireQuickbarFunction(*this, QuickbarWidgetClass, TEXT("InitializeForController"));
 
-	TestEqual(TEXT("Profile schema advances for persisted GUID quick slots"), UPRProfileSave::LatestSaveVersion, 8);
+	TestEqual(TEXT("Profile schema advances for crafting replay protection"), UPRProfileSave::LatestSaveVersion, 9);
 
 	FPRProfileSnapshot Snapshot;
 	FPRItemInstance Item;

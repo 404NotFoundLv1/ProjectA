@@ -18,6 +18,9 @@
 #include "ProjectA.h"
 #include "Progression/PRMissionProgressionDataAsset.h"
 #include "Ship/PRShipRepairDataAsset.h"
+#include "Crafting/PRCraftingLibrary.h"
+#include "Crafting/PRCraftingRecipeDataAsset.h"
+#include "Items/PREquipmentDataAsset.h"
 
 namespace ProjectRiftSaveSubsystemPrivate
 {
@@ -78,6 +81,41 @@ bool DoesReceiptMatchExpectedState(
 	return AreResourceWalletsEqual(ReceiptState.ResourceWallet, Expected.ResourceWallet)
 		&& AreShipModulesEqual(ReceiptState.ShipModules, Expected.ShipModules)
 		&& AreStoriesEqual(ReceiptState.Story, Expected.Story);
+}
+
+bool AreItemsEqual(const TArray<FPRItemInstance>& A, const TArray<FPRItemInstance>& B)
+{
+	if (A.Num() != B.Num()) { return false; }
+	for (int32 Index = 0; Index < A.Num(); ++Index)
+	{
+		const FPRItemInstance& Left = A[Index]; const FPRItemInstance& Right = B[Index];
+		if (Left.InstanceGuid != Right.InstanceGuid || Left.ItemId != Right.ItemId || Left.Count != Right.Count || Left.Level != Right.Level
+			|| Left.Rarity != Right.Rarity || !FMath::IsNearlyEqual(Left.Durability, Right.Durability) || Left.Affixes != Right.Affixes
+			|| Left.LootSeed != Right.LootSeed || Left.AffixGenerationVersion != Right.AffixGenerationVersion || Left.RolledAffixes != Right.RolledAffixes) { return false; }
+	}
+	return true;
+}
+
+bool AreEquipmentEqual(const TArray<FPRProfileEquipmentEntry>& A, const TArray<FPRProfileEquipmentEntry>& B)
+{
+	if (A.Num() != B.Num()) { return false; }
+	for (int32 Index = 0; Index < A.Num(); ++Index)
+	{
+		if (A[Index].SlotId != B[Index].SlotId || !AreItemsEqual({ A[Index].Item }, { B[Index].Item })) { return false; }
+	}
+	return true;
+}
+
+bool DoesCraftingReceiptMatchExpectedState(const FPRCraftingReceipt& Receipt, const FPRProfileSnapshot& Expected)
+{
+	FPRProfileSnapshot ReceiptState;
+	ReceiptState.ResourceWallet = Receipt.SettledResourceWallet;
+	ReceiptState.BackpackItems = Receipt.SettledBackpackItems;
+	ReceiptState.Equipment = Receipt.SettledEquipment;
+	ReceiptState.Normalize();
+	return AreResourceWalletsEqual(ReceiptState.ResourceWallet, Expected.ResourceWallet)
+		&& AreItemsEqual(ReceiptState.BackpackItems, Expected.BackpackItems)
+		&& AreEquipmentEqual(ReceiptState.Equipment, Expected.Equipment);
 }
 }
 
@@ -867,6 +905,75 @@ FPRProfileOperationResult UPRSaveSubsystem::RetryPendingShipRepairReceipt()
 	return bHasPendingShipRepairReceipt
 		? ApplyShipRepairReceipt(PendingShipRepairReceipt)
 		: FPRProfileOperationResult::MakeSuccess(GetActiveProfileId());
+}
+
+FPRProfileOperationResult UPRSaveSubsystem::ApplyCraftingReceipt(const FPRCraftingReceipt& Receipt)
+{
+	FString Diagnostic;
+	if (!Receipt.IsValid(&Diagnostic) || !SaveStore || !ActiveProfile || Receipt.ProfileId != ActiveProfile->ProfileId
+		|| !IsSessionProfileBound() || Receipt.ProfileId != SessionBoundProfileId)
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::ValidationFailed,
+			Diagnostic.IsEmpty() ? TEXT("Crafting receipt does not match the active session-bound profile.") : Diagnostic, Receipt.ProfileId);
+		SetLastResult(Result); return Result;
+	}
+	if ((bHasPendingCraftingReceipt && PendingCraftingReceipt.TransactionId != Receipt.TransactionId) || bHasPendingShipRepairReceipt)
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::Busy, TEXT("A different durable operation is still waiting to be saved."), Receipt.ProfileId);
+		SetLastResult(Result); return Result;
+	}
+	if (ActiveProfile->Snapshot.ProcessedCraftingTransactionIds.Contains(Receipt.TransactionId))
+	{
+		FPRProfileOperationResult Result = FPRProfileOperationResult::MakeSuccess(Receipt.ProfileId);
+		Result.bAlreadyProcessedCraftingTransaction = true; bHasPendingCraftingReceipt = false; SetLastResult(Result); return Result;
+	}
+	UPRAssetManager* AssetManager = UPRAssetManager::Get();
+	FPRProfileSnapshot Expected = ActiveProfile->Snapshot;
+	FPRCraftingEvaluation Evaluation;
+	bool bApplied = false;
+	if (Receipt.Operation == EPRCraftingOperation::Craft)
+	{
+		UPRCraftingRecipeDataAsset* Recipe = AssetManager ? AssetManager->LoadCraftingRecipeSync(Receipt.RecipeId) : nullptr;
+		UPRItemDataAsset* Output = Recipe && AssetManager ? AssetManager->LoadItemDataSync(Recipe->OutputItemId) : nullptr;
+		TArray<UPRAffixDefinitionDataAsset*> Affixes;
+		FPRItemInstance CraftedItem;
+		bApplied = Recipe && Output && AssetManager && AssetManager->LoadAffixCatalog(Affixes)
+			&& UPRCraftingLibrary::ApplyRecipeToSnapshot(Recipe, Output, Receipt.CraftSeed, Affixes, Expected, CraftedItem, Evaluation);
+	}
+	else
+	{
+		const FPRItemInstance* Existing = ActiveProfile->Snapshot.BackpackItems.FindByPredicate([&Receipt](const FPRItemInstance& Item) { return Item.InstanceGuid == Receipt.TargetInstanceGuid; });
+		if (!Existing)
+		{
+			for (const FPRProfileEquipmentEntry& Entry : ActiveProfile->Snapshot.Equipment) { if (Entry.Item.InstanceGuid == Receipt.TargetInstanceGuid) { Existing = &Entry.Item; break; } }
+		}
+		UPRItemDataAsset* Definition = Existing && AssetManager ? AssetManager->LoadItemDataSync(Existing->ItemId) : nullptr;
+		bApplied = Receipt.Operation == EPRCraftingOperation::Dismantle
+			? UPRCraftingLibrary::ApplyDismantleToSnapshot(Receipt.TargetInstanceGuid, Definition, Expected, Evaluation)
+			: UPRCraftingLibrary::ApplyUpgradeToSnapshot(Receipt.TargetInstanceGuid, Cast<UPREquipmentDataAsset>(Definition), Expected, Evaluation);
+	}
+	if (!bApplied || !ProjectRiftSaveSubsystemPrivate::DoesCraftingReceiptMatchExpectedState(Receipt, Expected))
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::ValidationFailed,
+			Evaluation.Diagnostic.IsEmpty() ? TEXT("Crafting receipt absolute state does not match the local calculation.") : Evaluation.Diagnostic, Receipt.ProfileId);
+		SetLastResult(Result); return Result;
+	}
+	UPRProfileSave* Candidate = DuplicateObject<UPRProfileSave>(ActiveProfile, this);
+	Candidate->Snapshot.ResourceWallet = Expected.ResourceWallet;
+	Candidate->Snapshot.BackpackItems = Expected.BackpackItems;
+	Candidate->Snapshot.Equipment = Expected.Equipment;
+	Candidate->Snapshot.ProcessedCraftingTransactionIds.Add(Receipt.TransactionId);
+	Candidate->Snapshot.Normalize();
+	Candidate->SaveVersion = UPRProfileSave::LatestSaveVersion;
+	Candidate->LastSavedUtc = FDateTime::UtcNow();
+	FPRProfileOperationResult Result = SaveStore->SaveProfile(Candidate);
+	if (!Result.IsSuccess()) { PendingCraftingReceipt = Receipt; bHasPendingCraftingReceipt = true; SetLastResult(Result); return Result; }
+	ActiveProfile = Candidate; bHasPendingCraftingReceipt = false; SetLastResult(Result); return Result;
+}
+
+FPRProfileOperationResult UPRSaveSubsystem::RetryPendingCraftingReceipt()
+{
+	return bHasPendingCraftingReceipt ? ApplyCraftingReceipt(PendingCraftingReceipt) : FPRProfileOperationResult::MakeSuccess(GetActiveProfileId());
 }
 
 FPRProfileOperationResult UPRSaveSubsystem::PrepareShipRepairAcceptanceForDevelopment()

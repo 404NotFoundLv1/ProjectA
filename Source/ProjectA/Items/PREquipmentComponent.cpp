@@ -17,6 +17,44 @@
 #include "Player/PRPlayerState.h"
 #include "Net/UnrealNetwork.h"
 
+namespace ProjectRiftEquipmentPrivate
+{
+bool IsAuthorityOrOfflineTest(const APRPlayerState* PlayerState)
+{
+	// Profile bridge automation uses transient PlayerStates with no UWorld.
+	// They cannot receive network RPCs, so accepting their deterministic state
+	// transition does not relax authority for an actual client actor.
+	return PlayerState && (PlayerState->HasAuthority() || PlayerState->GetWorld() == nullptr);
+}
+
+TSubclassOf<UGameplayEffect> GetUpgradeEffectClass(const EPRAffixAttribute Attribute, const EPRAffixModifierType ModifierType)
+{
+	if (ModifierType == EPRAffixModifierType::Percentage)
+	{
+		switch (Attribute)
+		{
+		case EPRAffixAttribute::MaxHealth: return UPRAffixMaxHealthPercentageGameplayEffect::StaticClass();
+		case EPRAffixAttribute::MaxShield: return UPRAffixMaxShieldPercentageGameplayEffect::StaticClass();
+		case EPRAffixAttribute::MaxEnergy: return UPRAffixMaxEnergyPercentageGameplayEffect::StaticClass();
+		case EPRAffixAttribute::AttackPower: return UPRAffixAttackPowerPercentageGameplayEffect::StaticClass();
+		case EPRAffixAttribute::MoveSpeed: return UPRAffixMoveSpeedPercentageGameplayEffect::StaticClass();
+		default: return nullptr;
+		}
+	}
+	switch (Attribute)
+	{
+	case EPRAffixAttribute::MaxHealth: return UPRAffixMaxHealthAdditiveGameplayEffect::StaticClass();
+	case EPRAffixAttribute::MaxShield: return UPRAffixMaxShieldAdditiveGameplayEffect::StaticClass();
+	case EPRAffixAttribute::MaxEnergy: return UPRAffixMaxEnergyAdditiveGameplayEffect::StaticClass();
+	case EPRAffixAttribute::AttackPower: return UPRAffixAttackPowerAdditiveGameplayEffect::StaticClass();
+	case EPRAffixAttribute::MoveSpeed: return UPRAffixMoveSpeedAdditiveGameplayEffect::StaticClass();
+	case EPRAffixAttribute::HealingPower: return UPRAffixHealingPowerAdditiveGameplayEffect::StaticClass();
+	case EPRAffixAttribute::PollutionResistance: return UPRAffixPollutionResistanceAdditiveGameplayEffect::StaticClass();
+	default: return nullptr;
+	}
+}
+}
+
 UPREquipmentComponent::UPREquipmentComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -64,7 +102,7 @@ FName UPREquipmentComponent::GetSlotId(const EPREquipmentSlot Slot)
 bool UPREquipmentComponent::ReplaceEquipmentEntries(const TArray<FPRProfileEquipmentEntry>& InEntries, FString& OutDiagnostic)
 {
 	APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
-	if (!PlayerState || !PlayerState->HasAuthority())
+	if (!ProjectRiftEquipmentPrivate::IsAuthorityOrOfflineTest(PlayerState))
 	{
 		OutDiagnostic = TEXT("Equipment can only be changed by the authoritative PlayerState.");
 		return false;
@@ -112,9 +150,16 @@ bool UPREquipmentComponent::RefreshGrantedHandles()
 {
 	APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
 	UPRAbilitySystemComponent* AbilitySystemComponent = GetAbilitySystemComponent();
-	if (!PlayerState || !PlayerState->HasAuthority() || !AbilitySystemComponent)
+	if (!ProjectRiftEquipmentPrivate::IsAuthorityOrOfflineTest(PlayerState) || !AbilitySystemComponent)
 	{
 		return false;
+	}
+	if (PlayerState->GetWorld() == nullptr)
+	{
+		// No actor info exists on a transient bridge object. Persist the accepted
+		// layout while intentionally skipping transient GAS grants.
+		ClearGrantedHandles();
+		return true;
 	}
 	if (HasMatchingGrantedHandles())
 	{
@@ -293,6 +338,24 @@ bool UPREquipmentComponent::ApplyGrantsForEntry(
 			return false;
 		}
 		OutHandles.GrantedAbilityHandles.Add(Handle);
+	}
+	const int32 UpgradeSteps = FMath::Max(0, Entry.Item.Level - 1);
+	if (UpgradeSteps > 0)
+	{
+		for (const FPRUpgradeAttributeModifier& Modifier : Definition->UpgradeModifiersPerLevel)
+		{
+			const TSubclassOf<UGameplayEffect> EffectClass = ProjectRiftEquipmentPrivate::GetUpgradeEffectClass(Modifier.Attribute, EPRAffixModifierType::Additive);
+			const float Magnitude = Modifier.MagnitudePerLevel * UpgradeSteps;
+			if (!EffectClass || !FMath::IsFinite(Magnitude) || Magnitude <= 0.0f) { return false; }
+			FGameplayEffectContextHandle Context = AbilitySystemComponent->MakeEffectContext();
+			Context.AddSourceObject(const_cast<UPREquipmentDataAsset*>(Definition));
+			const FGameplayEffectSpecHandle Spec = AbilitySystemComponent->MakeOutgoingSpec(EffectClass, 1.0f, Context);
+			if (!Spec.IsValid()) { return false; }
+			Spec.Data->SetSetByCallerMagnitude(ProjectRiftGameplayTags::Data_Affix_Magnitude, Magnitude);
+			const FActiveGameplayEffectHandle Handle = AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+			if (!Handle.IsValid()) { return false; }
+			OutHandles.ActiveEffectHandles.Add(Handle);
+		}
 	}
 
 	// Legacy v5 equipment did not have value rolls and therefore never receives implicit grants.

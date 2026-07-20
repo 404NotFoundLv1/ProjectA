@@ -65,6 +65,7 @@ public:
 	void CancelReload();
 
 	bool ReplaceEquipmentEntries(const TArray<FPRProfileEquipmentEntry>& InEntries, FString& OutDiagnostic);
+	bool ReplacePersistentBackpack(const TArray<FPRItemInstance>& InBackpack, FString& OutDiagnostic);
 	TArray<FPRProfileEquipmentEntry> GetEquipmentEntries() const;
 	bool BuildPersistentBackpack(TArray<FPRItemInstance>& OutBackpack, FString& OutDiagnostic) const;
 	bool EnsureStarterWeapon(FName StarterWeaponItemId, FString& OutDiagnostic);

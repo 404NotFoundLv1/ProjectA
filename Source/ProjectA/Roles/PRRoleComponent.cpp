@@ -16,6 +16,11 @@ namespace
 const FName AssaultRoleId(TEXT("Ability.Role.Assault"));
 const FName LegacyAssaultRoleId(TEXT("Role.Assault"));
 
+bool IsAuthorityOrOfflineTest(const APRPlayerState* PlayerState)
+{
+	return PlayerState && (PlayerState->HasAuthority() || PlayerState->GetWorld() == nullptr);
+}
+
 FGameplayTag GetInputTagForSlot(const EPRRoleModuleSlot Slot)
 {
 	switch (Slot)
@@ -72,7 +77,7 @@ EPRRoleLoadoutApplyResult UPRRoleComponent::CommitLoadout(
 	const bool bRequireLobby)
 {
 	APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
-	if (!PlayerState || !PlayerState->HasAuthority())
+	if (!IsAuthorityOrOfflineTest(PlayerState))
 	{
 		return EPRRoleLoadoutApplyResult::InternalFailure;
 	}
@@ -120,7 +125,7 @@ EPRRoleLoadoutApplyResult UPRRoleComponent::CommitLoadout(
 bool UPRRoleComponent::EnsureDefaultLoadoutForSelectedRole()
 {
 	APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
-	if (!PlayerState || !PlayerState->HasAuthority())
+	if (!IsAuthorityOrOfflineTest(PlayerState))
 	{
 		return false;
 	}
@@ -180,9 +185,15 @@ bool UPRRoleComponent::RefreshGrantedAbilities()
 {
 	APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
 	UPRAbilitySystemComponent* AbilitySystemComponent = PlayerState ? PlayerState->GetProjectRiftAbilitySystemComponent() : nullptr;
-	if (!PlayerState || !PlayerState->HasAuthority() || !AbilitySystemComponent)
+	if (!IsAuthorityOrOfflineTest(PlayerState) || !AbilitySystemComponent)
 	{
 		return false;
+	}
+	if (PlayerState->GetWorld() == nullptr)
+	{
+		ClearGrantedAbilities();
+		EnergyRegenerationHandle.Invalidate();
+		return true;
 	}
 
 	UPRRoleDataAsset* Role = nullptr;
@@ -295,7 +306,7 @@ void UPRRoleComponent::CaptureProfileRoleState(FName& OutSelectedRoleId, TArray<
 void UPRRoleComponent::ApplyProfileRoleState(FName SelectedRoleId, const TArray<FName>& InUnlockedRoles, const FPRRoleLoadout& InLoadout, const TArray<FName>& InUnlockedModules)
 {
 	APRPlayerState* PlayerState = Cast<APRPlayerState>(GetOwner());
-	if (!PlayerState || !PlayerState->HasAuthority())
+	if (!IsAuthorityOrOfflineTest(PlayerState))
 	{
 		return;
 	}

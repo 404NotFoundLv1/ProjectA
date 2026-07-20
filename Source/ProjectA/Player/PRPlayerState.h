@@ -5,6 +5,7 @@
 #include "GameFramework/PlayerState.h"
 #include "Multiplayer/PRMultiplayerProfileTypes.h"
 #include "Ship/PRShipRepairTypes.h"
+#include "Crafting/PRCraftingTypes.h"
 #include "PRPlayerState.generated.h"
 
 class UPRAbilitySystemComponent;
@@ -102,6 +103,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Lobby|Ship Repair")
 	bool IsRepairPersistencePending() const { return bRepairPersistencePending; }
 
+	UFUNCTION(BlueprintPure, Category = "Lobby|Crafting")
+	bool IsCraftingPersistencePending() const { return bCraftingPersistencePending; }
+
 	UFUNCTION(BlueprintPure, Category = "Lobby|Ship Repair")
 	FGuid GetPendingRepairTransactionId() const { return PendingRepairTransactionId; }
 
@@ -115,6 +119,9 @@ public:
 	bool BuildBoundShipRepairSnapshot(FPRProfileSnapshot& OutSnapshot, FString& OutDiagnostic) const;
 	bool ApplyShipRepairState(const FPRShipRepairReceipt& Receipt, FString& OutDiagnostic);
 	void SetRepairPersistencePending(FGuid TransactionId, bool bPending);
+	bool ApplyCraftingState(const FPRCraftingReceipt& Receipt, FString& OutDiagnostic);
+	void SetCraftingPersistencePending(FGuid TransactionId, bool bPending);
+	FGuid GetPendingCraftingTransactionId() const { return PendingCraftingTransactionId; }
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Lobby")
 	void SetReady(bool bReady);
@@ -209,6 +216,12 @@ private:
 
 	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Lobby|Ship Repair", meta = (AllowPrivateAccess = "true"))
 	FGuid PendingRepairTransactionId;
+
+	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Lobby|Crafting", meta = (AllowPrivateAccess = "true"))
+	bool bCraftingPersistencePending = false;
+
+	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Lobby|Crafting", meta = (AllowPrivateAccess = "true"))
+	FGuid PendingCraftingTransactionId;
 
 	UPROPERTY()
 	TArray<FPRItemInstance> MissionStartBackpackItems;
