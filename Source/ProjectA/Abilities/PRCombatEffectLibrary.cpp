@@ -417,6 +417,28 @@ bool UPRCombatEffectLibrary::ApplyDamageToTarget(
 	return true;
 }
 
+bool UPRCombatEffectLibrary::ApplyEnvironmentalDamageToTarget(
+	UAbilitySystemComponent* TargetAbilitySystem,
+	const float BaseDamage,
+	UObject* SourceObject)
+{
+	if (!HasAuthoritativeActorInfo(TargetAbilitySystem) || !FMath::IsFinite(BaseDamage) || BaseDamage <= 0.0f)
+	{
+		return false;
+	}
+	FGameplayEffectSpecHandle SpecHandle = TargetAbilitySystem->MakeOutgoingSpec(
+		UPRDamageGameplayEffect::StaticClass(), 1.0f,
+		MakeCombatEffectContext(TargetAbilitySystem, TargetAbilitySystem, SourceObject));
+	if (!SpecHandle.IsValid())
+	{
+		return false;
+	}
+	SpecHandle.Data->SetSetByCallerMagnitude(ProjectRiftGameplayTags::Data_Damage, BaseDamage);
+	SpecHandle.Data->AddDynamicAssetTag(ProjectRiftGameplayTags::Damage_Type_Pollution);
+	TargetAbilitySystem->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+	return true;
+}
+
 bool UPRCombatEffectLibrary::ApplyDamageRequestToTarget(
 	UAbilitySystemComponent* SourceAbilitySystem,
 	UAbilitySystemComponent* TargetAbilitySystem,

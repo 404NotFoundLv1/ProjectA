@@ -3,6 +3,9 @@
 #include "Core/PREnemySpawnPoint.h"
 #include "Core/PRRiftGameState.h"
 #include "Core/PRRiftGameMode.h"
+#include "Core/PRRiftRuleComponent.h"
+#include "Core/PRGameplayTags.h"
+#include "Abilities/PRAbilitySystemComponent.h"
 #include "Core/PRObjectiveGraphComponent.h"
 #include "Core/PRRiftObjectiveActor.h"
 #include "Enemies/PREnemyCharacter.h"
@@ -159,6 +162,7 @@ int32 APRSpawnManager::SpawnWave()
 	int32 SpawnedCount = 0;
 	for (int32 SpawnIndex = 0; SpawnIndex < SpawnCount; ++SpawnIndex)
 	{
+		bool bEliteSpawn = false;
 		FActorSpawnParameters SpawnParameters;
 		SpawnParameters.Owner = this;
 		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
@@ -173,6 +177,14 @@ int32 APRSpawnManager::SpawnWave()
 		{
 			Enemy->SetSpawnHealthMultiplier(GetEnemyHealthMultiplierForScaling());
 			const APRRiftGameMode* RiftGameMode = World->GetAuthGameMode<APRRiftGameMode>();
+			bEliteSpawn = RiftGameMode && RiftGameMode->GetRiftRuleComponent()
+				&& RiftGameMode->GetRiftRuleComponent()->HasModifier(FName(TEXT("Modifier.EliteReinforcements"))) && SpawnIndex == 0;
+			if (bEliteSpawn)
+			{
+				const FPRMissionRuleSnapshot Rules = RiftGameMode->GetRiftRuleComponent()->GetRuleSnapshot();
+				Enemy->SetSpawnHealthMultiplier(GetEnemyHealthMultiplierForScaling() * Rules.EliteHealthMultiplier);
+				Enemy->SetSpawnAttackPowerMultiplier(Rules.EliteAttackMultiplier);
+			}
 			const UPRObjectiveGraphComponent* ObjectiveGraph = RiftGameMode ? RiftGameMode->GetObjectiveGraphComponent() : nullptr;
 			const FPRObjectiveNodeDefinition* NodeDefinition = ObjectiveGraph && ActiveObjective
 				? ObjectiveGraph->FindNodeDefinition(ActiveObjective->GetObjectiveNodeId())
@@ -183,6 +195,23 @@ int32 APRSpawnManager::SpawnWave()
 			}
 		}
 		SpawnedActor->FinishSpawning(SpawnTransform);
+		if (APREnemyCharacter* Enemy = Cast<APREnemyCharacter>(SpawnedActor))
+		{
+			if (APRRiftGameMode* RiftGameMode = World->GetAuthGameMode<APRRiftGameMode>())
+			{
+				if (UPRRiftRuleComponent* Rules = RiftGameMode->GetRiftRuleComponent())
+				{
+					Rules->ApplyRulesToEnemy(Enemy);
+				}
+			}
+			if (bEliteSpawn)
+			{
+				if (UPRAbilitySystemComponent* AbilitySystem = Enemy->GetProjectRiftAbilitySystemComponent())
+				{
+					AbilitySystem->AddLooseGameplayTag(ProjectRiftGameplayTags::State_Enemy_Elite);
+				}
+			}
+		}
 
 		SpawnedActor->SetReplicates(true);
 		SpawnedActor->SetReplicateMovement(true);
@@ -255,7 +284,10 @@ int32 APRSpawnManager::GetDesiredEnemiesPerWave() const
 	const int32 EnemiesPerAdditionalPlayer = ProjectSettings
 		? FMath::Max(0, ProjectSettings->EnemiesPerAdditionalPlayer)
 		: 1;
-	return BaseEnemiesPerWave + FMath::Max(0, AlivePlayerCount - 1) * EnemiesPerAdditionalPlayer;
+	const int32 BaseCount = BaseEnemiesPerWave + FMath::Max(0, AlivePlayerCount - 1) * EnemiesPerAdditionalPlayer;
+	const APRRiftGameState* RiftGameState = GetWorld() ? GetWorld()->GetGameState<APRRiftGameState>() : nullptr;
+	const float Multiplier = RiftGameState ? RiftGameState->GetRiftRiskSnapshot().EnemyBudgetMultiplier : 1.0f;
+	return FMath::Max(0, FMath::RoundToInt(BaseCount * Multiplier));
 }
 
 int32 APRSpawnManager::GetDifficultyPlayerCountForScaling() const
@@ -292,7 +324,10 @@ int32 APRSpawnManager::GetMaxAliveEnemiesForScaling() const
 	const UPRProjectSettings* Settings = GetDefault<UPRProjectSettings>();
 	const int32 Base = Settings ? FMath::Max(1, Settings->MaxAliveEnemies) : 8;
 	const int32 PerPlayer = Settings ? FMath::Max(0, Settings->MaxAliveEnemiesPerAdditionalPlayer) : 2;
-	return Base + FMath::Max(0, GetDifficultyPlayerCountForScaling() - 1) * PerPlayer;
+	const int32 BaseCap = Base + FMath::Max(0, GetDifficultyPlayerCountForScaling() - 1) * PerPlayer;
+	const APRRiftGameState* RiftGameState = GetWorld() ? GetWorld()->GetGameState<APRRiftGameState>() : nullptr;
+	const float Multiplier = RiftGameState ? RiftGameState->GetRiftRiskSnapshot().EnemyBudgetMultiplier : 1.0f;
+	return FMath::Max(1, FMath::RoundToInt(BaseCap * Multiplier));
 }
 
 float APRSpawnManager::GetEnemyHealthMultiplierForScaling() const

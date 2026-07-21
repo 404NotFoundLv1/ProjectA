@@ -2,9 +2,29 @@
 
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Core/PRAssetManager.h"
+#include "Items/PRItemDataAsset.h"
 #include "Items/PRLootTableDataAsset.h"
 #include "Items/PRPickupActor.h"
 #include "ProjectA.h"
+
+namespace
+{
+void ApplyMaterialCountMultiplier(FPRItemInstance& Item, const float Multiplier)
+{
+	if (!Item.IsValid() || !FMath::IsFinite(Multiplier) || FMath::IsNearlyEqual(Multiplier, 1.0f))
+	{
+		return;
+	}
+	UPRAssetManager* AssetManager = UPRAssetManager::Get();
+	UPRItemDataAsset* ItemData = AssetManager ? AssetManager->LoadItemDataSync(Item.ItemId) : nullptr;
+	if (!ItemData || ItemData->ItemType != EPRItemType::Material)
+	{
+		return;
+	}
+	Item.Count = FMath::Clamp(FMath::RoundToInt(Item.Count * FMath::Clamp(Multiplier, 0.25f, 3.0f)), 1, FMath::Max(1, ItemData->MaxStackCount));
+}
+}
 
 APRPickupActor* UPRLootTableLibrary::SpawnLootPickupFromTable(
 	UObject* WorldContextObject,
@@ -12,7 +32,8 @@ APRPickupActor* UPRLootTableLibrary::SpawnLootPickupFromTable(
 	TSubclassOf<APRPickupActor> PickupActorClass,
 	const FVector SpawnLocation,
 	const FRotator SpawnRotation,
-	const float RollOverride)
+	const float RollOverride,
+	const float MaterialCountMultiplier)
 {
 	if (!WorldContextObject || !LootTable || !LootTable->IsValidLootTable() || LootTable->DistributionPolicy != EPRLootDistributionPolicy::SharedWorld)
 	{
@@ -46,6 +67,7 @@ APRPickupActor* UPRLootTableLibrary::SpawnLootPickupFromTable(
 	{
 		return nullptr;
 	}
+	ApplyMaterialCountMultiplier(RolledItem, MaterialCountMultiplier);
 
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -77,7 +99,8 @@ APRPickupActor* UPRLootTableLibrary::SpawnSeededLootPickupFromTable(
 	TSubclassOf<APRPickupActor> PickupActorClass,
 	const FVector SpawnLocation,
 	const FRotator SpawnRotation,
-	const int32 LootSeed)
+	const int32 LootSeed,
+	const float MaterialCountMultiplier)
 {
 	if (!WorldContextObject || !LootTable || !LootTable->IsValidLootTable() || LootTable->DistributionPolicy != EPRLootDistributionPolicy::SharedWorld)
 	{
@@ -101,6 +124,7 @@ APRPickupActor* UPRLootTableLibrary::SpawnSeededLootPickupFromTable(
 		UE_LOG(LogProjectA, Warning, TEXT("Seeded loot generation failed. Table=%s Seed=%d Diagnostic=%s"), *GetNameSafe(LootTable), LootSeed, *Diagnostic);
 		return nullptr;
 	}
+	ApplyMaterialCountMultiplier(RolledItem, MaterialCountMultiplier);
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	APRPickupActor* PickupActor = World->SpawnActor<APRPickupActor>(PickupActorClass, SpawnLocation, SpawnRotation, SpawnParameters);

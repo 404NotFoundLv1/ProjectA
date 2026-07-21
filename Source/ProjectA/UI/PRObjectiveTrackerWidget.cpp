@@ -4,6 +4,20 @@
 #include "GameFramework/PlayerController.h"
 #include "SlateBasics.h"
 
+namespace
+{
+const TCHAR* RiskTierToText(const EPRRiftRiskTier Tier)
+{
+	switch (Tier)
+	{
+	case EPRRiftRiskTier::Unstable: return TEXT("UNSTABLE");
+	case EPRRiftRiskTier::Critical: return TEXT("CRITICAL");
+	case EPRRiftRiskTier::Collapse: return TEXT("COLLAPSE");
+	default: return TEXT("STABLE");
+	}
+}
+}
+
 void UPRObjectiveTrackerWidget::InitializeForController(APlayerController* InController)
 {
 	LocalController = InController;
@@ -13,17 +27,24 @@ void UPRObjectiveTrackerWidget::InitializeForController(APlayerController* InCon
 FText UPRObjectiveTrackerWidget::GetObjectiveTrackerText() const
 {
 	const APRRiftGameState* RiftGameState = LocalController.IsValid() ? LocalController->GetWorld()->GetGameState<APRRiftGameState>() : nullptr;
-	if (!RiftGameState || RiftGameState->GetObjectiveSummaries().IsEmpty())
+	if (!RiftGameState)
 	{
 		return FText::GetEmpty();
 	}
-	FString Text(TEXT("OBJECTIVES\n"));
+	const FPRRiftRiskSnapshot Risk = RiftGameState->GetRiftRiskSnapshot();
+	FString Text = FString::Printf(TEXT("STABILITY %.0f%% | %s\nOBJECTIVES\n"), Risk.Stability, RiskTierToText(Risk.CurrentTier));
 	for (const FPRObjectiveSummary& Summary : RiftGameState->GetObjectiveSummaries())
 	{
 		const TCHAR* State = Summary.State == EPRObjectiveNodeState::Completed ? TEXT("✓")
 			: Summary.State == EPRObjectiveNodeState::Active ? TEXT("•") : TEXT("○");
-		Text += FString::Printf(TEXT("%s %s%s %d/%d\n"), State, Summary.bOptional ? TEXT("[Optional] ") : TEXT(""),
-			*Summary.DisplayName.ToString(), Summary.CurrentCount, Summary.TargetCount);
+		const FString TimerText = Summary.bOptional && Summary.RemainingTimeSeconds > 0.0f
+			? FString::Printf(TEXT(" %.0fs"), Summary.RemainingTimeSeconds) : FString();
+		Text += FString::Printf(TEXT("%s %s%s %d/%d%s\n"), State, Summary.bOptional ? TEXT("[Optional] ") : TEXT(""),
+			*Summary.DisplayName.ToString(), Summary.CurrentCount, Summary.TargetCount, *TimerText);
+	}
+	for (const FPRMissionModifierSummary& Modifier : RiftGameState->GetMissionModifierSummaries())
+	{
+		Text += FString::Printf(TEXT("MOD: %s\n"), *Modifier.DisplayName.ToString());
 	}
 	return FText::FromString(Text);
 }

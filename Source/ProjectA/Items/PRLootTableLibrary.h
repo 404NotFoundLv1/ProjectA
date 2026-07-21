@@ -20,7 +20,8 @@ public:
 		TSubclassOf<APRPickupActor> PickupActorClass,
 		FVector SpawnLocation,
 		FRotator SpawnRotation,
-		float RollOverride = -1.0f);
+		float RollOverride = -1.0f,
+		float MaterialCountMultiplier = 1.0f);
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Loot", meta = (WorldContext = "WorldContextObject"))
 	static APRPickupActor* SpawnSeededLootPickupFromTable(
@@ -29,5 +30,6 @@ public:
 		TSubclassOf<APRPickupActor> PickupActorClass,
 		FVector SpawnLocation,
 		FRotator SpawnRotation,
-		int32 LootSeed);
+		int32 LootSeed,
+		float MaterialCountMultiplier = 1.0f);
 };

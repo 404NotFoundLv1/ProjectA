@@ -20,6 +20,7 @@ class UPRMissionProgressionDataAsset;
 class APRRescueDroneActor;
 class APRCharacter;
 class UPRObjectiveGraphComponent;
+class UPRRiftRuleComponent;
 
 /**
  * Server-authoritative rule set for rift missions.
@@ -110,6 +111,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Rift|ObjectiveGraph")
 	UPRObjectiveGraphComponent* GetObjectiveGraphComponent() const { return ObjectiveGraphComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Rules")
+	UPRRiftRuleComponent* GetRiftRuleComponent() const { return RiftRuleComponent; }
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Rules")
+	bool ReportRiftAlarm(FName AlarmId, int32 Severity);
 
 	UFUNCTION(BlueprintPure, Category = "Rift|ObjectiveGraph")
 	bool HasObjectiveGraph() const;
@@ -212,6 +219,10 @@ private:
 	void SynchronizeObjectiveGraphActors();
 	void CacheObjectiveGraphSnapshot();
 	void RestoreObjectiveGraphSnapshot();
+	void RefreshRiftRuleReplication();
+	void ApplyObjectiveStageStabilityCost(EPRObjectiveNodeState PreviousState, FName NodeId);
+	void ApplyEnvironmentalRisk();
+	void ApplyRulesToConnectedPlayers();
 	void UpdateObjectiveItemRecovery();
 	bool IsObjectiveItemAvailable(FGuid ItemInstanceGuid) const;
 
@@ -227,6 +238,9 @@ private:
 	/** Server-only runtime graph. Clients receive only compact GameState summaries. */
 	UPROPERTY(VisibleAnywhere, Category = "Rift|ObjectiveGraph")
 	TObjectPtr<UPRObjectiveGraphComponent> ObjectiveGraphComponent;
+
+	UPROPERTY(VisibleAnywhere, Category = "Rift|Rules")
+	TObjectPtr<UPRRiftRuleComponent> RiftRuleComponent;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<APRSpawnManager>> SpawnManagers;
@@ -252,6 +266,7 @@ private:
 	FPRObjectiveGraphSnapshot ObjectiveGraphSnapshot;
 	TMap<FGuid, float> ObjectiveItemMissingSince;
 	float NextObjectiveItemRecoveryCheckTime = 0.0f;
+	float NextEnvironmentalHazardPulseTime = 0.0f;
 	int32 FailedSettlementAcknowledgementCount = 0;
 	float SettlementReturnEarliestTime = 0.0f;
 	float SettlementAcknowledgementDeadline = 0.0f;

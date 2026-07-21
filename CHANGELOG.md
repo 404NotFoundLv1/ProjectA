@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.2] - 2026-07-21
+
+- Added server-authoritative rift stability rules, four replicated risk bands, objective and alarm stability costs, and critical/collapse environmental pollution.
+- Added timed optional objectives with non-blocking failure, highest-risk reward multipliers, and runtime modifier definitions for low gravity, shield interference, pollution amplification, elite reinforcements, and resource-rich drops.
+- Added modifier effect lifecycle cleanup for player/enemy ASC instances, risk-scaled spawn budgets, and no new profile-schema migration.
+
 ## [0.8.1] - 2026-07-21
 
 - Added a server-authoritative objective graph with prerequisite policies, manual/automatic activation, optional nodes, compact replicated summaries, and same-session snapshots.

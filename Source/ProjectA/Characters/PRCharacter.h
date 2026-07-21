@@ -115,6 +115,7 @@ protected:
 	void HandleMoveSpeedChanged(const FOnAttributeChangeData& Data);
 	void HandleStunnedTagChanged(FGameplayTag StatusTag, int32 NewCount);
 	void HandleHitStaggeredTagChanged(FGameplayTag StatusTag, int32 NewCount);
+	void HandleLowGravityTagChanged(FGameplayTag StatusTag, int32 NewCount);
 	void RefreshMovementFromAttributes();
 	bool GrantAbilityIfMissing(TSubclassOf<UGameplayAbility> AbilityClass, FGameplayTag InputTag);
 	bool ActivateAbilityInputTag(FGameplayTag InputTag, const TCHAR* ActionName);
@@ -172,6 +173,8 @@ protected:
 	FDelegateHandle MoveSpeedChangedDelegateHandle;
 	FDelegateHandle StunnedTagChangedDelegateHandle;
 	FDelegateHandle HitStaggeredTagChangedDelegateHandle;
+	FDelegateHandle LowGravityTagChangedDelegateHandle;
+	float DefaultGravityScale = 1.0f;
 	UPROPERTY(EditDefaultsOnly, Category = "Input|Actions")
 	UInputAction* InteractAction;
 

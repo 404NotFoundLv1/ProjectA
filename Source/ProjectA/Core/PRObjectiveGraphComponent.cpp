@@ -57,6 +57,7 @@ bool UPRObjectiveGraphComponent::RestoreGraph(const FPRObjectiveGraphDefinition&
 		RuntimeNode->State = SnapshotNode.State;
 		RuntimeNode->CurrentCount = FMath::Clamp(SnapshotNode.CurrentCount, 0, NodeDefinition->TargetCount);
 		RuntimeNode->RecoveryAttempts = SnapshotNode.RecoveryAttempts;
+		RuntimeNode->RemainingTimeSeconds = FMath::Clamp(SnapshotNode.RemainingTimeSeconds, 0.0f, NodeDefinition->FailureTimeLimitSeconds);
 	}
 	RefreshAvailableNodes();
 	return true;
@@ -111,6 +112,45 @@ bool UPRObjectiveGraphComponent::SetNodeCurrentCount(const FName NodeId, const i
 	return true;
 }
 
+bool UPRObjectiveGraphComponent::FailNode(const FName NodeId)
+{
+	FRuntimeNode* RuntimeNode = RuntimeNodes.Find(NodeId);
+	const FPRObjectiveNodeDefinition* NodeDefinition = FindDefinition(NodeId);
+	if (!bInitialized || !RuntimeNode || !NodeDefinition || !NodeDefinition->bOptional
+		|| (RuntimeNode->State != EPRObjectiveNodeState::Available && RuntimeNode->State != EPRObjectiveNodeState::Active))
+	{
+		return false;
+	}
+	RuntimeNode->State = EPRObjectiveNodeState::Failed;
+	RuntimeNode->RemainingTimeSeconds = 0.0f;
+	return true;
+}
+
+bool UPRObjectiveGraphComponent::AdvanceTime(const float DeltaSeconds)
+{
+	if (!bInitialized || !FMath::IsFinite(DeltaSeconds) || DeltaSeconds <= 0.0f)
+	{
+		return false;
+	}
+	bool bChanged = false;
+	for (const FPRObjectiveNodeDefinition& NodeDefinition : Definition.Nodes)
+	{
+		FRuntimeNode* RuntimeNode = RuntimeNodes.Find(NodeDefinition.NodeId);
+		if (!RuntimeNode || !NodeDefinition.bOptional || NodeDefinition.FailureTimeLimitSeconds <= 0.0f
+			|| (RuntimeNode->State != EPRObjectiveNodeState::Available && RuntimeNode->State != EPRObjectiveNodeState::Active))
+		{
+			continue;
+		}
+		RuntimeNode->RemainingTimeSeconds = FMath::Max(0.0f, RuntimeNode->RemainingTimeSeconds - DeltaSeconds);
+		bChanged = true;
+		if (RuntimeNode->RemainingTimeSeconds <= 0.0f)
+		{
+			RuntimeNode->State = EPRObjectiveNodeState::Failed;
+		}
+	}
+	return bChanged;
+}
+
 bool UPRObjectiveGraphComponent::SetNodeProgressNormalized(const FName NodeId, const float Progress)
 {
 	const FPRObjectiveNodeDefinition* NodeDefinition = FindDefinition(NodeId);
@@ -157,6 +197,8 @@ TArray<FPRObjectiveSummary> UPRObjectiveGraphComponent::GetVisibleSummaries() co
 		Summary.TargetCount = Node.TargetCount;
 		Summary.Progress = Node.TargetCount > 0 ? static_cast<float>(RuntimeNode->CurrentCount) / static_cast<float>(Node.TargetCount) : 0.0f;
 		Summary.bOptional = Node.bOptional;
+		Summary.RemainingTimeSeconds = RuntimeNode->RemainingTimeSeconds;
+		Summary.RewardBudgetBonus = Node.RewardBudgetBonus;
 	}
 	return Result;
 }
@@ -182,8 +224,40 @@ FPRObjectiveGraphSnapshot UPRObjectiveGraphComponent::BuildSnapshot() const
 		SnapshotNode.State = RuntimeNode->State;
 		SnapshotNode.CurrentCount = RuntimeNode->CurrentCount;
 		SnapshotNode.RecoveryAttempts = RuntimeNode->RecoveryAttempts;
+		SnapshotNode.RemainingTimeSeconds = RuntimeNode->RemainingTimeSeconds;
 	}
 	return Snapshot;
+}
+
+int32 UPRObjectiveGraphComponent::GetCompletedOptionalRewardBudget() const
+{
+	int32 Total = 0;
+	for (const FPRObjectiveNodeDefinition& Node : Definition.Nodes)
+	{
+		if (Node.bOptional && GetNodeState(Node.NodeId) == EPRObjectiveNodeState::Completed)
+		{
+			Total += FMath::Max(0, Node.RewardBudgetBonus);
+		}
+	}
+	return Total;
+}
+
+bool UPRObjectiveGraphComponent::FailIncompleteOptionalNodes()
+{
+	bool bChanged = false;
+	for (TPair<FName, FRuntimeNode>& Pair : RuntimeNodes)
+	{
+		const FPRObjectiveNodeDefinition* NodeDefinition = FindDefinition(Pair.Key);
+		if (NodeDefinition && NodeDefinition->bOptional
+			&& Pair.Value.State != EPRObjectiveNodeState::Completed
+			&& Pair.Value.State != EPRObjectiveNodeState::Failed)
+		{
+			Pair.Value.State = EPRObjectiveNodeState::Failed;
+			Pair.Value.RemainingTimeSeconds = 0.0f;
+			bChanged = true;
+		}
+	}
+	return bChanged;
 }
 
 bool UPRObjectiveGraphComponent::ArePrerequisitesMet(const FPRObjectiveNodeDefinition& Node) const
@@ -225,6 +299,9 @@ void UPRObjectiveGraphComponent::RefreshAvailableNodes()
 			RuntimeNode->State = NodeDefinition.ActivationMode == EPRObjectiveActivationMode::Automatic
 				? EPRObjectiveNodeState::Active
 				: EPRObjectiveNodeState::Available;
+			RuntimeNode->RemainingTimeSeconds = NodeDefinition.bOptional
+				? FMath::Max(0.0f, NodeDefinition.FailureTimeLimitSeconds)
+				: 0.0f;
 			bChanged = true;
 		}
 	}

@@ -4,6 +4,7 @@
 #include "Core/PRGameState.h"
 #include "Core/PRRiftSettlementTypes.h"
 #include "Progression/PRObjectiveGraphTypes.h"
+#include "Progression/PRRiftRuleTypes.h"
 #include "PRRiftGameState.generated.h"
 
 UENUM(BlueprintType)
@@ -61,6 +62,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Rift|ObjectiveGraph")
 	const TArray<FPRObjectiveSummary>& GetObjectiveSummaries() const { return ObjectiveSummaries; }
 
+	UFUNCTION(BlueprintPure, Category = "Rift|Rules")
+	FPRRiftRiskSnapshot GetRiftRiskSnapshot() const { return RiftRiskSnapshot; }
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Rules")
+	FPRMissionRuleSnapshot GetMissionRuleSnapshot() const { return MissionRuleSnapshot; }
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Rules")
+	const TArray<FPRMissionModifierSummary>& GetMissionModifierSummaries() const { return MissionModifierSummaries; }
+
 	UFUNCTION(BlueprintPure, Category = "Rift|Settlement")
 	bool IsSettlementReady() const { return bSettlementReady; }
 
@@ -102,6 +112,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|ObjectiveGraph")
 	void SetObjectiveSummaries(const TArray<FPRObjectiveSummary>& InObjectiveSummaries);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Rules")
+	void SetRiftRiskSnapshot(const FPRRiftRiskSnapshot& InRiskSnapshot);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Rules")
+	void SetMissionRuleSnapshot(const FPRMissionRuleSnapshot& InRuleSnapshot);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Rules")
+	void SetMissionModifierSummaries(const TArray<FPRMissionModifierSummary>& InModifierSummaries);
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Settlement")
 	void SetSettlementData(const FPRRiftSettlementData& InSettlementData);
@@ -145,6 +164,15 @@ protected:
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Rift|ObjectiveGraph")
 	TArray<FPRObjectiveSummary> ObjectiveSummaries;
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Rift|Rules")
+	FPRRiftRiskSnapshot RiftRiskSnapshot;
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Rift|Rules")
+	FPRMissionRuleSnapshot MissionRuleSnapshot;
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Rift|Rules")
+	TArray<FPRMissionModifierSummary> MissionModifierSummaries;
 
 	UPROPERTY(ReplicatedUsing = OnRep_SettlementData, BlueprintReadOnly, Category = "Rift|Settlement")
 	FPRRiftSettlementData SettlementData;

@@ -9,6 +9,7 @@ class UPRAffixDefinitionDataAsset;
 class UPRLootTableDataAsset;
 class UPRRewardBudgetDataAsset;
 class UPRMissionProgressionDataAsset;
+class UPRMissionModifierDefinitionDataAsset;
 class UPRRoleDataAsset;
 class UPRRoleModuleDataAsset;
 class UPRShipRepairDataAsset;
@@ -30,6 +31,7 @@ public:
 	static FPrimaryAssetId MakeLootTablePrimaryAssetId(FName AssetName);
 	static FPrimaryAssetId MakeRewardBudgetPrimaryAssetId(FName AssetName);
 	static FPrimaryAssetId MakeMissionPrimaryAssetId(FName MissionId);
+	static FPrimaryAssetId MakeMissionModifierPrimaryAssetId(FName ModifierId);
 	static FPrimaryAssetId MakeRolePrimaryAssetId(FName RoleId);
 	static FPrimaryAssetId MakeRoleModulePrimaryAssetId(FName ModuleId);
 	static FPrimaryAssetId MakeShipRepairPrimaryAssetId(FName RepairProjectId);
@@ -45,6 +47,7 @@ public:
 	UPRLootTableDataAsset* LoadLootTableSync(FName AssetName);
 	UPRRewardBudgetDataAsset* LoadRewardBudgetSync(FName AssetName);
 	UPRMissionProgressionDataAsset* LoadMissionSync(FName MissionId);
+	UPRMissionModifierDefinitionDataAsset* LoadMissionModifierSync(FName ModifierId);
 	bool LoadMissionCatalog(TArray<UPRMissionProgressionDataAsset*>& OutCatalog);
 	UPRRoleDataAsset* LoadRoleSync(FName RoleId);
 	UPRRoleModuleDataAsset* LoadRoleModuleSync(FName ModuleId);

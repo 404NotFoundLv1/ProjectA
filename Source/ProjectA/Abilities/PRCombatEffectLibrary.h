@@ -60,6 +60,12 @@ public:
 		FGameplayTag DamageType,
 		UObject* SourceObject = nullptr);
 
+	/** Server-owned environmental damage.  Self-sourcing deliberately disables AttackPower in the shared execution. */
+	static bool ApplyEnvironmentalDamageToTarget(
+		UAbilitySystemComponent* TargetAbilitySystem,
+		float BaseDamage,
+		UObject* SourceObject = nullptr);
+
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "ProjectRift|Combat")
 	static bool ApplyDamageRequestToTarget(
 		UAbilitySystemComponent* SourceAbilitySystem,

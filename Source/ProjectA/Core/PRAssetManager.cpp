@@ -5,6 +5,7 @@
 #include "Items/PRLootTableDataAsset.h"
 #include "Items/PRRewardBudgetDataAsset.h"
 #include "Progression/PRMissionProgressionDataAsset.h"
+#include "Progression/PRMissionModifierDefinitionDataAsset.h"
 #include "Roles/PRRoleDataAsset.h"
 #include "Roles/PRRoleModuleDataAsset.h"
 #include "Ship/PRShipRepairDataAsset.h"
@@ -70,6 +71,13 @@ FPrimaryAssetId UPRAssetManager::MakeMissionPrimaryAssetId(const FName MissionId
 		: FPrimaryAssetId(UPRMissionProgressionDataAsset::MissionPrimaryAssetType, MissionId);
 }
 
+FPrimaryAssetId UPRAssetManager::MakeMissionModifierPrimaryAssetId(const FName ModifierId)
+{
+	return ModifierId.IsNone()
+		? FPrimaryAssetId()
+		: FPrimaryAssetId(UPRMissionModifierDefinitionDataAsset::ModifierPrimaryAssetType, ModifierId);
+}
+
 FPrimaryAssetId UPRAssetManager::MakeRolePrimaryAssetId(const FName RoleId)
 {
 	return RoleId.IsNone()
@@ -124,6 +132,7 @@ void UPRAssetManager::RefreshPrimaryAssetCatalogs()
 	ScanPathsForPrimaryAssets(UPRLootTableDataAsset::LootTablePrimaryAssetType, { TEXT("/Game/ProjectRift/Items"), TEXT("/Game/ProjectRift/Rewards") }, UPRLootTableDataAsset::StaticClass(), false);
 	ScanPathsForPrimaryAssets(UPRRewardBudgetDataAsset::RewardBudgetPrimaryAssetType, { TEXT("/Game/ProjectRift/Rewards") }, UPRRewardBudgetDataAsset::StaticClass(), false);
 	ScanPathsForPrimaryAssets(UPRMissionProgressionDataAsset::MissionPrimaryAssetType, { TEXT("/Game/ProjectRift/Missions") }, UPRMissionProgressionDataAsset::StaticClass(), false);
+	ScanPathsForPrimaryAssets(UPRMissionModifierDefinitionDataAsset::ModifierPrimaryAssetType, { TEXT("/Game/ProjectRift/MissionModifiers") }, UPRMissionModifierDefinitionDataAsset::StaticClass(), false);
 	ScanPathsForPrimaryAssets(UPRRoleDataAsset::RolePrimaryAssetType, { TEXT("/Game/ProjectRift/Roles") }, UPRRoleDataAsset::StaticClass(), false);
 	ScanPathsForPrimaryAssets(UPRRoleModuleDataAsset::RoleModulePrimaryAssetType, { TEXT("/Game/ProjectRift/RoleModules") }, UPRRoleModuleDataAsset::StaticClass(), false);
 	ScanPathsForPrimaryAssets(UPRShipRepairDataAsset::ShipRepairPrimaryAssetType, { TEXT("/Game/ProjectRift/ShipRepairs") }, UPRShipRepairDataAsset::StaticClass(), false);
@@ -134,6 +143,7 @@ void UPRAssetManager::RefreshPrimaryAssetCatalogs()
 	ValidatePrimaryAssetType(UPRLootTableDataAsset::LootTablePrimaryAssetType);
 	ValidatePrimaryAssetType(UPRRewardBudgetDataAsset::RewardBudgetPrimaryAssetType);
 	ValidatePrimaryAssetType(UPRMissionProgressionDataAsset::MissionPrimaryAssetType);
+	ValidatePrimaryAssetType(UPRMissionModifierDefinitionDataAsset::ModifierPrimaryAssetType);
 	ValidatePrimaryAssetType(UPRRoleDataAsset::RolePrimaryAssetType);
 	ValidatePrimaryAssetType(UPRRoleModuleDataAsset::RoleModulePrimaryAssetType);
 	ValidatePrimaryAssetType(UPRShipRepairDataAsset::ShipRepairPrimaryAssetType);
@@ -218,6 +228,13 @@ UPRMissionProgressionDataAsset* UPRAssetManager::LoadMissionSync(const FName Mis
 	return Cast<UPRMissionProgressionDataAsset>(LoadPrimaryAssetSync(
 		MakeMissionPrimaryAssetId(MissionId),
 		UPRMissionProgressionDataAsset::StaticClass()));
+}
+
+UPRMissionModifierDefinitionDataAsset* UPRAssetManager::LoadMissionModifierSync(const FName ModifierId)
+{
+	return Cast<UPRMissionModifierDefinitionDataAsset>(LoadPrimaryAssetSync(
+		MakeMissionModifierPrimaryAssetId(ModifierId),
+		UPRMissionModifierDefinitionDataAsset::StaticClass()));
 }
 
 bool UPRAssetManager::LoadMissionCatalog(TArray<UPRMissionProgressionDataAsset*>& OutCatalog)

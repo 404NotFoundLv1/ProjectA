@@ -35,9 +35,13 @@ bool ArePrerequisitesMet(const FPRObjectiveNodeDefinition& Node, const TMap<FNam
 
 bool FPRObjectiveNodeDefinition::IsValid(FString* OutDiagnostic) const
 {
-	if (NodeId.IsNone() || TargetCount <= 0)
+	if (NodeId.IsNone() || TargetCount <= 0 || !FMath::IsFinite(FailureTimeLimitSeconds) || FailureTimeLimitSeconds < 0.0f || RewardBudgetBonus < 0)
 	{
-		return PRObjectiveGraph::SetDiagnostic(OutDiagnostic, TEXT("Objective nodes require a node id and positive target count."));
+		return PRObjectiveGraph::SetDiagnostic(OutDiagnostic, TEXT("Objective nodes require valid identifiers, counts, timers, and rewards."));
+	}
+	if (!bOptional && FailureTimeLimitSeconds > 0.0f)
+	{
+		return PRObjectiveGraph::SetDiagnostic(OutDiagnostic, TEXT("Only optional objective nodes can have a failure timer."));
 	}
 	TSet<FName> SeenPrerequisites;
 	for (const FName PrerequisiteId : PrerequisiteNodeIds)
@@ -140,7 +144,7 @@ int32 FPRObjectiveGraphDefinition::ComputeSignature() const
 	{
 		TArray<FName> Prerequisites = Node->PrerequisiteNodeIds;
 		Prerequisites.Sort(FNameLexicalLess());
-		Source += FString::Printf(TEXT("|%s|%d|%d|%d|%d|%d|%s|%d"), *Node->NodeId.ToString(), static_cast<int32>(Node->ObjectiveType), static_cast<int32>(Node->PrerequisitePolicy), static_cast<int32>(Node->ActivationMode), Node->bOptional ? 1 : 0, Node->bDrivesEnemySpawning ? 1 : 0, *Node->TargetId.ToString(), Node->TargetCount);
+		Source += FString::Printf(TEXT("|%s|%d|%d|%d|%d|%d|%s|%d|%.3f|%d"), *Node->NodeId.ToString(), static_cast<int32>(Node->ObjectiveType), static_cast<int32>(Node->PrerequisitePolicy), static_cast<int32>(Node->ActivationMode), Node->bOptional ? 1 : 0, Node->bDrivesEnemySpawning ? 1 : 0, *Node->TargetId.ToString(), Node->TargetCount, Node->FailureTimeLimitSeconds, Node->RewardBudgetBonus);
 		for (const FName Prerequisite : Prerequisites)
 		{
 			Source += TEXT("|") + Prerequisite.ToString();
@@ -159,7 +163,7 @@ bool FPRObjectiveGraphSnapshot::IsValid() const
 	TSet<FName> SeenIds;
 	for (const FPRObjectiveNodeSnapshot& Node : Nodes)
 	{
-		if (Node.NodeId.IsNone() || SeenIds.Contains(Node.NodeId) || Node.CurrentCount < 0 || Node.RecoveryAttempts < 0)
+		if (Node.NodeId.IsNone() || SeenIds.Contains(Node.NodeId) || Node.CurrentCount < 0 || Node.RecoveryAttempts < 0 || !FMath::IsFinite(Node.RemainingTimeSeconds) || Node.RemainingTimeSeconds < 0.0f)
 		{
 			return false;
 		}

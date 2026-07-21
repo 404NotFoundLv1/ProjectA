@@ -97,6 +97,14 @@ bool FPRRewardGenerationTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Four-player budget converts the 75 remainder to three chips"), FourPlayers.CommonChipCount, 3);
 	TestEqual(TEXT("One equipment item consumes exactly 100 budget"), Solo.GrantedWarehouseItems.Num(), 1);
 
+	FPRRewardRuntimeModifiers RiskAndOptionalModifiers;
+	RiskAndOptionalModifiers.Multiplier = 1.5f;
+	RiskAndOptionalModifiers.FlatBonusBudget = 25;
+	const FPRPersonalRewardGenerationResult RiskAndOptional = UPRRewardGenerationLibrary::GeneratePersonalSettlementRewardWithModifiers(
+		Budget, Source, FPRLootProtectionState(), 1, RiskAndOptionalModifiers);
+	TestEqual(TEXT("Peak risk and completed optional budget compose deterministically"), RiskAndOptional.TotalBudget, 175);
+	TestEqual(TEXT("Modified budget retains the existing chip conversion"), RiskAndOptional.CommonChipCount, 3);
+
 	const FPRPersonalRewardGenerationResult Repeated = UPRRewardGenerationLibrary::GeneratePersonalSettlementReward(Budget, Source, FPRLootProtectionState(), 1);
 	TestEqual(TEXT("Same source seed produces the same item id"), Repeated.GrantedWarehouseItems[0].ItemId, Solo.GrantedWarehouseItems[0].ItemId);
 	TestTrue(TEXT("Same source seed produces equivalent generated item state"), Repeated.GrantedWarehouseItems[0].HasEquivalentStackingState(Solo.GrantedWarehouseItems[0]));

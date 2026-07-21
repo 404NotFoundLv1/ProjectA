@@ -31,6 +31,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Rift|ObjectiveGraph")
 	bool SetNodeCurrentCount(FName NodeId, int32 NewCurrentCount);
 
+	UFUNCTION(BlueprintCallable, Category = "Rift|ObjectiveGraph")
+	bool FailNode(FName NodeId);
+
+	UFUNCTION(BlueprintCallable, Category = "Rift|ObjectiveGraph")
+	bool AdvanceTime(float DeltaSeconds);
+
 	bool SetNodeProgressNormalized(FName NodeId, float Progress);
 	const FPRObjectiveNodeDefinition* FindNodeDefinition(FName NodeId) const;
 
@@ -39,6 +45,13 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Rift|ObjectiveGraph")
 	TArray<FPRObjectiveSummary> GetVisibleSummaries() const;
+
+	UFUNCTION(BlueprintPure, Category = "Rift|ObjectiveGraph")
+	int32 GetCompletedOptionalRewardBudget() const;
+
+	/** Settlement ends optional work without changing required-node success. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|ObjectiveGraph")
+	bool FailIncompleteOptionalNodes();
 
 	FPRObjectiveGraphSnapshot BuildSnapshot() const;
 	const FPRObjectiveGraphDefinition& GetDefinition() const { return Definition; }
@@ -49,6 +62,7 @@ private:
 		EPRObjectiveNodeState State = EPRObjectiveNodeState::Locked;
 		int32 CurrentCount = 0;
 		int32 RecoveryAttempts = 0;
+		float RemainingTimeSeconds = 0.0f;
 	};
 
 	bool ArePrerequisitesMet(const FPRObjectiveNodeDefinition& Node) const;

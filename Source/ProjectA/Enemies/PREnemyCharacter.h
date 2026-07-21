@@ -69,6 +69,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Enemy|Scaling")
 	void SetSpawnHealthMultiplier(float InMultiplier);
 
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Enemy|Scaling")
+	void SetSpawnAttackPowerMultiplier(float InMultiplier);
+
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Enemy|Objective")
 	void SetHuntTargetId(FName InHuntTargetId) { HuntTargetId = InHuntTargetId; }
 
@@ -129,6 +132,9 @@ protected:
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Enemy|Scaling")
 	float SpawnHealthMultiplier = 1.0f;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Enemy|Scaling")
+	float SpawnAttackPowerMultiplier = 1.0f;
 
 	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Enemy|Objective")
 	FName HuntTargetId;

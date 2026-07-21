@@ -49,6 +49,13 @@ namespace ProjectRiftGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Reviving, "State.Reviving", "Player is reviving a downed ally");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_BeingRevived, "State.BeingRevived", "Player is receiving a revive");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_UsingItem, "State.UsingItem", "Player is channeling a quickbar item");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Enemy_Elite, "State.Enemy.Elite", "Enemy spawned as a mission elite reinforcement");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Mission_Modifier_LowGravity, "Mission.Modifier.LowGravity", "Rift low-gravity mission rule is active");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Mission_Modifier_ShieldInterference, "Mission.Modifier.ShieldInterference", "Rift shield interference mission rule is active");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Mission_Modifier_PollutionAmplified, "Mission.Modifier.PollutionAmplified", "Rift pollution amplification mission rule is active");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Mission_Modifier_EliteReinforcements, "Mission.Modifier.EliteReinforcements", "Rift elite reinforcement mission rule is active");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Mission_Modifier_ResourceRich, "Mission.Modifier.ResourceRich", "Rift resource-rich mission rule is active");
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Combat_Impact_Shield, "GameplayCue.Combat.Impact.Shield", "Shield damage feedback");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Combat_Impact_ShieldBreak, "GameplayCue.Combat.Impact.ShieldBreak", "Shield break feedback");

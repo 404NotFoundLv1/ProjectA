@@ -22,6 +22,9 @@ void APRRiftGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(APRRiftGameState, KilledEnemyCount);
 
 	DOREPLIFETIME(APRRiftGameState, ObjectiveSummaries);
+	DOREPLIFETIME(APRRiftGameState, RiftRiskSnapshot);
+	DOREPLIFETIME(APRRiftGameState, MissionRuleSnapshot);
+	DOREPLIFETIME(APRRiftGameState, MissionModifierSummaries);
 	DOREPLIFETIME(APRRiftGameState, SettlementData);
 	DOREPLIFETIME(APRRiftGameState, bSettlementReady);
 }
@@ -84,6 +87,27 @@ void APRRiftGameState::IncrementKilledEnemyCount()
 void APRRiftGameState::SetObjectiveSummaries(const TArray<FPRObjectiveSummary>& InObjectiveSummaries)
 {
 	ObjectiveSummaries = InObjectiveSummaries;
+}
+
+void APRRiftGameState::SetRiftRiskSnapshot(const FPRRiftRiskSnapshot& InRiskSnapshot)
+{
+	RiftRiskSnapshot = InRiskSnapshot;
+	RiftRiskSnapshot.Stability = FMath::Clamp(RiftRiskSnapshot.Stability, 0.0f, 100.0f);
+	RiftRiskSnapshot.EnemyBudgetMultiplier = FMath::Clamp(RiftRiskSnapshot.EnemyBudgetMultiplier, 0.25f, 3.0f);
+	RiftRiskSnapshot.RewardMultiplier = FMath::Clamp(RiftRiskSnapshot.RewardMultiplier, 0.25f, 3.0f);
+	RiftRiskSnapshot.PeakRewardMultiplier = FMath::Clamp(RiftRiskSnapshot.PeakRewardMultiplier, 0.25f, 3.0f);
+	RiftRiskSnapshot.EnvironmentalPollutionDamage = FMath::Max(0.0f, RiftRiskSnapshot.EnvironmentalPollutionDamage);
+	RiftRiskSnapshot.EnvironmentalPulseIntervalSeconds = FMath::Max(0.0f, RiftRiskSnapshot.EnvironmentalPulseIntervalSeconds);
+}
+
+void APRRiftGameState::SetMissionModifierSummaries(const TArray<FPRMissionModifierSummary>& InModifierSummaries)
+{
+	MissionModifierSummaries = InModifierSummaries;
+}
+
+void APRRiftGameState::SetMissionRuleSnapshot(const FPRMissionRuleSnapshot& InRuleSnapshot)
+{
+	MissionRuleSnapshot = InRuleSnapshot;
 }
 
 void APRRiftGameState::SetSettlementData(const FPRRiftSettlementData& InSettlementData)

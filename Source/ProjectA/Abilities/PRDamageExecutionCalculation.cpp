@@ -3,6 +3,9 @@
 #include "Abilities/PRAttributeSet.h"
 #include "AbilitySystemComponent.h"
 #include "Core/PRGameplayTags.h"
+#include "Core/PRRiftGameState.h"
+#include "Engine/World.h"
+#include "GameFramework/Actor.h"
 #include "GameplayEffect.h"
 #include "Settings/PRProjectSettings.h"
 
@@ -96,6 +99,19 @@ void UPRDamageExecutionCalculation::Execute_Implementation(
 			? FMath::Clamp(Settings->MaxPollutionDamageReduction, 0.0f, 1.0f)
 			: 0.8f;
 		FinalDamage *= 1.0f - FMath::Clamp(PollutionResistance, 0.0f, MaxReduction);
+		if (const UAbilitySystemComponent* TargetAbilitySystem = ExecutionParams.GetTargetAbilitySystemComponent())
+		{
+			if (TargetAbilitySystem->HasMatchingGameplayTag(ProjectRiftGameplayTags::Mission_Modifier_PollutionAmplified))
+			{
+				if (const AActor* TargetAvatar = TargetAbilitySystem->GetAvatarActor())
+				{
+					if (const APRRiftGameState* RiftGameState = TargetAvatar->GetWorld() ? TargetAvatar->GetWorld()->GetGameState<APRRiftGameState>() : nullptr)
+					{
+						FinalDamage *= RiftGameState->GetMissionRuleSnapshot().PollutionDamageMultiplier;
+					}
+				}
+			}
+		}
 	}
 
 	if (!FMath::IsFinite(FinalDamage) || FinalDamage <= 0.0f)

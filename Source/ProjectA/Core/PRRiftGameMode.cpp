@@ -3,8 +3,11 @@
 #include "Diagnostics/PRDiagnosticsLog.h"
 
 #include "Characters/PRCharacter.h"
+#include "Abilities/PRCombatEffectLibrary.h"
+#include "Abilities/PRAbilitySystemComponent.h"
 #include "Core/PRSpawnManager.h"
 #include "Core/PRObjectiveGraphComponent.h"
+#include "Core/PRRiftRuleComponent.h"
 #include "Core/PRRiftObjectiveActor.h"
 #include "Core/PRObjectiveTypeActors.h"
 #include "Core/PRAssetManager.h"
@@ -38,6 +41,7 @@ APRRiftGameMode::APRRiftGameMode()
 	PrimaryActorTick.bCanEverTick = true;
 	GameStateClass = APRRiftGameState::StaticClass();
 	ObjectiveGraphComponent = CreateDefaultSubobject<UPRObjectiveGraphComponent>(TEXT("ObjectiveGraphComponent"));
+	RiftRuleComponent = CreateDefaultSubobject<UPRRiftRuleComponent>(TEXT("RiftRuleComponent"));
 }
 
 void APRRiftGameMode::BeginPlay()
@@ -56,6 +60,10 @@ void APRRiftGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	LogFlowPhase(TEXT("EndPlay"));
 	GetWorldTimerManager().ClearTimer(ReturnToLobbyTravelTimerHandle);
 	StopSpawnManagers();
+	if (RiftRuleComponent)
+	{
+		RiftRuleComponent->ClearAppliedEffects();
+	}
 	ClearRescueDrone();
 	SpawnManagers.Reset();
 	ActiveObjective = nullptr;
@@ -141,6 +149,12 @@ void APRRiftGameMode::Tick(const float DeltaSeconds)
 
 		RiftGameState->SetMissionTime(RiftGameState->GetMissionTime() + DeltaSeconds);
 		DrainRiftStability(DeltaSeconds);
+		ApplyEnvironmentalRisk();
+		if (HasObjectiveGraph() && ObjectiveGraphComponent->AdvanceTime(DeltaSeconds))
+		{
+			RefreshObjectiveGraphReplication();
+			CacheObjectiveGraphSnapshot();
+		}
 		CheckFailureConditions();
 		UpdateObjectiveItemRecovery();
 	}
@@ -158,6 +172,10 @@ void APRRiftGameMode::PostLogin(APlayerController* NewPlayer)
 		InitializeRescueDroneForMission();
 	}
 	UpdateAlivePlayerCount();
+	if (bRiftMissionStarted && RiftRuleComponent)
+	{
+		RiftRuleComponent->ApplyRulesToPlayer(NewPlayer ? NewPlayer->GetPlayerState<APRPlayerState>() : nullptr);
+	}
 	RestoreObjectiveGraphSnapshot();
 }
 
@@ -246,7 +264,17 @@ bool APRRiftGameMode::StartRiftMission()
 	const float InitialStability = ProjectSettings
 		? FMath::Clamp(ProjectSettings->InitialRiftStability, 0.0f, 100.0f)
 		: 100.0f;
-	RiftGameState->SetRiftStability(InitialStability);
+	FString RuleDiagnostic;
+	if (!RiftRuleComponent || !RiftRuleComponent->InitializeRules(CurrentMissionDefinition, &RuleDiagnostic))
+	{
+		UE_LOG(LogProjectA, Error, TEXT("Rift mission start rejected because mission rules are invalid. MissionId=%s Diagnostic=%s"), *MissionId.ToString(), *RuleDiagnostic);
+		return false;
+	}
+	RiftRuleComponent->ResetRules(InitialStability);
+	NextEnvironmentalHazardPulseTime = 0.0f;
+	RiftGameState->SetRiftStability(RiftRuleComponent->GetRiskSnapshot().Stability);
+	RefreshRiftRuleReplication();
+	ApplyRulesToConnectedPlayers();
 	RiftGameState->SetExtractionAvailable(false);
 	RiftGameState->SetMissionTime(0.0f);
 	RiftGameState->SetKilledEnemyCount(0);
@@ -322,11 +350,13 @@ bool APRRiftGameMode::ActivateObjectiveNode(APRRiftObjectiveActor* ObjectiveActo
 
 bool APRRiftGameMode::ReportObjectiveNodeProgress(const FName NodeId, const float NormalizedProgress)
 {
+	const EPRObjectiveNodeState PreviousState = HasObjectiveGraph() ? ObjectiveGraphComponent->GetNodeState(NodeId) : EPRObjectiveNodeState::Failed;
 	if (!HasAuthority() || !HasObjectiveGraph() || !ObjectiveGraphComponent->SetNodeProgressNormalized(NodeId, NormalizedProgress))
 	{
 		return false;
 	}
 	RefreshObjectiveGraphReplication();
+	ApplyObjectiveStageStabilityCost(PreviousState, NodeId);
 	SynchronizeObjectiveGraphActors();
 	if (ObjectiveGraphComponent->IsGraphCompleted())
 	{
@@ -338,17 +368,39 @@ bool APRRiftGameMode::ReportObjectiveNodeProgress(const FName NodeId, const floa
 
 bool APRRiftGameMode::ReportObjectiveNodeCount(const FName NodeId, const int32 CurrentCount)
 {
+	const EPRObjectiveNodeState PreviousState = HasObjectiveGraph() ? ObjectiveGraphComponent->GetNodeState(NodeId) : EPRObjectiveNodeState::Failed;
 	if (!HasAuthority() || !HasObjectiveGraph() || !ObjectiveGraphComponent->SetNodeCurrentCount(NodeId, CurrentCount))
 	{
 		return false;
 	}
 	RefreshObjectiveGraphReplication();
+	ApplyObjectiveStageStabilityCost(PreviousState, NodeId);
 	SynchronizeObjectiveGraphActors();
 	if (ObjectiveGraphComponent->IsGraphCompleted())
 	{
 		CompleteCurrentObjective();
 	}
 	CacheObjectiveGraphSnapshot();
+	return true;
+}
+
+bool APRRiftGameMode::ReportRiftAlarm(const FName AlarmId, const int32 Severity)
+{
+	if (!HasAuthority() || !RiftRuleComponent)
+	{
+		return false;
+	}
+	const UPRProjectSettings* Settings = GetDefault<UPRProjectSettings>();
+	const float Cost = Settings ? FMath::Max(0.0f, Settings->AlarmStabilityCostPerSeverity) : 8.0f;
+	if (!RiftRuleComponent->ReportAlarm(AlarmId, Severity, Cost))
+	{
+		return false;
+	}
+	if (APRRiftGameState* RiftGameState = GetRiftGameState())
+	{
+		RiftGameState->SetRiftStability(RiftRuleComponent->GetRiskSnapshot().Stability);
+	}
+	RefreshRiftRuleReplication();
 	return true;
 }
 
@@ -621,6 +673,15 @@ void APRRiftGameMode::FinalizeRiftSettlement(const EPRRiftMissionResult Result)
 
 		bSettlementFinalizationInProgress = true;
 		ClearRescueDrone();
+		if (ObjectiveGraphComponent)
+		{
+			ObjectiveGraphComponent->FailIncompleteOptionalNodes();
+			RefreshObjectiveGraphReplication();
+		}
+		if (RiftRuleComponent)
+		{
+			RiftRuleComponent->ClearAppliedEffects();
+		}
 		FPRRiftSettlementData Settlement = GenerateSettlementData(Result);
 		ApplyExtractedResourceRules(Result, Settlement);
 		FinalizePersonalSettlements(Result);
@@ -816,11 +877,15 @@ FPRPlayerSettlementReceipt APRRiftGameMode::BuildPersonalSettlementReceipt(
 			Source.RecipientProfileId = Receipt.ProfileId;
 			Source.Ordinal = 0;
 			Source.Seed = AllocateRewardSeed(Source.SourceType, Source.SourceId, Source.RecipientProfileId, Source.Ordinal);
-			const FPRPersonalRewardGenerationResult Generated = UPRRewardGenerationLibrary::GeneratePersonalSettlementReward(
+			FPRRewardRuntimeModifiers RuntimeModifiers;
+			RuntimeModifiers.Multiplier = RiftRuleComponent ? RiftRuleComponent->GetRiskSnapshot().PeakRewardMultiplier : 1.0f;
+			RuntimeModifiers.FlatBonusBudget = ObjectiveGraphComponent ? ObjectiveGraphComponent->GetCompletedOptionalRewardBudget() : 0;
+			const FPRPersonalRewardGenerationResult Generated = UPRRewardGenerationLibrary::GeneratePersonalSettlementRewardWithModifiers(
 				RewardBudget,
 				Source,
 				PlayerState->GetLootProtectionState(RewardBudget->GetFName()),
-				GetMissionDifficultyPlayerCount());
+				GetMissionDifficultyPlayerCount(),
+				RuntimeModifiers);
 			if (Generated.bSuccess)
 			{
 				Receipt.GrantedWarehouseItems = Generated.GrantedWarehouseItems;
@@ -1084,6 +1149,40 @@ void APRRiftGameMode::RefreshObjectiveGraphReplication()
 	RiftGameState->SetCurrentObjectiveState(ObjectiveGraphComponent->IsGraphCompleted()
 		? EPRRiftObjectiveState::Completed
 		: EPRRiftObjectiveState::Active);
+}
+
+void APRRiftGameMode::RefreshRiftRuleReplication()
+{
+	if (!RiftRuleComponent)
+	{
+		return;
+	}
+	if (APRRiftGameState* RiftGameState = GetRiftGameState())
+	{
+		RiftGameState->SetRiftRiskSnapshot(RiftRuleComponent->GetRiskSnapshot());
+		RiftGameState->SetMissionRuleSnapshot(RiftRuleComponent->GetRuleSnapshot());
+		RiftGameState->SetMissionModifierSummaries(RiftRuleComponent->GetModifierSummaries());
+	}
+}
+
+void APRRiftGameMode::ApplyObjectiveStageStabilityCost(const EPRObjectiveNodeState PreviousState, const FName NodeId)
+{
+	if (PreviousState == EPRObjectiveNodeState::Completed || !RiftRuleComponent || !ObjectiveGraphComponent
+		|| ObjectiveGraphComponent->GetNodeState(NodeId) != EPRObjectiveNodeState::Completed)
+	{
+		return;
+	}
+	const UPRProjectSettings* Settings = GetDefault<UPRProjectSettings>();
+	const float Cost = Settings ? FMath::Max(0.0f, Settings->ObjectiveStageStabilityCost) : 4.0f;
+	if (!RiftRuleComponent->ApplyObjectiveStageCost(Cost))
+	{
+		return;
+	}
+	if (APRRiftGameState* RiftGameState = GetRiftGameState())
+	{
+		RiftGameState->SetRiftStability(RiftRuleComponent->GetRiskSnapshot().Stability);
+	}
+	RefreshRiftRuleReplication();
 }
 
 void APRRiftGameMode::SynchronizeObjectiveGraphActors()
@@ -1522,12 +1621,58 @@ void APRRiftGameMode::DrainRiftStability(const float DeltaSeconds)
 	}
 
 	APRRiftGameState* RiftGameState = GetRiftGameState();
-	if (!RiftGameState || RiftGameState->GetCurrentObjectiveState() != EPRRiftObjectiveState::Active)
+	if (!RiftGameState || !RiftRuleComponent)
 	{
 		return;
 	}
 
-	RiftGameState->SetRiftStability(RiftGameState->GetRiftStability() - DrainPerSecond * DeltaSeconds);
+	if (RiftRuleComponent->AdvanceStability(DeltaSeconds, DrainPerSecond))
+	{
+		RiftGameState->SetRiftStability(RiftRuleComponent->GetRiskSnapshot().Stability);
+		RefreshRiftRuleReplication();
+	}
+}
+
+void APRRiftGameMode::ApplyRulesToConnectedPlayers()
+{
+	if (!HasAuthority() || !RiftRuleComponent || !GameState)
+	{
+		return;
+	}
+	for (const TObjectPtr<APlayerState>& PlayerState : GameState->PlayerArray)
+	{
+		RiftRuleComponent->ApplyRulesToPlayer(Cast<APRPlayerState>(PlayerState.Get()));
+	}
+}
+
+void APRRiftGameMode::ApplyEnvironmentalRisk()
+{
+	if (!HasAuthority() || !RiftRuleComponent || !GetWorld())
+	{
+		return;
+	}
+	const FPRRiftRiskSnapshot Risk = RiftRuleComponent->GetRiskSnapshot();
+	if (Risk.EnvironmentalPollutionDamage <= 0.0f || Risk.EnvironmentalPulseIntervalSeconds <= 0.0f)
+	{
+		NextEnvironmentalHazardPulseTime = 0.0f;
+		return;
+	}
+	const float Now = GetWorld()->GetTimeSeconds();
+	if (NextEnvironmentalHazardPulseTime > Now)
+	{
+		return;
+	}
+	NextEnvironmentalHazardPulseTime = Now + Risk.EnvironmentalPulseIntervalSeconds;
+	for (const TObjectPtr<APlayerState>& PlayerState : GameState->PlayerArray)
+	{
+		if (const APRPlayerState* RiftPlayerState = Cast<APRPlayerState>(PlayerState.Get()))
+		{
+			if (APRCharacter* Character = Cast<APRCharacter>(ResolvePawnForPlayerState(RiftPlayerState)))
+			{
+				UPRCombatEffectLibrary::ApplyEnvironmentalDamageToTarget(Character->GetProjectRiftAbilitySystemComponent(), Risk.EnvironmentalPollutionDamage, this);
+			}
+		}
+	}
 }
 
 void APRRiftGameMode::DiscoverSpawnManagers()

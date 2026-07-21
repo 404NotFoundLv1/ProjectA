@@ -14,6 +14,7 @@
 #include "Components/WidgetComponent.h"
 #include "Core/PRGameplayTags.h"
 #include "Core/PRRiftGameMode.h"
+#include "Core/PRRiftRuleComponent.h"
 #include "Enemies/PREnemyAIController.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerState.h"
@@ -92,7 +93,7 @@ void APREnemyCharacter::BeginPlay()
 			AttributeSet->SetShield(0.0f);
 			AttributeSet->SetMaxEnergy(0.0f);
 			AttributeSet->SetEnergy(0.0f);
-			AttributeSet->SetAttackPower(10.0f);
+			AttributeSet->SetAttackPower(10.0f * SpawnAttackPowerMultiplier);
 			AttributeSet->SetMoveSpeed(360.0f);
 			AttributeSet->SetCooldownReduction(0.0f);
 			AttributeSet->SetHealingPower(0.0f);
@@ -184,6 +185,14 @@ void APREnemyCharacter::SetSpawnHealthMultiplier(const float InMultiplier)
 	if (HasAuthority())
 	{
 		SpawnHealthMultiplier = FMath::IsFinite(InMultiplier) ? FMath::Clamp(InMultiplier, 0.1f, 20.0f) : 1.0f;
+	}
+}
+
+void APREnemyCharacter::SetSpawnAttackPowerMultiplier(const float InMultiplier)
+{
+	if (HasAuthority())
+	{
+		SpawnAttackPowerMultiplier = FMath::IsFinite(InMultiplier) ? FMath::Clamp(InMultiplier, 0.1f, 20.0f) : 1.0f;
 	}
 }
 
@@ -297,6 +306,14 @@ APRPickupActor* APREnemyCharacter::SpawnDeathLoot()
 		RewardSource.Seed = RiftGameMode->AllocateRewardSeed(RewardSource.SourceType, RewardSource.SourceId, FGuid(), 0);
 	}
 	APRPickupActor* LootPickup = nullptr;
+	float MaterialCountMultiplier = 1.0f;
+	if (const APRRiftGameMode* RiftGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<APRRiftGameMode>() : nullptr)
+	{
+		if (const UPRRiftRuleComponent* Rules = RiftGameMode->GetRiftRuleComponent())
+		{
+			MaterialCountMultiplier = Rules->GetWorldMaterialLootMultiplier();
+		}
+	}
 	if (DeathLootRollOverride >= 0.0f)
 	{
 		// Retained solely for deterministic legacy test setups.
@@ -306,7 +323,8 @@ APRPickupActor* APREnemyCharacter::SpawnDeathLoot()
 			PickupActorClass,
 			SpawnLocation,
 			FRotator::ZeroRotator,
-			DeathLootRollOverride);
+			DeathLootRollOverride,
+			MaterialCountMultiplier);
 	}
 	else
 	{
@@ -317,7 +335,8 @@ APRPickupActor* APREnemyCharacter::SpawnDeathLoot()
 			PickupActorClass,
 			SpawnLocation,
 			FRotator::ZeroRotator,
-			RewardSource.Seed != 0 ? RewardSource.Seed : FMath::Rand());
+			RewardSource.Seed != 0 ? RewardSource.Seed : FMath::Rand(),
+			MaterialCountMultiplier);
 	}
 	if (LootPickup)
 	{

@@ -72,6 +72,13 @@ struct PROJECTA_API FPRObjectiveNodeDefinition
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Objective", meta = (ClampMin = "1"))
 	int32 TargetCount = 1;
 
+	/** Optional objectives can expire; required objectives deliberately remain non-expiring. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Objective", meta = (ClampMin = "0.0"))
+	float FailureTimeLimitSeconds = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Objective", meta = (ClampMin = "0"))
+	int32 RewardBudgetBonus = 0;
+
 	bool IsValid(FString* OutDiagnostic = nullptr) const;
 };
 
@@ -118,6 +125,12 @@ struct PROJECTA_API FPRObjectiveSummary
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Objective")
 	bool bOptional = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Objective")
+	float RemainingTimeSeconds = 0.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Objective")
+	int32 RewardBudgetBonus = 0;
 };
 
 USTRUCT(BlueprintType)
@@ -136,6 +149,9 @@ struct PROJECTA_API FPRObjectiveNodeSnapshot
 
 	UPROPERTY()
 	int32 RecoveryAttempts = 0;
+
+	UPROPERTY()
+	float RemainingTimeSeconds = 0.0f;
 };
 
 USTRUCT(BlueprintType)

@@ -13,6 +13,7 @@
 #include "Combat/PRCombatFeedbackComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Core/PRGameplayTags.h"
+#include "Core/PRRiftGameState.h"
 #include "EnhancedInputComponent.h"
 #include "Engine/Engine.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -218,6 +219,7 @@ void APRCharacter::BeginPlay()
 	if (const UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
 	{
 		bDefaultOrientRotationToMovement = MovementComponent->bOrientRotationToMovement;
+		DefaultGravityScale = MovementComponent->GravityScale;
 	}
 	TargetCameraArmLength = DefaultCameraArmLength;
 	TargetCameraFieldOfView = DefaultCameraFieldOfView;
@@ -569,6 +571,11 @@ void APRCharacter::BindAttributeChangeDelegates()
 	HitStaggeredTagChangedDelegateHandle = AbilitySystemComponent
 		->RegisterGameplayTagEvent(ProjectRiftGameplayTags::State_HitStaggered, EGameplayTagEventType::NewOrRemoved)
 		.AddUObject(this, &APRCharacter::HandleHitStaggeredTagChanged);
+	LowGravityTagChangedDelegateHandle = AbilitySystemComponent
+		->RegisterGameplayTagEvent(ProjectRiftGameplayTags::Mission_Modifier_LowGravity, EGameplayTagEventType::NewOrRemoved)
+		.AddUObject(this, &APRCharacter::HandleLowGravityTagChanged);
+	HandleLowGravityTagChanged(ProjectRiftGameplayTags::Mission_Modifier_LowGravity,
+		AbilitySystemComponent->GetTagCount(ProjectRiftGameplayTags::Mission_Modifier_LowGravity));
 	RefreshMovementFromAttributes();
 }
 
@@ -582,6 +589,7 @@ void APRCharacter::ClearAttributeChangeDelegates()
 		MoveSpeedChangedDelegateHandle.Reset();
 		StunnedTagChangedDelegateHandle.Reset();
 		HitStaggeredTagChangedDelegateHandle.Reset();
+		LowGravityTagChangedDelegateHandle.Reset();
 		return;
 	}
 
@@ -632,6 +640,14 @@ void APRCharacter::ClearAttributeChangeDelegates()
 			.Remove(HitStaggeredTagChangedDelegateHandle);
 		HitStaggeredTagChangedDelegateHandle.Reset();
 	}
+
+	if (LowGravityTagChangedDelegateHandle.IsValid())
+	{
+		AbilitySystemComponent
+			->RegisterGameplayTagEvent(ProjectRiftGameplayTags::Mission_Modifier_LowGravity, EGameplayTagEventType::NewOrRemoved)
+			.Remove(LowGravityTagChangedDelegateHandle);
+		LowGravityTagChangedDelegateHandle.Reset();
+	}
 }
 
 void APRCharacter::HandleHealthChanged(const FOnAttributeChangeData& Data)
@@ -660,6 +676,22 @@ void APRCharacter::HandleEnergyChanged(const FOnAttributeChangeData& Data)
 void APRCharacter::HandleMoveSpeedChanged(const FOnAttributeChangeData& Data)
 {
 	RefreshMovementFromAttributes();
+}
+
+void APRCharacter::HandleLowGravityTagChanged(const FGameplayTag StatusTag, const int32 NewCount)
+{
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		float GravityScale = DefaultGravityScale;
+		if (NewCount > 0)
+		{
+			if (const APRRiftGameState* RiftGameState = GetWorld() ? GetWorld()->GetGameState<APRRiftGameState>() : nullptr)
+			{
+				GravityScale *= RiftGameState->GetMissionRuleSnapshot().GravityScale;
+			}
+		}
+		MovementComponent->GravityScale = FMath::Max(0.01f, GravityScale);
+	}
 }
 
 void APRCharacter::HandleStunnedTagChanged(const FGameplayTag StatusTag, const int32 NewCount)

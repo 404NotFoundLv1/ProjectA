@@ -16,6 +16,16 @@ FPRPersonalRewardGenerationResult UPRRewardGenerationLibrary::GeneratePersonalSe
 	const FPRLootProtectionState& PreviousProtection,
 	const int32 FrozenParticipantCount)
 {
+	return GeneratePersonalSettlementRewardWithModifiers(RewardBudget, Source, PreviousProtection, FrozenParticipantCount, FPRRewardRuntimeModifiers());
+}
+
+FPRPersonalRewardGenerationResult UPRRewardGenerationLibrary::GeneratePersonalSettlementRewardWithModifiers(
+	const UPRRewardBudgetDataAsset* RewardBudget,
+	const FPRRewardSourceContext& Source,
+	const FPRLootProtectionState& PreviousProtection,
+	const int32 FrozenParticipantCount,
+	const FPRRewardRuntimeModifiers& RuntimeModifiers)
+{
 	FPRPersonalRewardGenerationResult Result;
 	Result.UpdatedProtectionState = PreviousProtection;
 	if (!RewardBudget || !Source.RecipientProfileId.IsValid())
@@ -29,8 +39,10 @@ FPRPersonalRewardGenerationResult UPRRewardGenerationLibrary::GeneratePersonalSe
 		Result.Diagnostic = Validation;
 		return Result;
 	}
-	Result.TotalBudget = RewardBudget->BaseSuccessBudget + RewardBudget->ObjectiveBudget
+	const int32 BaseBudget = RewardBudget->BaseSuccessBudget + RewardBudget->ObjectiveBudget
 		+ RewardBudget->AdditionalPlayerBudget * FMath::Clamp(FrozenParticipantCount - 1, 0, 3);
+	const float RewardMultiplier = FMath::Clamp(FMath::IsFinite(RuntimeModifiers.Multiplier) ? RuntimeModifiers.Multiplier : 1.0f, 0.25f, 3.0f);
+	Result.TotalBudget = FMath::Max(0, FMath::RoundToInt(BaseBudget * RewardMultiplier) + FMath::Max(0, RuntimeModifiers.FlatBonusBudget));
 	Result.RemainingBudget = Result.TotalBudget;
 	Result.UpdatedProtectionState.RewardBudgetId = RewardBudget->GetFName();
 	UPRLootTableDataAsset* Table = RewardBudget->PersonalEquipmentLootTable.LoadSynchronous();

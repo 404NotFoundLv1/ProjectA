@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Items/PRRewardTypes.h"
+#include "Progression/PRRiftRuleTypes.h"
 #include "PRRewardGenerationLibrary.generated.h"
 
 class UPRRewardBudgetDataAsset;
@@ -23,4 +24,12 @@ public:
 		const FPRRewardSourceContext& Source,
 		const FPRLootProtectionState& PreviousProtection,
 		int32 FrozenParticipantCount);
+
+	/** Applies server-authored mission risk and optional-objective reward modifiers to the existing deterministic roll. */
+	static FPRPersonalRewardGenerationResult GeneratePersonalSettlementRewardWithModifiers(
+		const UPRRewardBudgetDataAsset* RewardBudget,
+		const FPRRewardSourceContext& Source,
+		const FPRLootProtectionState& PreviousProtection,
+		int32 FrozenParticipantCount,
+		const FPRRewardRuntimeModifiers& RuntimeModifiers);
 };

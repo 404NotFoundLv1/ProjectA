@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DeveloperSettings.h"
+#include "Progression/PRRiftRuleTypes.h"
 #include "PRProjectSettings.generated.h"
 
 UCLASS(Config=Game, DefaultConfig, meta=(DisplayName="ProjectRift Gameplay"))
@@ -10,6 +11,8 @@ class PROJECTA_API UPRProjectSettings : public UDeveloperSettings
 	GENERATED_BODY()
 
 public:
+	UPRProjectSettings();
+
 	virtual FName GetCategoryName() const override;
 	virtual FName GetSectionName() const override;
 
@@ -17,7 +20,19 @@ public:
 	float InitialRiftStability = 100.0f;
 
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Mission", meta=(ClampMin="0.0", UIMin="0.0"))
-	float RiftStabilityDrainPerSecond = 1.0f;
+	float RiftStabilityDrainPerSecond = 0.15f;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Mission", meta=(ClampMin="0.0", UIMin="0.0"))
+	float ObjectiveStageStabilityCost = 4.0f;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Mission", meta=(ClampMin="0.0", UIMin="0.0"))
+	float AlarmStabilityCostPerSeverity = 8.0f;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Mission", meta=(ClampMin="1", ClampMax="6", UIMin="1", UIMax="6"))
+	int32 MaxMissionModifiers = 6;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Mission")
+	TArray<FPRRiftRiskBandDefinition> RiftRiskBands;
 
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Mission", meta=(ClampMin="0.0", ClampMax="1.0", UIMin="0.0", UIMax="1.0"))
 	float FailedResourceRetentionRate = 0.5f;
