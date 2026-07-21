@@ -115,15 +115,15 @@ bool APRRiftObjectiveActor::ActivateObjective(AController* ActivatingController)
 		}
 	}
 
-	SetObjectiveState(EPRRiftObjectiveState::Active);
-	SetObjectiveProgress(0.0f);
-
-	if (APRRiftGameMode* RiftGameMode = GetRiftGameMode())
+	if (UsesObjectiveGraph())
 	{
-		RiftGameMode->HandleObjectiveActivated(this);
+		APRRiftGameMode* RiftGameMode = GetRiftGameMode();
+		if (!RiftGameMode || !RiftGameMode->ActivateObjectiveNode(this, ActivatingController))
+		{
+			return false;
+		}
 	}
-
-	HandleObjectiveActivated(ActivatingController);
+	ActivateFromObjectiveGraph(ActivatingController);
 	return true;
 }
 
@@ -133,6 +133,14 @@ bool APRRiftObjectiveActor::CanActivateObjective(AController* ActivatingControll
 	{
 		return false;
 	}
+	if (UsesObjectiveGraph())
+	{
+		const APRRiftGameMode* RiftGameMode = GetRiftGameMode();
+		if (!RiftGameMode || !RiftGameMode->CanActivateObjectiveNode(ObjectiveNodeId))
+		{
+			return false;
+		}
+	}
 	if (RequiredMissionItemId.IsNone())
 	{
 		return true;
@@ -140,6 +148,21 @@ bool APRRiftObjectiveActor::CanActivateObjective(AController* ActivatingControll
 	const APRPlayerState* PlayerState = ActivatingController ? ActivatingController->GetPlayerState<APRPlayerState>() : nullptr;
 	const UPRInventoryComponent* Inventory = PlayerState ? PlayerState->GetInventoryComponent() : nullptr;
 	return Inventory && Inventory->GetItemCount(RequiredMissionItemId) > 0;
+}
+
+void APRRiftObjectiveActor::ActivateFromObjectiveGraph(AController* ActivatingController)
+{
+	if (!HasAuthority() || ObjectiveState != EPRRiftObjectiveState::NotStarted)
+	{
+		return;
+	}
+	SetObjectiveState(EPRRiftObjectiveState::Active);
+	SetObjectiveProgress(0.0f);
+	if (APRRiftGameMode* RiftGameMode = GetRiftGameMode())
+	{
+		RiftGameMode->HandleObjectiveActivated(this);
+	}
+	HandleObjectiveActivated(ActivatingController);
 }
 
 void APRRiftObjectiveActor::CompleteObjective()

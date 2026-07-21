@@ -39,7 +39,7 @@ bool UPRMissionProgressionDataAsset::IsContractValid(FString* OutDiagnostic) con
 		UnlockIds.Add(UnlockId);
 	}
 
-	return ValidateMissionContract(OutDiagnostic);
+	return ValidateMissionContract(OutDiagnostic) && ValidateObjectiveGraph(OutDiagnostic);
 }
 
 bool UPRMissionProgressionDataAsset::ValidateMissionContract(FString* OutDiagnostic) const
@@ -54,6 +54,11 @@ bool UPRMissionProgressionDataAsset::ValidateMissionContract(FString* OutDiagnos
 		EffectiveContract = FPRMissionContract();
 	}
 	return EffectiveContract.IsValid(OutDiagnostic);
+}
+
+bool UPRMissionProgressionDataAsset::ValidateObjectiveGraph(FString* OutDiagnostic) const
+{
+	return !HasObjectiveGraph() || ObjectiveGraph.IsValid(OutDiagnostic);
 }
 
 FPRMissionDefinition UPRMissionProgressionDataAsset::BuildMissionDefinition(const int32 Seed, FString* OutDiagnostic) const
@@ -90,6 +95,10 @@ FPRMissionDefinition UPRMissionProgressionDataAsset::BuildMissionDefinition(cons
 	for (const FName RewardTypeId : Definition.RewardPreview.RewardTypeIds)
 	{
 		SignatureSource += TEXT("|") + RewardTypeId.ToString();
+	}
+	if (HasObjectiveGraph())
+	{
+		SignatureSource += FString::Printf(TEXT("|Graph:%d"), ObjectiveGraph.ComputeSignature());
 	}
 	Definition.DeterministicSignature = static_cast<int32>(FCrc::StrCrc32(*SignatureSource));
 	return Definition;

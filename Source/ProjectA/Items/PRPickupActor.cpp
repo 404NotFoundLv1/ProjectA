@@ -68,6 +68,7 @@ void APRPickupActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 
 	DOREPLIFETIME(APRPickupActor, ItemInstance);
 	DOREPLIFETIME(APRPickupActor, RewardSource);
+	DOREPLIFETIME(APRPickupActor, ObjectiveNodeId);
 	DOREPLIFETIME(APRPickupActor, bIsPickedUp);
 }
 

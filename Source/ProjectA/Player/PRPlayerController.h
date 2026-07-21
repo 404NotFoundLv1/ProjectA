@@ -25,6 +25,7 @@ class UPRMissionSelectionWidget;
 class UPRDiagnosticsWidget;
 class UPRWeaponHUDWidget;
 class UPRQuickbarHUDWidget;
+class UPRObjectiveTrackerWidget;
 class UPRLootTableDataAsset;
 class UGameplayEffect;
 class APRPickupActor;
@@ -141,6 +142,8 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Quickbar|UI")
 	UPRQuickbarHUDWidget* GetQuickbarHUDWidget() const { return QuickbarHUDWidget.Get(); }
+
+	UPRObjectiveTrackerWidget* GetObjectiveTrackerWidget() const { return ObjectiveTrackerWidget.Get(); }
 
 	/** Server-only endpoint used by resolved combat feedback to notify this owning client. */
 	void SendHitConfirmationToOwner(const FPRHitConfirmation& Confirmation);
@@ -378,6 +381,8 @@ private:
 	void DestroyWeaponHUD();
 	void CreateQuickbarHUD();
 	void DestroyQuickbarHUD();
+	void CreateObjectiveTracker();
+	void DestroyObjectiveTracker();
 	void CreateRiftSettlementUI();
 	void DestroyRiftSettlementUI();
 	void CreateShipRepairUI();
@@ -470,8 +475,14 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Quickbar|UI")
 	TSubclassOf<UPRQuickbarHUDWidget> QuickbarHUDWidgetClass;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Rift|Objective")
+	TSubclassOf<UPRObjectiveTrackerWidget> ObjectiveTrackerWidgetClass;
+
 	UPROPERTY(Transient)
 	TObjectPtr<UPRQuickbarHUDWidget> QuickbarHUDWidget;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPRObjectiveTrackerWidget> ObjectiveTrackerWidget;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Rift|Settlement")
 	TSubclassOf<UPRRiftSettlementWidget> RiftSettlementWidgetClass;

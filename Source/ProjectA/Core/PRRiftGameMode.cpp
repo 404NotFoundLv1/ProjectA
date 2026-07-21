@@ -4,7 +4,9 @@
 
 #include "Characters/PRCharacter.h"
 #include "Core/PRSpawnManager.h"
+#include "Core/PRObjectiveGraphComponent.h"
 #include "Core/PRRiftObjectiveActor.h"
+#include "Core/PRObjectiveTypeActors.h"
 #include "Core/PRAssetManager.h"
 #include "Enemies/PREnemyCharacter.h"
 #include "Revive/PRRescueDroneActor.h"
@@ -18,6 +20,7 @@
 #include "Items/PRInventoryComponent.h"
 #include "Items/PRItemDataAsset.h"
 #include "Items/PRItemTypes.h"
+#include "Items/PRPickupActor.h"
 #include "Items/PRQuickbarComponent.h"
 #include "Items/PRRewardBudgetDataAsset.h"
 #include "Items/PRRewardGenerationLibrary.h"
@@ -34,6 +37,7 @@ APRRiftGameMode::APRRiftGameMode()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	GameStateClass = APRRiftGameState::StaticClass();
+	ObjectiveGraphComponent = CreateDefaultSubobject<UPRObjectiveGraphComponent>(TEXT("ObjectiveGraphComponent"));
 }
 
 void APRRiftGameMode::BeginPlay()
@@ -58,6 +62,9 @@ void APRRiftGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	ExtractedPlayerStates.Reset();
 	CountedKilledEnemies.Reset();
 	PendingSettlementAcknowledgements.Reset();
+	ObjectiveGraphSnapshot = FPRObjectiveGraphSnapshot();
+	ObjectiveItemMissingSince.Reset();
+	NextObjectiveItemRecoveryCheckTime = 0.0f;
 	bRiftMissionStarted = false;
 	bReturnToLobbyTravelPending = false;
 	bSettlementFinalizationInProgress = false;
@@ -135,6 +142,7 @@ void APRRiftGameMode::Tick(const float DeltaSeconds)
 		RiftGameState->SetMissionTime(RiftGameState->GetMissionTime() + DeltaSeconds);
 		DrainRiftStability(DeltaSeconds);
 		CheckFailureConditions();
+		UpdateObjectiveItemRecovery();
 	}
 }
 
@@ -150,10 +158,12 @@ void APRRiftGameMode::PostLogin(APlayerController* NewPlayer)
 		InitializeRescueDroneForMission();
 	}
 	UpdateAlivePlayerCount();
+	RestoreObjectiveGraphSnapshot();
 }
 
 void APRRiftGameMode::Logout(AController* Exiting)
 {
+	CacheObjectiveGraphSnapshot();
 	if (APRPlayerController* ProjectRiftController = Cast<APRPlayerController>(Exiting))
 	{
 		PendingSettlementAcknowledgements.Remove(TObjectKey<APRPlayerController>(ProjectRiftController));
@@ -217,6 +227,9 @@ bool APRRiftGameMode::StartRiftMission()
 	PendingSettlementAcknowledgements.Reset();
 	FailedSettlementAcknowledgementCount = 0;
 	CountedKilledEnemies.Reset();
+	ObjectiveGraphSnapshot = FPRObjectiveGraphSnapshot();
+	ObjectiveItemMissingSince.Reset();
+	NextObjectiveItemRecoveryCheckTime = 0.0f;
 	bRiftMissionStarted = true;
 	ActiveObjective = nullptr;
 	ResetExtractionState();
@@ -224,6 +237,7 @@ bool APRRiftGameMode::StartRiftMission()
 	ClearRescueDrone();
 	RiftGameState->SetCurrentObjectiveState(EPRRiftObjectiveState::NotStarted);
 	RiftGameState->SetObjectiveProgress(0.0f);
+	RiftGameState->SetObjectiveSummaries({});
 	const UPRProjectSettings* ProjectSettings = GetDefault<UPRProjectSettings>();
 	if (!ProjectSettings)
 	{
@@ -239,6 +253,10 @@ bool APRRiftGameMode::StartRiftMission()
 	RiftGameState->SetDifficultyPlayerCount(CountMissionParticipants());
 	InitializeRescueDroneForMission();
 	UpdateAlivePlayerCount();
+	if (!InitializeObjectiveGraph())
+	{
+		return false;
+	}
 
 	UE_LOG(LogProjectA, Log, TEXT("Rift mission started. Stability=%.1f AlivePlayers=%d"),
 		RiftGameState->GetRiftStability(),
@@ -276,6 +294,128 @@ void APRRiftGameMode::CompleteCurrentObjective()
 		RiftGameState->SetCurrentObjectiveState(EPRRiftObjectiveState::Completed);
 		OpenExtraction();
 	}
+}
+
+bool APRRiftGameMode::HasObjectiveGraph() const
+{
+	return ObjectiveGraphComponent && !ObjectiveGraphComponent->GetDefinition().Nodes.IsEmpty();
+}
+
+bool APRRiftGameMode::CanActivateObjectiveNode(const FName NodeId) const
+{
+	return HasObjectiveGraph() && ObjectiveGraphComponent->GetNodeState(NodeId) == EPRObjectiveNodeState::Available;
+}
+
+bool APRRiftGameMode::ActivateObjectiveNode(APRRiftObjectiveActor* ObjectiveActor, AController* ActivatingController)
+{
+	if (!HasAuthority() || !ObjectiveActor || !HasObjectiveGraph())
+	{
+		return false;
+	}
+	const bool bActivated = ObjectiveGraphComponent->ActivateNode(ObjectiveActor->GetObjectiveNodeId());
+	if (bActivated)
+	{
+		RefreshObjectiveGraphReplication();
+	}
+	return bActivated;
+}
+
+bool APRRiftGameMode::ReportObjectiveNodeProgress(const FName NodeId, const float NormalizedProgress)
+{
+	if (!HasAuthority() || !HasObjectiveGraph() || !ObjectiveGraphComponent->SetNodeProgressNormalized(NodeId, NormalizedProgress))
+	{
+		return false;
+	}
+	RefreshObjectiveGraphReplication();
+	SynchronizeObjectiveGraphActors();
+	if (ObjectiveGraphComponent->IsGraphCompleted())
+	{
+		CompleteCurrentObjective();
+	}
+	CacheObjectiveGraphSnapshot();
+	return true;
+}
+
+bool APRRiftGameMode::ReportObjectiveNodeCount(const FName NodeId, const int32 CurrentCount)
+{
+	if (!HasAuthority() || !HasObjectiveGraph() || !ObjectiveGraphComponent->SetNodeCurrentCount(NodeId, CurrentCount))
+	{
+		return false;
+	}
+	RefreshObjectiveGraphReplication();
+	SynchronizeObjectiveGraphActors();
+	if (ObjectiveGraphComponent->IsGraphCompleted())
+	{
+		CompleteCurrentObjective();
+	}
+	CacheObjectiveGraphSnapshot();
+	return true;
+}
+
+bool APRRiftGameMode::RegisterObjectivePickup(const FName NodeId, const FGuid ItemInstanceGuid)
+{
+	if (!HasAuthority() || !CanRegisterObjectivePickup(NodeId, ItemInstanceGuid))
+	{
+		return false;
+	}
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+	for (TActorIterator<APRRiftObjectiveActor> It(World); It; ++It)
+	{
+		APRRiftObjectiveActor* Objective = *It;
+		if (!Objective || Objective->GetObjectiveNodeId() != NodeId)
+		{
+			continue;
+		}
+		if (APRCollectObjectiveActor* CollectObjective = Cast<APRCollectObjectiveActor>(Objective))
+		{
+			const bool bRegistered = CollectObjective->RegisterCollectedItem(ItemInstanceGuid);
+			if (bRegistered) { CacheObjectiveGraphSnapshot(); }
+			return bRegistered;
+		}
+		if (APRCarryObjectiveActor* CarryObjective = Cast<APRCarryObjectiveActor>(Objective))
+		{
+			const bool bRegistered = CarryObjective->SetTrackedCoreGuid(ItemInstanceGuid);
+			if (bRegistered) { CacheObjectiveGraphSnapshot(); }
+			return bRegistered;
+		}
+	}
+	return false;
+}
+
+bool APRRiftGameMode::CanRegisterObjectivePickup(const FName NodeId, const FGuid ItemInstanceGuid) const
+{
+	if (!HasObjectiveGraph() || NodeId.IsNone() || !ItemInstanceGuid.IsValid()
+		|| ObjectiveGraphComponent->GetNodeState(NodeId) != EPRObjectiveNodeState::Active)
+	{
+		return false;
+	}
+
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+	for (TActorIterator<APRRiftObjectiveActor> It(World); It; ++It)
+	{
+		const APRRiftObjectiveActor* Objective = *It;
+		if (!Objective || Objective->GetObjectiveNodeId() != NodeId)
+		{
+			continue;
+		}
+		if (const APRCollectObjectiveActor* CollectObjective = Cast<APRCollectObjectiveActor>(Objective))
+		{
+			return !CollectObjective->HasCollectedItem(ItemInstanceGuid);
+		}
+		if (const APRCarryObjectiveActor* CarryObjective = Cast<APRCarryObjectiveActor>(Objective))
+		{
+			return !CarryObjective->GetTrackedCoreGuid().IsValid();
+		}
+	}
+	return false;
 }
 
 void APRRiftGameMode::OpenExtraction()
@@ -837,13 +977,17 @@ void APRRiftGameMode::HandleObjectiveActivated(APRRiftObjectiveActor* ObjectiveA
 	}
 
 	ActiveObjective = ObjectiveActor;
-	StartSpawnManagersForObjective(ObjectiveActor);
+	if (!ObjectiveActor->UsesObjectiveGraph() || (ObjectiveGraphComponent && ObjectiveGraphComponent->FindNodeDefinition(ObjectiveActor->GetObjectiveNodeId())
+		&& ObjectiveGraphComponent->FindNodeDefinition(ObjectiveActor->GetObjectiveNodeId())->bDrivesEnemySpawning))
+	{
+		StartSpawnManagersForObjective(ObjectiveActor);
+	}
 	LogFlowPhase(TEXT("ObjectiveActivated"));
 
 	if (APRRiftGameState* RiftGameState = GetRiftGameState())
 	{
 		RiftGameState->SetCurrentObjectiveState(EPRRiftObjectiveState::Active);
-		RiftGameState->SetObjectiveProgress(ObjectiveActor->GetObjectiveProgress());
+		RiftGameState->SetObjectiveProgress(HasObjectiveGraph() ? 0.0f : ObjectiveActor->GetObjectiveProgress());
 	}
 }
 
@@ -856,6 +1000,11 @@ void APRRiftGameMode::HandleObjectiveProgressChanged(APRRiftObjectiveActor* Obje
 
 	if (ActiveObjective && ActiveObjective != ObjectiveActor)
 	{
+		return;
+	}
+	if (ObjectiveActor->UsesObjectiveGraph())
+	{
+		ReportObjectiveNodeProgress(ObjectiveActor->GetObjectiveNodeId(), ObjectiveProgress);
 		return;
 	}
 
@@ -878,9 +1027,203 @@ void APRRiftGameMode::HandleObjectiveCompleted(APRRiftObjectiveActor* ObjectiveA
 	}
 
 	ActiveObjective = ObjectiveActor;
+	if (ObjectiveActor->UsesObjectiveGraph())
+	{
+		ReportObjectiveNodeProgress(ObjectiveActor->GetObjectiveNodeId(), 1.0f);
+		LogFlowPhase(TEXT("ObjectiveNodeCompleted"));
+		return;
+	}
 	StopSpawnManagers();
 	LogFlowPhase(TEXT("ObjectiveCompleted"));
 	CompleteCurrentObjective();
+}
+
+bool APRRiftGameMode::InitializeObjectiveGraph()
+{
+	const UPRMissionProgressionDataAsset* Mission = ResolveMissionContract();
+	if (!Mission || !Mission->HasObjectiveGraph())
+	{
+		return true;
+	}
+	if (!ObjectiveGraphComponent)
+	{
+		UE_LOG(LogProjectA, Error, TEXT("Rift objective graph is missing its runtime component."));
+		return false;
+	}
+	FString Diagnostic;
+	if (!ObjectiveGraphComponent->InitializeGraph(Mission->ObjectiveGraph, &Diagnostic))
+	{
+		UE_LOG(LogProjectA, Error, TEXT("Rift objective graph is invalid. MissionId=%s Diagnostic=%s"), *MissionId.ToString(), *Diagnostic);
+		return false;
+	}
+	RefreshObjectiveGraphReplication();
+	SynchronizeObjectiveGraphActors();
+	return true;
+}
+
+void APRRiftGameMode::RefreshObjectiveGraphReplication()
+{
+	APRRiftGameState* RiftGameState = GetRiftGameState();
+	if (!RiftGameState || !HasObjectiveGraph())
+	{
+		return;
+	}
+	const TArray<FPRObjectiveSummary> Summaries = ObjectiveGraphComponent->GetVisibleSummaries();
+	RiftGameState->SetObjectiveSummaries(Summaries);
+	float RequiredProgress = 0.0f;
+	int32 RequiredCount = 0;
+	for (const FPRObjectiveSummary& Summary : Summaries)
+	{
+		if (!Summary.bOptional)
+		{
+			RequiredProgress += Summary.Progress;
+			++RequiredCount;
+		}
+	}
+	RiftGameState->SetObjectiveProgress(RequiredCount > 0 ? RequiredProgress / RequiredCount : 0.0f);
+	RiftGameState->SetCurrentObjectiveState(ObjectiveGraphComponent->IsGraphCompleted()
+		? EPRRiftObjectiveState::Completed
+		: EPRRiftObjectiveState::Active);
+}
+
+void APRRiftGameMode::SynchronizeObjectiveGraphActors()
+{
+	if (!HasAuthority() || !HasObjectiveGraph())
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	for (TActorIterator<APRRiftObjectiveActor> It(World); It; ++It)
+	{
+		APRRiftObjectiveActor* Objective = *It;
+		if (Objective && Objective->UsesObjectiveGraph()
+			&& ObjectiveGraphComponent->GetNodeState(Objective->GetObjectiveNodeId()) == EPRObjectiveNodeState::Active)
+		{
+			Objective->ActivateFromObjectiveGraph();
+		}
+	}
+}
+
+void APRRiftGameMode::CacheObjectiveGraphSnapshot()
+{
+	if (HasObjectiveGraph())
+	{
+		ObjectiveGraphSnapshot = ObjectiveGraphComponent->BuildSnapshot();
+	}
+}
+
+void APRRiftGameMode::RestoreObjectiveGraphSnapshot()
+{
+	if (!HasAuthority() || !HasObjectiveGraph() || !ObjectiveGraphSnapshot.IsValid())
+	{
+		return;
+	}
+	FString Diagnostic;
+	if (!ObjectiveGraphComponent->RestoreGraph(ObjectiveGraphComponent->GetDefinition(), ObjectiveGraphSnapshot, &Diagnostic))
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Objective graph reconnect restore rejected: %s"), *Diagnostic);
+		return;
+	}
+	RefreshObjectiveGraphReplication();
+	SynchronizeObjectiveGraphActors();
+}
+
+bool APRRiftGameMode::IsObjectiveItemAvailable(const FGuid ItemInstanceGuid) const
+{
+	if (!ItemInstanceGuid.IsValid())
+	{
+		return false;
+	}
+	if (const AGameStateBase* CurrentGameState = GameState)
+	{
+		for (const TObjectPtr<APlayerState>& RawPlayerState : CurrentGameState->PlayerArray)
+		{
+			const APRPlayerState* PlayerState = Cast<APRPlayerState>(RawPlayerState.Get());
+			const UPRInventoryComponent* Inventory = PlayerState ? PlayerState->GetInventoryComponent() : nullptr;
+			if (Inventory && Inventory->GetItems().ContainsByPredicate([ItemInstanceGuid](const FPRItemInstance& Item)
+			{
+				return Item.InstanceGuid == ItemInstanceGuid && Item.Count > 0;
+			}))
+			{
+				return true;
+			}
+		}
+	}
+	if (const UWorld* World = GetWorld())
+	{
+		for (TActorIterator<APRPickupActor> It(World); It; ++It)
+		{
+			const APRPickupActor* Pickup = *It;
+			if (Pickup && Pickup->CanBePickedUp() && Pickup->GetItemInstance().InstanceGuid == ItemInstanceGuid)
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+void APRRiftGameMode::UpdateObjectiveItemRecovery()
+{
+	if (!HasAuthority() || !HasObjectiveGraph())
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	if (!World || World->GetTimeSeconds() < NextObjectiveItemRecoveryCheckTime)
+	{
+		return;
+	}
+	NextObjectiveItemRecoveryCheckTime = World->GetTimeSeconds() + 1.0f;
+	for (TActorIterator<APRCarryObjectiveActor> It(World); It; ++It)
+	{
+		APRCarryObjectiveActor* CarryObjective = *It;
+		const FGuid CoreGuid = CarryObjective ? CarryObjective->GetTrackedCoreGuid() : FGuid();
+		if (!CarryObjective || !CarryObjective->IsObjectiveActive() || !CoreGuid.IsValid())
+		{
+			continue;
+		}
+		if (IsObjectiveItemAvailable(CoreGuid))
+		{
+			ObjectiveItemMissingSince.Remove(CoreGuid);
+			continue;
+		}
+		const float* MissingSince = ObjectiveItemMissingSince.Find(CoreGuid);
+		if (!MissingSince)
+		{
+			ObjectiveItemMissingSince.Add(CoreGuid, World->GetTimeSeconds());
+			continue;
+		}
+		if (World->GetTimeSeconds() - *MissingSince < 10.0f)
+		{
+			continue;
+		}
+		const FPRObjectiveNodeDefinition* NodeDefinition = ObjectiveGraphComponent->FindNodeDefinition(CarryObjective->GetObjectiveNodeId());
+		if (!NodeDefinition || NodeDefinition->TargetId.IsNone())
+		{
+			continue;
+		}
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.Owner = this;
+		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+		APRPickupActor* RecoveredPickup = World->SpawnActor<APRPickupActor>(APRPickupActor::StaticClass(), CarryObjective->GetActorLocation() + FVector(0.0f, 0.0f, 40.0f), FRotator::ZeroRotator, SpawnParameters);
+		if (!RecoveredPickup)
+		{
+			continue;
+		}
+		FPRItemInstance RecoveredItem;
+		RecoveredItem.ItemId = NodeDefinition->TargetId;
+		RecoveredItem.Count = 1;
+		RecoveredItem.InstanceGuid = CoreGuid;
+		RecoveredPickup->SetItemInstance(RecoveredItem);
+		RecoveredPickup->SetObjectiveNodeId(CarryObjective->GetObjectiveNodeId());
+		ObjectiveItemMissingSince.Remove(CoreGuid);
+		UE_LOG(LogProjectA, Log, TEXT("Recovered missing carry objective item. Node=%s Guid=%s"), *CarryObjective->GetObjectiveNodeId().ToString(), *CoreGuid.ToString(EGuidFormats::DigitsWithHyphens));
+	}
 }
 
 bool APRRiftGameMode::StartSpawnManagersForObjective(APRRiftObjectiveActor* ObjectiveActor)
@@ -932,6 +1275,16 @@ bool APRRiftGameMode::RegisterEnemyKilled(APREnemyCharacter* Enemy, AController*
 	CountedKilledEnemies.Add(EnemyKey);
 
 	RiftGameState->IncrementKilledEnemyCount();
+	if (!Enemy->GetHuntTargetId().IsNone() && HasObjectiveGraph())
+	{
+		for (TActorIterator<APRRiftObjectiveActor> It(GetWorld()); It; ++It)
+		{
+			if (APRHuntObjectiveActor* HuntObjective = Cast<APRHuntObjectiveActor>(*It))
+			{
+				HuntObjective->RegisterHuntTargetEliminated(Enemy->GetHuntTargetId());
+			}
+		}
+	}
 	UE_LOG(LogProjectA, Log, TEXT("Rift enemy kill registered. Enemy=%s Killer=%s Kills=%d"),
 		*GetNameSafe(Enemy),
 		*GetNameSafe(Killer),

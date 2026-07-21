@@ -33,6 +33,10 @@ protected:
 	UFUNCTION()
 	void OnRep_CurrentHoldTime();
 
+	/** Zero preserves the project default; graph test maps use a 15-second instance override. */
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Rift|Objective", meta = (ClampMin = "0.0"))
+	float HoldDurationOverride = 0.0f;
+
 private:
 	void SetCurrentHoldTime(float InCurrentHoldTime);
 };

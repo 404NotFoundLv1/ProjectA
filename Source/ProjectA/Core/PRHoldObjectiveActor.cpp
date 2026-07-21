@@ -30,6 +30,10 @@ void APRHoldObjectiveActor::Tick(const float DeltaSeconds)
 
 float APRHoldObjectiveActor::GetHoldDuration() const
 {
+	if (HoldDurationOverride > 0.0f)
+	{
+		return FMath::Max(0.1f, HoldDurationOverride);
+	}
 	const UPRProjectSettings* ProjectSettings = GetDefault<UPRProjectSettings>();
 	if (!ProjectSettings)
 	{

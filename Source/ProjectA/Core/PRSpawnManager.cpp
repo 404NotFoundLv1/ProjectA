@@ -2,6 +2,8 @@
 
 #include "Core/PREnemySpawnPoint.h"
 #include "Core/PRRiftGameState.h"
+#include "Core/PRRiftGameMode.h"
+#include "Core/PRObjectiveGraphComponent.h"
 #include "Core/PRRiftObjectiveActor.h"
 #include "Enemies/PREnemyCharacter.h"
 #include "EngineUtils.h"
@@ -170,6 +172,15 @@ int32 APRSpawnManager::SpawnWave()
 		if (APREnemyCharacter* Enemy = Cast<APREnemyCharacter>(SpawnedActor))
 		{
 			Enemy->SetSpawnHealthMultiplier(GetEnemyHealthMultiplierForScaling());
+			const APRRiftGameMode* RiftGameMode = World->GetAuthGameMode<APRRiftGameMode>();
+			const UPRObjectiveGraphComponent* ObjectiveGraph = RiftGameMode ? RiftGameMode->GetObjectiveGraphComponent() : nullptr;
+			const FPRObjectiveNodeDefinition* NodeDefinition = ObjectiveGraph && ActiveObjective
+				? ObjectiveGraph->FindNodeDefinition(ActiveObjective->GetObjectiveNodeId())
+				: nullptr;
+			if (NodeDefinition && NodeDefinition->ObjectiveType == EPRObjectiveType::Hunt)
+			{
+				Enemy->SetHuntTargetId(NodeDefinition->TargetId);
+			}
 		}
 		SpawnedActor->FinishSpawning(SpawnTransform);
 

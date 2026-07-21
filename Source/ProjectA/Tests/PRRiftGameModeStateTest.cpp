@@ -188,6 +188,22 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 		TEXT("L_Rift_Test resolves APRRiftGameMode for runtime travel"),
 		RiftMapConfiguredGameModeClass && RiftMapConfiguredGameModeClass->IsChildOf(RiftGameModeClass));
 
+	UWorld* ObjectiveGraphTestWorld = LoadObject<UWorld>(nullptr, TEXT("/Game/ProjectRift/Maps/L_Rift_ObjectiveGraph_Test.L_Rift_ObjectiveGraph_Test"));
+	TestNotNull(TEXT("Objective graph test map asset loads"), ObjectiveGraphTestWorld);
+	AWorldSettings* ObjectiveGraphWorldSettings = ObjectiveGraphTestWorld ? ObjectiveGraphTestWorld->GetWorldSettings() : nullptr;
+	TestNotNull(TEXT("Objective graph test map has world settings"), ObjectiveGraphWorldSettings);
+	const UClass* ObjectiveGraphGameModeClass = ObjectiveGraphWorldSettings ? ObjectiveGraphWorldSettings->DefaultGameMode : nullptr;
+	TestTrue(
+		TEXT("Objective graph test map explicitly uses a Rift GameMode"),
+		ObjectiveGraphGameModeClass && ObjectiveGraphGameModeClass->IsChildOf(RiftGameModeClass));
+	const APRRiftGameMode* ObjectiveGraphGameModeDefaults = ObjectiveGraphGameModeClass
+		? Cast<APRRiftGameMode>(ObjectiveGraphGameModeClass->GetDefaultObject())
+		: nullptr;
+	TestEqual(
+		TEXT("Objective graph test map binds its authored mission"),
+		ObjectiveGraphGameModeDefaults ? ObjectiveGraphGameModeDefaults->GetMissionId() : NAME_None,
+		FName(TEXT("Mission.Rift.Test.ObjectiveGraph")));
+
 	const UGameMapsSettings* Maps = GetDefault<UGameMapsSettings>();
 	const UGeneralProjectSettings* Project = GetDefault<UGeneralProjectSettings>();
 	TestNotNull(TEXT("Game maps settings are available"), Maps);
@@ -196,7 +212,7 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	{
 		TestEqual(TEXT("Game default map is ship lobby"), Maps->GetGameDefaultMap(), FString(TEXT("/Game/ProjectRift/Maps/L_ShipLobby")));
 		TestEqual(TEXT("Project name is ProjectRift"), Project->ProjectName, FString(TEXT("ProjectRift")));
-		TestEqual(TEXT("Project version is v0.8.0"), Project->ProjectVersion, FString(TEXT("0.8.0")));
+		TestEqual(TEXT("Project version is v0.8.1"), Project->ProjectVersion, FString(TEXT("0.8.1")));
 	}
 
 	TArray<FString> MapsToCook;

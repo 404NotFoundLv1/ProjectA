@@ -125,9 +125,9 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 	const UGeneralProjectSettings* ProjectSettings = GetDefault<UGeneralProjectSettings>();
 	TestNotNull(TEXT("General project settings exist"), ProjectSettings);
 	TestEqual(
-		TEXT("Project version is v0.8.0"),
+		TEXT("Project version is v0.8.1"),
 		ProjectSettings ? ProjectSettings->ProjectVersion : FString(),
-		FString(TEXT("0.8.0")));
+		FString(TEXT("0.8.1")));
 
 	TestTrue(TEXT("Global manager is UPRAssetManager"), UAssetManager::Get().IsA<UPRAssetManager>());
 	TestEqual(
@@ -180,7 +180,7 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 	Manager->GetPrimaryAssetIdList(UPRMissionProgressionDataAsset::MissionPrimaryAssetType, MissionIds);
 	Manager->GetPrimaryAssetIdList(UPRRewardBudgetDataAsset::RewardBudgetPrimaryAssetType, RewardBudgetIds);
 	Manager->GetPrimaryAssetIdList(UPRShipRepairDataAsset::ShipRepairPrimaryAssetType, ShipRepairIds);
-	TestEqual(TEXT("Thirteen ProjectRift item assets are registered"), ItemIds.Num(), 13);
+	TestEqual(TEXT("Fifteen ProjectRift item assets are registered"), ItemIds.Num(), 15);
 	TestTrue(TEXT("Energy cell is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("EnergyCell"))));
 	TestTrue(TEXT("Purifier is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("Purifier"))));
 	TestTrue(TEXT("Ammo pack is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("AmmoPack"))));
@@ -190,9 +190,12 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Test armor is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("DA_TestArmor"))));
 	TestTrue(TEXT("Test chip is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("DA_TestChip"))));
 	TestTrue(TEXT("Field Toolkit is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("DA_FieldToolkit"))));
+	TestTrue(TEXT("Objective sample is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("ObjectiveSample"))));
+	TestTrue(TEXT("Objective core is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("ObjectiveCore"))));
 	TestEqual(TEXT("Two ProjectRift loot tables are registered"), LootTableIds.Num(), 2);
 	TestEqual(TEXT("One ProjectRift reward budget is registered"), RewardBudgetIds.Num(), 1);
-	TestEqual(TEXT("One ProjectRift mission is registered"), MissionIds.Num(), 1);
+	TestEqual(TEXT("Two ProjectRift missions are registered"), MissionIds.Num(), 2);
+	TestTrue(TEXT("Objective graph mission is registered"), MissionIds.Contains(UPRAssetManager::MakeMissionPrimaryAssetId(TEXT("Mission.Rift.Test.ObjectiveGraph"))));
 	TestEqual(TEXT("One ProjectRift ship repair is registered"), ShipRepairIds.Num(), 1);
 
 	UPRItemDataAsset* HealthInjector = Manager->LoadItemDataSync(TEXT("HealthInjector"));

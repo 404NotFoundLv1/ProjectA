@@ -35,6 +35,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Objective")
 	virtual void CompleteObjective();
 
+	/** Activates a node that became automatic after prerequisites completed. */
+	void ActivateFromObjectiveGraph(AController* ActivatingController = nullptr);
+
 	UFUNCTION(BlueprintPure, Category = "Rift|Objective")
 	bool IsObjectiveActive() const { return ObjectiveState == EPRRiftObjectiveState::Active; }
 
@@ -55,6 +58,16 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Rift|Objective")
 	FName GetRequiredMissionItemId() const { return RequiredMissionItemId; }
+
+	/** Empty preserves the pre-v0.8.1 single-objective flow. */
+	UFUNCTION(BlueprintPure, Category = "Rift|Objective|Graph")
+	FName GetObjectiveNodeId() const { return ObjectiveNodeId; }
+
+	UFUNCTION(BlueprintPure, Category = "Rift|Objective|Graph")
+	bool UsesObjectiveGraph() const { return !ObjectiveNodeId.IsNone(); }
+
+	/** Native setup and automation entry point. Authored maps set ObjectiveNodeId directly. */
+	void SetObjectiveNodeIdForRuntime(FName InObjectiveNodeId) { ObjectiveNodeId = InObjectiveNodeId; }
 
 	UWidgetComponent* GetInteractionPromptWidget() const { return InteractionPromptWidget; }
 
@@ -92,6 +105,10 @@ protected:
 
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Rift|Objective|Mission Item")
 	bool bConsumeRequiredMissionItem = true;
+
+	/** Links this placed actor to a server-authoritative v0.8.1 objective graph node. */
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Rift|Objective|Graph")
+	FName ObjectiveNodeId;
 
 	UFUNCTION()
 	void OnRep_ObjectiveState();

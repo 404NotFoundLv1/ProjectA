@@ -22,6 +22,11 @@ public:
 		const UAbilitySystemComponent* SourceAbilitySystem,
 		const UAbilitySystemComponent* TargetAbilitySystem);
 
+	/** Damage-only validation; permits player fire against v0.8.1 destroy objectives without opening status/friendly-fire paths. */
+	static bool IsDamageableTarget(
+		const UAbilitySystemComponent* SourceAbilitySystem,
+		const UAbilitySystemComponent* TargetAbilitySystem);
+
 	/** Friendly-only support validation; intentionally rejects enemies and inactive players. */
 	static bool IsFriendlyPlayerTarget(
 		const UAbilitySystemComponent* SourceAbilitySystem,

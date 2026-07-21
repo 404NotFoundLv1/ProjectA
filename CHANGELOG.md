@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.1] - 2026-07-21
+
+- Added a server-authoritative objective graph with prerequisite policies, manual/automatic activation, optional nodes, compact replicated summaries, and same-session snapshots.
+- Added native Collect, Carry, Destroy, Hunt and configurable Hold objective contracts, including hunt-target replication, a damage-only GAS destroy target path, objective-pickup activation gates, and GUID-preserving carry-core recovery.
+- Added a native objective tracker and retained legacy single-hold maps and profile format v9 compatibility.
+
 ## [0.8.0] - 2026-07-21
 
 - Added server-authoritative mission contract definitions with deterministic Seed-based selection, reward previews, compact travel context, host chapter gating, and replicated lobby/rift state.

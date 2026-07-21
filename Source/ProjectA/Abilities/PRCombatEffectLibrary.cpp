@@ -10,6 +10,7 @@
 #include "Combat/PRCombatFeedbackComponent.h"
 #include "Combat/PRCombatUnitInterface.h"
 #include "Core/PRGameplayTags.h"
+#include "Core/PRObjectiveTypeActors.h"
 #include "Enemies/PREnemyCharacter.h"
 #include "GameFramework/Pawn.h"
 #include "GameplayEffect.h"
@@ -23,6 +24,8 @@ enum class EPRCombatantKind : uint8
 	Unknown,
 	Player,
 	Enemy
+	,
+	Objective
 };
 
 AActor* ResolveCombatActor(const UAbilitySystemComponent* AbilitySystem)
@@ -47,6 +50,10 @@ EPRCombatantKind GetCombatantKind(const UAbilitySystemComponent* AbilitySystem)
 	if (Cast<APREnemyCharacter>(CombatActor))
 	{
 		return EPRCombatantKind::Enemy;
+	}
+	if (Cast<APRDestroyObjectiveActor>(CombatActor))
+	{
+		return EPRCombatantKind::Objective;
 	}
 
 	return EPRCombatantKind::Unknown;
@@ -89,6 +96,17 @@ bool AreOpposingCombatants(
 	const EPRCombatantKind TargetKind = GetCombatantKind(TargetAbilitySystem);
 	return (SourceKind == EPRCombatantKind::Player && TargetKind == EPRCombatantKind::Enemy)
 		|| (SourceKind == EPRCombatantKind::Enemy && TargetKind == EPRCombatantKind::Player);
+}
+
+bool IsDamageableCombatTarget(const UAbilitySystemComponent* SourceAbilitySystem, const UAbilitySystemComponent* TargetAbilitySystem)
+{
+	if (!SourceAbilitySystem || !TargetAbilitySystem || SourceAbilitySystem == TargetAbilitySystem || HasInactiveState(TargetAbilitySystem))
+	{
+		return false;
+	}
+	return AreOpposingCombatants(SourceAbilitySystem, TargetAbilitySystem)
+		|| (GetCombatantKind(SourceAbilitySystem) == EPRCombatantKind::Player
+			&& GetCombatantKind(TargetAbilitySystem) == EPRCombatantKind::Objective);
 }
 
 bool HasAuthoritativeActorInfo(const UAbilitySystemComponent* AbilitySystem)
@@ -258,6 +276,13 @@ bool UPRCombatEffectLibrary::IsHostileTarget(
 	return AreOpposingCombatants(SourceAbilitySystem, TargetAbilitySystem);
 }
 
+bool UPRCombatEffectLibrary::IsDamageableTarget(
+	const UAbilitySystemComponent* SourceAbilitySystem,
+	const UAbilitySystemComponent* TargetAbilitySystem)
+{
+	return IsDamageableCombatTarget(SourceAbilitySystem, TargetAbilitySystem);
+}
+
 bool UPRCombatEffectLibrary::IsFriendlyPlayerTarget(
 	const UAbilitySystemComponent* SourceAbilitySystem,
 	const UAbilitySystemComponent* TargetAbilitySystem)
@@ -365,7 +390,7 @@ bool UPRCombatEffectLibrary::ApplyDamageToTarget(
 	FGameplayTag DamageType,
 	UObject* SourceObject)
 {
-	if (!IsHostileTarget(SourceAbilitySystem, TargetAbilitySystem)
+	if (!IsDamageableTarget(SourceAbilitySystem, TargetAbilitySystem)
 		|| !FMath::IsFinite(BaseDamage)
 		|| BaseDamage <= 0.0f)
 	{
@@ -400,7 +425,7 @@ bool UPRCombatEffectLibrary::ApplyDamageRequestToTarget(
 {
 	if (!HasAuthoritativeActorInfo(SourceAbilitySystem)
 		|| !HasAuthoritativeActorInfo(TargetAbilitySystem)
-		|| !IsHostileTarget(SourceAbilitySystem, TargetAbilitySystem)
+		|| !IsDamageableTarget(SourceAbilitySystem, TargetAbilitySystem)
 		|| !FMath::IsFinite(DamageRequest.BaseDamage)
 		|| DamageRequest.BaseDamage <= 0.0f
 		|| !IsFiniteBlockingHitContext(DamageRequest.HitResult))

@@ -20,6 +20,8 @@ void APRRiftGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(APRRiftGameState, MissionTime);
 	DOREPLIFETIME(APRRiftGameState, ObjectiveProgress);
 	DOREPLIFETIME(APRRiftGameState, KilledEnemyCount);
+
+	DOREPLIFETIME(APRRiftGameState, ObjectiveSummaries);
 	DOREPLIFETIME(APRRiftGameState, SettlementData);
 	DOREPLIFETIME(APRRiftGameState, bSettlementReady);
 }
@@ -77,6 +79,11 @@ void APRRiftGameState::SetKilledEnemyCount(const int32 InKilledEnemyCount)
 void APRRiftGameState::IncrementKilledEnemyCount()
 {
 	SetKilledEnemyCount(KilledEnemyCount + 1);
+}
+
+void APRRiftGameState::SetObjectiveSummaries(const TArray<FPRObjectiveSummary>& InObjectiveSummaries)
+{
+	ObjectiveSummaries = InObjectiveSummaries;
 }
 
 void APRRiftGameState::SetSettlementData(const FPRRiftSettlementData& InSettlementData)

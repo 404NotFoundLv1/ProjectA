@@ -12,6 +12,7 @@
 #include "Core/PRGameState.h"
 #include "Core/PRShipLobbyGameMode.h"
 #include "Core/PRRiftGameMode.h"
+#include "Core/PRObjectiveTypeActors.h"
 #include "Core/PRRiftObjectiveActor.h"
 #include "Crafting/PRCraftingStation.h"
 #include "Misc/Crc.h"
@@ -34,6 +35,7 @@
 #include "Items/PRLootTableDataAsset.h"
 #include "Items/PRLootTableLibrary.h"
 #include "Items/PRPickupActor.h"
+#include "Core/PRRiftGameMode.h"
 #include "Items/PRWeaponDataAsset.h"
 #include "Player/PRPlayerState.h"
 #include "ProjectA.h"
@@ -55,6 +57,7 @@
 #include "UI/PRCraftingWidget.h"
 #include "UI/PRWeaponHUDWidget.h"
 #include "UI/PRQuickbarHUDWidget.h"
+#include "UI/PRObjectiveTrackerWidget.h"
 #include "Roles/PRRoleComponent.h"
 #include "Roles/PRRoleDataAsset.h"
 #include "Roles/PRRoleModuleDataAsset.h"
@@ -165,6 +168,7 @@ APRPlayerController::APRPlayerController()
 	InventoryWidgetClass = UPRInventoryWidget::StaticClass();
 	WeaponHUDWidgetClass = UPRWeaponHUDWidget::StaticClass();
 	QuickbarHUDWidgetClass = UPRQuickbarHUDWidget::StaticClass();
+	ObjectiveTrackerWidgetClass = UPRObjectiveTrackerWidget::StaticClass();
 	RiftSettlementWidgetClass = UPRRiftSettlementWidget::StaticClass();
 	ShipRepairWidgetClass = UPRShipRepairWidget::StaticClass();
 	CraftingWidgetClass = UPRCraftingWidget::StaticClass();
@@ -214,6 +218,7 @@ void APRPlayerController::BeginPlay()
 		CreateInventoryUI();
 		CreateWeaponHUD();
 		CreateQuickbarHUD();
+		CreateObjectiveTracker();
 		CreateRiftSettlementUI();
 		CreateShipRepairUI();
 		CreateCraftingUI();
@@ -242,6 +247,7 @@ void APRPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	DestroyInventoryUI();
 	DestroyWeaponHUD();
 	DestroyQuickbarHUD();
+	DestroyObjectiveTracker();
 	DestroyDiagnosticsUI();
 	DestroyLobbyReadyDebugHUD();
 	DestroyGASDebugHUD();
@@ -998,7 +1004,9 @@ APRRiftObjectiveActor* APRPlayerController::FindBestRiftObjectiveCandidate() con
 	for (const FOverlapResult& Overlap : Overlaps)
 	{
 		APRRiftObjectiveActor* ObjectiveActor = Cast<APRRiftObjectiveActor>(Overlap.GetActor());
-		if (!ObjectiveActor || !ObjectiveActor->CanActivateObjective(const_cast<APRPlayerController*>(this)))
+		const bool bCanActivate = ObjectiveActor && ObjectiveActor->CanActivateObjective(const_cast<APRPlayerController*>(this));
+		const bool bCanSubmitCarry = Cast<APRCarryObjectiveActor>(ObjectiveActor) && ObjectiveActor->IsObjectiveActive();
+		if (!ObjectiveActor || (!bCanActivate && !bCanSubmitCarry))
 		{
 			continue;
 		}
@@ -1156,6 +1164,13 @@ bool APRPlayerController::TryPickupOnServer(APRPickupActor* PickupActor)
 			*TransactionResult.Diagnostic);
 		return false;
 	}
+	if (!PickupActor->GetObjectiveNodeId().IsNone())
+	{
+		if (APRRiftGameMode* RiftGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<APRRiftGameMode>() : nullptr)
+		{
+			RiftGameMode->RegisterObjectivePickup(PickupActor->GetObjectiveNodeId(), PickedItem.InstanceGuid);
+		}
+	}
 
 	UE_LOG(
 		LogProjectA,
@@ -1175,6 +1190,33 @@ bool APRPlayerController::TryActivateRiftObjectiveOnServer(APRRiftObjectiveActor
 	{
 		ServerTryActivateRiftObjective(ObjectiveActor);
 		return false;
+	}
+
+	if (APRCarryObjectiveActor* CarryObjective = Cast<APRCarryObjectiveActor>(ObjectiveActor);
+		CarryObjective && CarryObjective->IsObjectiveActive())
+	{
+		APRPlayerState* ProjectRiftPlayerState = GetPlayerState<APRPlayerState>();
+		UPRInventoryComponent* Inventory = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetInventoryComponent() : nullptr;
+		UPRItemTransactionComponent* Transactions = ProjectRiftPlayerState ? ProjectRiftPlayerState->GetItemTransactionComponent() : nullptr;
+		const FPRItemInstance* CoreItem = Inventory ? Inventory->GetItems().FindByPredicate([CarryObjective](const FPRItemInstance& Item)
+		{
+			return CarryObjective->IsTrackedCoreGuid(Item.InstanceGuid);
+		}) : nullptr;
+		if (!CoreItem || !Transactions)
+		{
+			return false;
+		}
+		FPRItemTransactionRequest Request;
+		Request.Header.TransactionId = FGuid::NewGuid();
+		Request.Header.ExpectedRevision = Transactions->GetRevision();
+		Request.Intent = EPRItemTransactionIntent::Use;
+		Request.InstanceGuid = CoreItem->InstanceGuid;
+		Request.Count = 1;
+		if (Transactions->ExecuteAuthoritativeTransaction(Request).Status != EPRItemTransactionStatus::Success)
+		{
+			return false;
+		}
+		return CarryObjective->SubmitTrackedCore(CoreItem->InstanceGuid);
 	}
 
 	FString FailureReason;
@@ -2381,6 +2423,38 @@ void APRPlayerController::DestroyQuickbarHUD()
 	}
 }
 
+void APRPlayerController::CreateObjectiveTracker()
+{
+	if (!IsLocalPlayerController() || ObjectiveTrackerWidget)
+	{
+		return;
+	}
+	if (!ObjectiveTrackerWidgetClass)
+	{
+		ObjectiveTrackerWidgetClass = UPRObjectiveTrackerWidget::StaticClass();
+	}
+	ObjectiveTrackerWidget = CreateWidget<UPRObjectiveTrackerWidget>(this, ObjectiveTrackerWidgetClass);
+	if (!ObjectiveTrackerWidget)
+	{
+		return;
+	}
+	ObjectiveTrackerWidget->InitializeForController(this);
+	ObjectiveTrackerWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+	ObjectiveTrackerWidget->AddToPlayerScreen(25);
+	ObjectiveTrackerWidget->SetPositionInViewport(FVector2D(28.0f, 148.0f), false);
+	ObjectiveTrackerWidget->SetAnchorsInViewport(FAnchors(0.0f, 0.0f));
+	ObjectiveTrackerWidget->SetAlignmentInViewport(FVector2D::ZeroVector);
+}
+
+void APRPlayerController::DestroyObjectiveTracker()
+{
+	if (ObjectiveTrackerWidget)
+	{
+		ObjectiveTrackerWidget->RemoveFromParent();
+		ObjectiveTrackerWidget = nullptr;
+	}
+}
+
 void APRPlayerController::CreateRiftSettlementUI()
 {
 	if (!IsLocalPlayerController() || RiftSettlementWidget)
@@ -2948,6 +3022,15 @@ bool APRPlayerController::CanServerPickup(APRPickupActor* PickupActor, FString* 
 		return Reject(TEXT("pickup item is invalid"));
 	}
 
+	if (!PickupActor->GetObjectiveNodeId().IsNone())
+	{
+		const APRRiftGameMode* RiftGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<APRRiftGameMode>() : nullptr;
+		if (!RiftGameMode || !RiftGameMode->CanRegisterObjectivePickup(PickupActor->GetObjectiveNodeId(), PickedItem.InstanceGuid))
+		{
+			return Reject(TEXT("objective pickup is not active or is already tracked"));
+		}
+	}
+
 	const APawn* ControlledPawn = GetPawn();
 	if (!ControlledPawn)
 	{
@@ -3011,7 +3094,9 @@ bool APRPlayerController::CanServerActivateRiftObjective(APRRiftObjectiveActor* 
 		return Reject(TEXT("objective belongs to a different world"));
 	}
 
-	if (!ObjectiveActor->CanActivateObjective(const_cast<APRPlayerController*>(this)))
+	const bool bCanActivate = ObjectiveActor->CanActivateObjective(const_cast<APRPlayerController*>(this));
+	const bool bCanSubmitCarry = Cast<APRCarryObjectiveActor>(ObjectiveActor) && ObjectiveActor->IsObjectiveActive();
+	if (!bCanActivate && !bCanSubmitCarry)
 	{
 		return Reject(TEXT("objective is not available"));
 	}

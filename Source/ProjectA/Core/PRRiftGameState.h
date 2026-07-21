@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Core/PRGameState.h"
 #include "Core/PRRiftSettlementTypes.h"
+#include "Progression/PRObjectiveGraphTypes.h"
 #include "PRRiftGameState.generated.h"
 
 UENUM(BlueprintType)
@@ -57,6 +58,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Rift|State")
 	int32 GetKilledEnemyCount() const { return KilledEnemyCount; }
 
+	UFUNCTION(BlueprintPure, Category = "Rift|ObjectiveGraph")
+	const TArray<FPRObjectiveSummary>& GetObjectiveSummaries() const { return ObjectiveSummaries; }
+
 	UFUNCTION(BlueprintPure, Category = "Rift|Settlement")
 	bool IsSettlementReady() const { return bSettlementReady; }
 
@@ -95,6 +99,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|State")
 	void IncrementKilledEnemyCount();
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|ObjectiveGraph")
+	void SetObjectiveSummaries(const TArray<FPRObjectiveSummary>& InObjectiveSummaries);
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Settlement")
 	void SetSettlementData(const FPRRiftSettlementData& InSettlementData);
@@ -135,6 +142,9 @@ protected:
 
 	UPROPERTY(ReplicatedUsing = OnRep_KilledEnemyCount, BlueprintReadOnly, Category = "Rift|State")
 	int32 KilledEnemyCount = 0;
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Rift|ObjectiveGraph")
+	TArray<FPRObjectiveSummary> ObjectiveSummaries;
 
 	UPROPERTY(ReplicatedUsing = OnRep_SettlementData, BlueprintReadOnly, Category = "Rift|Settlement")
 	FPRRiftSettlementData SettlementData;

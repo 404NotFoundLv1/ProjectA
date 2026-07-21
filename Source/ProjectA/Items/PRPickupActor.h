@@ -35,6 +35,12 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Pickup|Rewards")
 	void SetRewardSource(const FPRRewardSourceContext& InRewardSource);
 
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Pickup|Objective")
+	void SetObjectiveNodeId(FName InObjectiveNodeId) { ObjectiveNodeId = InObjectiveNodeId; ForceNetUpdate(); }
+
+	UFUNCTION(BlueprintPure, Category = "Pickup|Objective")
+	FName GetObjectiveNodeId() const { return ObjectiveNodeId; }
+
 	UFUNCTION(BlueprintPure, Category = "Pickup")
 	bool CanBePickedUp() const;
 
@@ -95,6 +101,9 @@ private:
 
 	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Pickup|Rewards", meta = (AllowPrivateAccess = "true"))
 	FPRRewardSourceContext RewardSource;
+
+	UPROPERTY(Replicated, EditInstanceOnly, BlueprintReadOnly, Category = "Pickup|Objective", meta = (AllowPrivateAccess = "true"))
+	FName ObjectiveNodeId;
 
 	UPROPERTY(ReplicatedUsing = OnRep_IsPickedUp, VisibleInstanceOnly, BlueprintReadOnly, Category = "Pickup", meta = (AllowPrivateAccess = "true"))
 	bool bIsPickedUp;

@@ -22,6 +22,7 @@
 #include "Items/PRLootTableDataAsset.h"
 #include "Items/PRLootTableLibrary.h"
 #include "Items/PRPickupActor.h"
+#include "Net/UnrealNetwork.h"
 #include "ProjectA.h"
 #include "UI/PREnemyHealthBarWidget.h"
 #include "UObject/ConstructorHelpers.h"
@@ -113,6 +114,7 @@ void APREnemyCharacter::BeginPlay()
 void APREnemyCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(APREnemyCharacter, HuntTargetId);
 }
 
 UAbilitySystemComponent* APREnemyCharacter::GetAbilitySystemComponent() const

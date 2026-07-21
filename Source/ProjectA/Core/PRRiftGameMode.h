@@ -19,6 +19,7 @@ class APRPlayerController;
 class UPRMissionProgressionDataAsset;
 class APRRescueDroneActor;
 class APRCharacter;
+class UPRObjectiveGraphComponent;
 
 /**
  * Server-authoritative rule set for rift missions.
@@ -107,6 +108,20 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Objective")
 	void HandleObjectiveCompleted(APRRiftObjectiveActor* ObjectiveActor);
 
+	UFUNCTION(BlueprintPure, Category = "Rift|ObjectiveGraph")
+	UPRObjectiveGraphComponent* GetObjectiveGraphComponent() const { return ObjectiveGraphComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "Rift|ObjectiveGraph")
+	bool HasObjectiveGraph() const;
+
+	bool CanActivateObjectiveNode(FName NodeId) const;
+	bool ActivateObjectiveNode(APRRiftObjectiveActor* ObjectiveActor, AController* ActivatingController);
+	bool ReportObjectiveNodeProgress(FName NodeId, float NormalizedProgress);
+	bool ReportObjectiveNodeCount(FName NodeId, int32 CurrentCount);
+	/** Validates a graph-bound pickup before its inventory transaction mutates state. */
+	bool CanRegisterObjectivePickup(FName NodeId, FGuid ItemInstanceGuid) const;
+	bool RegisterObjectivePickup(FName NodeId, FGuid ItemInstanceGuid);
+
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Spawning")
 	bool StartSpawnManagersForObjective(APRRiftObjectiveActor* ObjectiveActor);
 
@@ -192,6 +207,13 @@ private:
 	FPRPlayerSettlementReceipt BuildPersonalSettlementReceipt(APRPlayerState* PlayerState, EPRRiftMissionResult Result, const UPRMissionProgressionDataAsset* Mission) const;
 	UPRMissionProgressionDataAsset* ResolveMissionContract() const;
 	void LogFlowPhase(const TCHAR* Phase, const APlayerState* PlayerState = nullptr) const;
+	bool InitializeObjectiveGraph();
+	void RefreshObjectiveGraphReplication();
+	void SynchronizeObjectiveGraphActors();
+	void CacheObjectiveGraphSnapshot();
+	void RestoreObjectiveGraphSnapshot();
+	void UpdateObjectiveItemRecovery();
+	bool IsObjectiveItemAvailable(FGuid ItemInstanceGuid) const;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Rift|Diagnostics")
 	FName MissionId = FName(TEXT("Mission.Rift.Test.Hold"));
@@ -201,6 +223,10 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<APRRiftObjectiveActor> ActiveObjective;
+
+	/** Server-only runtime graph. Clients receive only compact GameState summaries. */
+	UPROPERTY(VisibleAnywhere, Category = "Rift|ObjectiveGraph")
+	TObjectPtr<UPRObjectiveGraphComponent> ObjectiveGraphComponent;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<APRSpawnManager>> SpawnManagers;
@@ -222,6 +248,10 @@ private:
 	TSet<TObjectKey<APlayerState>> ExtractedPlayerStates;
 	TSet<TObjectKey<APREnemyCharacter>> CountedKilledEnemies;
 	TSet<TObjectKey<APRPlayerController>> PendingSettlementAcknowledgements;
+	UPROPERTY(Transient)
+	FPRObjectiveGraphSnapshot ObjectiveGraphSnapshot;
+	TMap<FGuid, float> ObjectiveItemMissingSince;
+	float NextObjectiveItemRecoveryCheckTime = 0.0f;
 	int32 FailedSettlementAcknowledgementCount = 0;
 	float SettlementReturnEarliestTime = 0.0f;
 	float SettlementAcknowledgementDeadline = 0.0f;

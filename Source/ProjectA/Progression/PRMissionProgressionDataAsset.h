@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "Persistence/PRProfileTypes.h"
+#include "Progression/PRObjectiveGraphTypes.h"
 #include "Progression/PRMissionContractTypes.h"
 #include "PRMissionProgressionDataAsset.generated.h"
 
@@ -49,8 +50,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission|Contract")
 	FPRMissionContract Contract;
 
+	/** Optional v0.8.1 graph. Empty preserves legacy single hold-objective maps. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission|Objectives")
+	FPRObjectiveGraphDefinition ObjectiveGraph;
+
 	bool IsContractValid(FString* OutDiagnostic = nullptr) const;
 	bool ValidateMissionContract(FString* OutDiagnostic = nullptr) const;
+	bool ValidateObjectiveGraph(FString* OutDiagnostic = nullptr) const;
+	bool HasObjectiveGraph() const { return !ObjectiveGraph.Nodes.IsEmpty(); }
 	FPRMissionDefinition BuildMissionDefinition(int32 Seed, FString* OutDiagnostic = nullptr) const;
 	bool IsEligible(const FPRProfileStoryProgress& Story) const;
 	bool ApplyCompletion(FPRProfileStoryProgress& Story) const;
