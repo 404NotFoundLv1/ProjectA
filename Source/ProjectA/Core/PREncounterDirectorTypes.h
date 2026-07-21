@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Progression/PRRiftRuleTypes.h"
 #include "PREncounterDirectorTypes.generated.h"
 
 class APREnemyCharacter;
@@ -35,6 +36,7 @@ struct PROJECTA_API FPREncounterScalingSnapshot
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Encounter") bool bAllStandingPlayersLowHealth = false;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Encounter") float RiftStability = 100.0f;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Encounter") float RiskEnemyBudgetMultiplier = 1.0f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Encounter") EPRRiftRiskTier RiskTier = EPRRiftRiskTier::Stable;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Encounter") FName ObjectiveNodeId = NAME_None;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Encounter") FName EncounterRegionId = NAME_None;
 };
@@ -44,10 +46,15 @@ struct PROJECTA_API FPREncounterSpawnEntry
 {
 	GENERATED_BODY()
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter") FName EntryId = NAME_None;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter") FName EnemyDefinitionId = NAME_None;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter") TSubclassOf<APREnemyCharacter> EnemyClass;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter") float ThreatCost = 1.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter") EPREncounterUnitCategory Category = EPREncounterUnitCategory::Melee;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter") float SelectionWeight = 1.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter", meta=(ClampMin="1")) int32 PackSize = 1;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter", meta=(ClampMin="1")) int32 MinimumFrozenPlayerCount = 1;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter", meta=(ClampMin="0")) int32 MaxAlive = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter") EPRRiftRiskTier MinimumRiskTier = EPRRiftRiskTier::Stable;
 };
 
 USTRUCT(BlueprintType)
@@ -64,6 +71,9 @@ struct PROJECTA_API FPREncounterSpawnRequest
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Encounter") int32 DecisionOrdinal = 0;
 	/** Stable mission seed supplied by the server director for reproducible candidate ordering. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Encounter") int32 RunSeed = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Encounter") FName EnemyDefinitionId = NAME_None;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Encounter") bool bSummoned = false;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Encounter") int32 PackSize = 1;
 };
 
 USTRUCT(BlueprintType)

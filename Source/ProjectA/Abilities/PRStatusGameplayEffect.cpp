@@ -111,3 +111,51 @@ FGameplayTag UPRReconRevealGameplayEffect::GetStatusTag() const
 {
 	return ProjectRiftGameplayTags::Status_Debuff_Revealed;
 }
+
+UPRParasitizedStatusGameplayEffect::UPRParasitizedStatusGameplayEffect(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	Period = FScalableFloat(1.0f);
+	bExecutePeriodicEffectOnApplication = true;
+	UTargetTagsGameplayEffectComponent* Tags = ObjectInitializer.CreateDefaultSubobject<UTargetTagsGameplayEffectComponent>(this, TEXT("ParasitizedTags"));
+	FInheritedTagContainer GrantedTags;
+	GrantedTags.Added.AddTag(ProjectRiftGameplayTags::Status_Debuff_Parasitized);
+	Tags->SetAndApplyTargetTagChanges(GrantedTags);
+	GEComponents.Add(Tags);
+	FGameplayModifierInfo EnergyDrain;
+	EnergyDrain.Attribute = UPRAttributeSet::GetEnergyAttribute();
+	EnergyDrain.ModifierOp = EGameplayModOp::Additive;
+	EnergyDrain.ModifierMagnitude = FGameplayEffectModifierMagnitude(FScalableFloat(-6.0f));
+	Modifiers.Add(EnergyDrain);
+	FGameplayModifierInfo Slow;
+	Slow.Attribute = UPRAttributeSet::GetMoveSpeedAttribute();
+	Slow.ModifierOp = EGameplayModOp::Multiplicitive;
+	Slow.ModifierMagnitude = FGameplayEffectModifierMagnitude(FScalableFloat(0.85f));
+	Modifiers.Add(Slow);
+}
+
+FGameplayTag UPRParasitizedStatusGameplayEffect::GetStatusTag() const { return ProjectRiftGameplayTags::Status_Debuff_Parasitized; }
+
+UPRAbilityDisruptedStatusGameplayEffect::UPRAbilityDisruptedStatusGameplayEffect(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	UTargetTagsGameplayEffectComponent* Tags = ObjectInitializer.CreateDefaultSubobject<UTargetTagsGameplayEffectComponent>(this, TEXT("AbilityDisruptedTags"));
+	FInheritedTagContainer GrantedTags;
+	GrantedTags.Added.AddTag(ProjectRiftGameplayTags::State_AbilityDisrupted);
+	Tags->SetAndApplyTargetTagChanges(GrantedTags);
+	GEComponents.Add(Tags);
+}
+
+FGameplayTag UPRAbilityDisruptedStatusGameplayEffect::GetStatusTag() const { return ProjectRiftGameplayTags::State_AbilityDisrupted; }
+
+UPRDisruptionGraceGameplayEffect::UPRDisruptionGraceGameplayEffect(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	UTargetTagsGameplayEffectComponent* Tags = ObjectInitializer.CreateDefaultSubobject<UTargetTagsGameplayEffectComponent>(this, TEXT("DisruptionGraceTags"));
+	FInheritedTagContainer GrantedTags;
+	GrantedTags.Added.AddTag(ProjectRiftGameplayTags::Status_Grace_Disruption);
+	Tags->SetAndApplyTargetTagChanges(GrantedTags);
+	GEComponents.Add(Tags);
+}
+
+FGameplayTag UPRDisruptionGraceGameplayEffect::GetStatusTag() const { return ProjectRiftGameplayTags::Status_Grace_Disruption; }

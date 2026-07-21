@@ -20,6 +20,7 @@ public:
 
 	virtual void BeginPlay() override;
 	virtual void OnPossess(APawn* InPawn) override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaSeconds) override;
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Enemy|AI")
@@ -27,6 +28,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Enemy|AI")
 	APawn* GetCurrentTarget() const { return CurrentTarget.Get(); }
+
+	void RequestMoveToTarget(APRCharacter* Target, float InAcceptanceRadius);
+	void StopForEnemyAction();
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI", meta = (ClampMin = "0.1"))
@@ -40,12 +44,15 @@ protected:
 
 private:
 	void HandleTargetRefresh();
+	void HandleLegacyMeleeTimer();
 	APRCharacter* FindNearestLivingPlayer() const;
 	bool TryAttackCurrentTarget();
 
 	UPROPERTY(Transient)
 	TObjectPtr<APawn> CurrentTarget;
 
+	FTimerHandle TargetRefreshTimer;
+	FTimerHandle LegacyMeleeTimer;
 	float TimeSinceTargetRefresh = 0.0f;
 	float TimeSinceLastMeleeAttack = 0.0f;
 };

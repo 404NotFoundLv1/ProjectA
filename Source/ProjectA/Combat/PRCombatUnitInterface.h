@@ -19,4 +19,6 @@ class PROJECTA_API IPRCombatUnitInterface
 public:
 	virtual bool IsCombatUnitInactive() const = 0;
 	virtual void HandleCombatUnitHealthDepleted(const FGameplayEffectContextHandle& EffectContext) = 0;
+	/** Called only after the shared Damage meta attribute has resolved shield and health loss. */
+	virtual void HandleCombatUnitDamageResolved(AActor* DamageSource, float ResolvedDamage) {}
 };

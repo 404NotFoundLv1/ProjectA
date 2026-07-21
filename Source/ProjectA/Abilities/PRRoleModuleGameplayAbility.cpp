@@ -8,7 +8,10 @@
 #include "GameplayEffect.h"
 #include "Roles/PRRoleModuleDataAsset.h"
 
-UPRRoleModuleGameplayAbility::UPRRoleModuleGameplayAbility() = default;
+UPRRoleModuleGameplayAbility::UPRRoleModuleGameplayAbility()
+{
+	ActivationBlockedTags.AddTag(ProjectRiftGameplayTags::State_AbilityDisrupted);
+}
 
 bool UPRRoleModuleGameplayAbility::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
 	const FGameplayTagContainer* SourceTags, const FGameplayTagContainer* TargetTags,

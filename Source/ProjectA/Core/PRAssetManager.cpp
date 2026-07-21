@@ -10,6 +10,8 @@
 #include "Roles/PRRoleModuleDataAsset.h"
 #include "Ship/PRShipRepairDataAsset.h"
 #include "Crafting/PRCraftingRecipeDataAsset.h"
+#include "Enemies/PREnemyDefinitionDataAsset.h"
+#include "Enemies/PREnemyRosterDataAsset.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Engine/StreamableManager.h"
 #include "Modules/ModuleManager.h"
@@ -106,6 +108,20 @@ FPrimaryAssetId UPRAssetManager::MakeCraftingRecipePrimaryAssetId(const FName Re
 		: FPrimaryAssetId(UPRCraftingRecipeDataAsset::CraftingRecipePrimaryAssetType, RecipeId);
 }
 
+FPrimaryAssetId UPRAssetManager::MakeEnemyPrimaryAssetId(const FName EnemyId)
+{
+	return EnemyId.IsNone()
+		? FPrimaryAssetId()
+		: FPrimaryAssetId(UPREnemyDefinitionDataAsset::EnemyPrimaryAssetType, EnemyId);
+}
+
+FPrimaryAssetId UPRAssetManager::MakeEnemyRosterPrimaryAssetId(const FName RosterId)
+{
+	return RosterId.IsNone()
+		? FPrimaryAssetId()
+		: FPrimaryAssetId(UPREnemyRosterDataAsset::EnemyRosterPrimaryAssetType, RosterId);
+}
+
 void UPRAssetManager::StartInitialLoading()
 {
 	Super::StartInitialLoading();
@@ -137,6 +153,8 @@ void UPRAssetManager::RefreshPrimaryAssetCatalogs()
 	ScanPathsForPrimaryAssets(UPRRoleModuleDataAsset::RoleModulePrimaryAssetType, { TEXT("/Game/ProjectRift/RoleModules") }, UPRRoleModuleDataAsset::StaticClass(), false);
 	ScanPathsForPrimaryAssets(UPRShipRepairDataAsset::ShipRepairPrimaryAssetType, { TEXT("/Game/ProjectRift/ShipRepairs") }, UPRShipRepairDataAsset::StaticClass(), false);
 	ScanPathsForPrimaryAssets(UPRCraftingRecipeDataAsset::CraftingRecipePrimaryAssetType, { TEXT("/Game/ProjectRift/Crafting") }, UPRCraftingRecipeDataAsset::StaticClass(), false);
+	ScanPathsForPrimaryAssets(UPREnemyDefinitionDataAsset::EnemyPrimaryAssetType, { TEXT("/Game/ProjectRift/Enemies/Definitions") }, UPREnemyDefinitionDataAsset::StaticClass(), false);
+	ScanPathsForPrimaryAssets(UPREnemyRosterDataAsset::EnemyRosterPrimaryAssetType, { TEXT("/Game/ProjectRift/Enemies/Rosters") }, UPREnemyRosterDataAsset::StaticClass(), false);
 
 	ValidatePrimaryAssetType(UPRItemDataAsset::ItemPrimaryAssetType);
 	ValidatePrimaryAssetType(UPRAffixDefinitionDataAsset::AffixPrimaryAssetType);
@@ -148,6 +166,8 @@ void UPRAssetManager::RefreshPrimaryAssetCatalogs()
 	ValidatePrimaryAssetType(UPRRoleModuleDataAsset::RoleModulePrimaryAssetType);
 	ValidatePrimaryAssetType(UPRShipRepairDataAsset::ShipRepairPrimaryAssetType);
 	ValidatePrimaryAssetType(UPRCraftingRecipeDataAsset::CraftingRecipePrimaryAssetType);
+	ValidatePrimaryAssetType(UPREnemyDefinitionDataAsset::EnemyPrimaryAssetType);
+	ValidatePrimaryAssetType(UPREnemyRosterDataAsset::EnemyRosterPrimaryAssetType);
 
 	TArray<UPRRoleDataAsset*> Roles;
 	TArray<UPRRoleModuleDataAsset*> RoleModules;
@@ -362,6 +382,49 @@ UPRCraftingRecipeDataAsset* UPRAssetManager::LoadCraftingRecipeSync(const FName 
 	return Cast<UPRCraftingRecipeDataAsset>(LoadPrimaryAssetSync(
 		MakeCraftingRecipePrimaryAssetId(RecipeId),
 		UPRCraftingRecipeDataAsset::StaticClass()));
+}
+
+UPREnemyDefinitionDataAsset* UPRAssetManager::LoadEnemyDefinitionSync(const FName EnemyId)
+{
+	return Cast<UPREnemyDefinitionDataAsset>(LoadPrimaryAssetSync(
+		MakeEnemyPrimaryAssetId(EnemyId),
+		UPREnemyDefinitionDataAsset::StaticClass()));
+}
+
+UPREnemyRosterDataAsset* UPRAssetManager::LoadEnemyRosterSync(const FName RosterId)
+{
+	return Cast<UPREnemyRosterDataAsset>(LoadPrimaryAssetSync(
+		MakeEnemyRosterPrimaryAssetId(RosterId),
+		UPREnemyRosterDataAsset::StaticClass()));
+}
+
+bool UPRAssetManager::LoadEnemyCatalog(
+	TArray<UPREnemyDefinitionDataAsset*>& OutDefinitions,
+	TArray<UPREnemyRosterDataAsset*>& OutRosters)
+{
+	OutDefinitions.Reset();
+	OutRosters.Reset();
+	TArray<FPrimaryAssetId> DefinitionIds;
+	TArray<FPrimaryAssetId> RosterIds;
+	GetPrimaryAssetIdList(UPREnemyDefinitionDataAsset::EnemyPrimaryAssetType, DefinitionIds);
+	GetPrimaryAssetIdList(UPREnemyRosterDataAsset::EnemyRosterPrimaryAssetType, RosterIds);
+	DefinitionIds.Sort([](const FPrimaryAssetId& A, const FPrimaryAssetId& B) { return A.PrimaryAssetName.LexicalLess(B.PrimaryAssetName); });
+	RosterIds.Sort([](const FPrimaryAssetId& A, const FPrimaryAssetId& B) { return A.PrimaryAssetName.LexicalLess(B.PrimaryAssetName); });
+	for (const FPrimaryAssetId& AssetId : DefinitionIds)
+	{
+		if (UPREnemyDefinitionDataAsset* Definition = Cast<UPREnemyDefinitionDataAsset>(LoadPrimaryAssetSync(AssetId, UPREnemyDefinitionDataAsset::StaticClass())))
+		{
+			OutDefinitions.Add(Definition);
+		}
+	}
+	for (const FPrimaryAssetId& AssetId : RosterIds)
+	{
+		if (UPREnemyRosterDataAsset* Roster = Cast<UPREnemyRosterDataAsset>(LoadPrimaryAssetSync(AssetId, UPREnemyRosterDataAsset::StaticClass())))
+		{
+			OutRosters.Add(Roster);
+		}
+	}
+	return !OutDefinitions.IsEmpty() && !OutRosters.IsEmpty();
 }
 
 bool UPRAssetManager::LoadCraftingRecipeCatalog(TArray<UPRCraftingRecipeDataAsset*>& OutCatalog)

@@ -11,6 +11,9 @@ class UGameplayAbility;
 class UPRAbilitySystemComponent;
 class UPRAttributeSet;
 class UPRCombatFeedbackComponent;
+class UPREnemyDefinitionDataAsset;
+class UPREnemyBehaviorComponent;
+class UPREnemyThreatComponent;
 class UPRLootTableDataAsset;
 class UWidgetComponent;
 struct FOnAttributeChangeData;
@@ -32,6 +35,7 @@ public:
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual bool IsCombatUnitInactive() const override;
 	virtual void HandleCombatUnitHealthDepleted(const FGameplayEffectContextHandle& EffectContext) override;
+	virtual void HandleCombatUnitDamageResolved(AActor* DamageSource, float ResolvedDamage) override;
 
 	UFUNCTION(BlueprintPure, Category = "Enemy|GAS")
 	UPRAbilitySystemComponent* GetProjectRiftAbilitySystemComponent() const { return AbilitySystemComponent; }
@@ -72,6 +76,20 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Enemy|Scaling")
 	void SetSpawnAttackPowerMultiplier(float InMultiplier);
 
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Enemy|Definition")
+	bool SetEnemyDefinition(UPREnemyDefinitionDataAsset* InDefinition);
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|Definition")
+	FName GetEnemyDefinitionId() const { return EnemyDefinitionId; }
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|Definition")
+	bool IsStatusImmune(FGameplayTag StatusTag) const;
+	bool IsHeavyHitReactionsOnly() const;
+
+	UPREnemyDefinitionDataAsset* GetEnemyDefinition() const { return EnemyDefinition; }
+	UPREnemyThreatComponent* GetEnemyThreatComponent() const { return EnemyThreatComponent; }
+	UPREnemyBehaviorComponent* GetEnemyBehaviorComponent() const { return EnemyBehaviorComponent; }
+
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Enemy|Objective")
 	void SetHuntTargetId(FName InHuntTargetId) { HuntTargetId = InHuntTargetId; }
 
@@ -89,6 +107,8 @@ protected:
 	void HandleHitStaggeredTagChanged(const FGameplayTag StatusTag, int32 NewCount);
 	void HandleDeadTagChanged(const FGameplayTag StatusTag, int32 NewCount);
 	void RefreshMovementFromAttributes();
+	UFUNCTION() void OnRep_EnemyDefinitionId();
+	void ResolveEnemyDefinitionFromId();
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Visual")
 	TObjectPtr<UWidgetComponent> EnemyHealthBarWidget;
@@ -101,6 +121,12 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Combat|Feedback")
 	TObjectPtr<UPRCombatFeedbackComponent> CombatFeedbackComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|AI")
+	TObjectPtr<UPREnemyThreatComponent> EnemyThreatComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|AI")
+	TObjectPtr<UPREnemyBehaviorComponent> EnemyBehaviorComponent;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|State", meta = (ClampMin = "1.0"))
 	float MaxHealth = 50.0f;
@@ -138,6 +164,12 @@ protected:
 
 	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Enemy|Objective")
 	FName HuntTargetId;
+
+	UPROPERTY(ReplicatedUsing=OnRep_EnemyDefinitionId, VisibleInstanceOnly, BlueprintReadOnly, Category = "Enemy|Definition")
+	FName EnemyDefinitionId;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPREnemyDefinitionDataAsset> EnemyDefinition;
 
 private:
 	UPROPERTY(Transient)

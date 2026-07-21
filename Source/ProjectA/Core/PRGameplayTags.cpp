@@ -36,6 +36,8 @@ namespace ProjectRiftGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Debuff_Polluted, "Status.Debuff.Polluted", "Pollution damage over time is active");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Debuff_Slowed, "Status.Debuff.Slowed", "Movement slow is active");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Debuff_Revealed, "Status.Debuff.Revealed", "Recon scan is revealing an enemy");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Debuff_Parasitized, "Status.Debuff.Parasitized", "Parasite is draining energy and slowing the target");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Grace_Disruption, "Status.Grace.Disruption", "Prevents repeated ability disruption");
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Ability_Enemy_Melee, "Event.Ability.Enemy.Melee", "Requests an enemy melee attack");
 
@@ -50,6 +52,7 @@ namespace ProjectRiftGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_BeingRevived, "State.BeingRevived", "Player is receiving a revive");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_UsingItem, "State.UsingItem", "Player is channeling a quickbar item");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Enemy_Elite, "State.Enemy.Elite", "Enemy spawned as a mission elite reinforcement");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_AbilityDisrupted, "State.AbilityDisrupted", "Role module inputs are temporarily blocked");
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Mission_Modifier_LowGravity, "Mission.Modifier.LowGravity", "Rift low-gravity mission rule is active");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Mission_Modifier_ShieldInterference, "Mission.Modifier.ShieldInterference", "Rift shield interference mission rule is active");

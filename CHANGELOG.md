@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.4] - 2026-07-22
+
+- Added a data-driven twelve-enemy roster (eight regulars and four elites), each with a concrete ProjectRift child Blueprint, authoritative attributes, threat cost, action timings, status payloads and placeholder identity color.
+- Added timer-driven enemy behavior, PlayerArray-based threat targeting, burst/exploder/support/summon/disrupt actions, action interruption, summon accounting and definition-based loot ownership.
+- Bound the rift spawn manager to the new roster and made elite reinforcement requests select genuine elite definitions rather than relabel regular enemies.
+- Added enemy-only temporary shields, parasite energy drain, role-module-only ability disruption and disruption anti-repeat grace while preserving the shared GAS damage path and profile format.
+
 ## [0.8.3] - 2026-07-21
 
 - Added the server-authoritative Encounter Director, frozen-party threat budgets, pressure/cooldown/respite pacing and deterministic decision telemetry.

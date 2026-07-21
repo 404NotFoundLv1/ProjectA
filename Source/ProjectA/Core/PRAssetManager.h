@@ -14,6 +14,8 @@ class UPRRoleDataAsset;
 class UPRRoleModuleDataAsset;
 class UPRShipRepairDataAsset;
 class UPRCraftingRecipeDataAsset;
+class UPREnemyDefinitionDataAsset;
+class UPREnemyRosterDataAsset;
 struct FStreamableHandle;
 
 DECLARE_DELEGATE_OneParam(FPRItemDataLoadComplete, UPRItemDataAsset*);
@@ -36,6 +38,8 @@ public:
 	static FPrimaryAssetId MakeRoleModulePrimaryAssetId(FName ModuleId);
 	static FPrimaryAssetId MakeShipRepairPrimaryAssetId(FName RepairProjectId);
 	static FPrimaryAssetId MakeCraftingRecipePrimaryAssetId(FName RecipeId);
+	static FPrimaryAssetId MakeEnemyPrimaryAssetId(FName EnemyId);
+	static FPrimaryAssetId MakeEnemyRosterPrimaryAssetId(FName RosterId);
 
 	virtual void StartInitialLoading() override;
 
@@ -56,6 +60,9 @@ public:
 	bool LoadShipRepairCatalog(TArray<UPRShipRepairDataAsset*>& OutCatalog);
 	UPRCraftingRecipeDataAsset* LoadCraftingRecipeSync(FName RecipeId);
 	bool LoadCraftingRecipeCatalog(TArray<UPRCraftingRecipeDataAsset*>& OutCatalog);
+	UPREnemyDefinitionDataAsset* LoadEnemyDefinitionSync(FName EnemyId);
+	UPREnemyRosterDataAsset* LoadEnemyRosterSync(FName RosterId);
+	bool LoadEnemyCatalog(TArray<UPREnemyDefinitionDataAsset*>& OutDefinitions, TArray<UPREnemyRosterDataAsset*>& OutRosters);
 	TSharedPtr<FStreamableHandle> LoadItemDataAsync(FName ItemId, FPRItemDataLoadComplete Completion);
 	TSharedPtr<FStreamableHandle> LoadLootTableAsync(FName AssetName, FPRLootTableLoadComplete Completion);
 

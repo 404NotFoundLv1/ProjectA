@@ -8,6 +8,7 @@
 class APREnemySpawnPoint;
 class APRRiftObjectiveActor;
 class APREncounterExclusionVolume;
+class UPREnemyRosterDataAsset;
 
 /**
  * Server-authoritative wave spawner for rift objectives.
@@ -62,15 +63,19 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Rift|Encounter") FName GetEncounterRegionId() const { return EncounterRegionId; }
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Encounter") int32 ExecuteEncounterSpawnRequest(const FPREncounterSpawnRequest& Request);
+	/** Server-only helper used by the Summoner action. Summons use the same caps and threat accounting as director spawns. */
+	int32 SpawnSummonedEnemies(FName DefinitionId, int32 RequestedCount);
 	UFUNCTION(BlueprintPure, Category = "Rift|Encounter") float GetAliveEncounterThreat() const;
 	UFUNCTION(BlueprintPure, Category = "Rift|Encounter") int32 GetAliveEncounterCategoryCount(EPREncounterUnitCategory Category) const;
-	const TArray<FPREncounterSpawnEntry>& GetEncounterSpawnEntries() const { return EncounterSpawnEntries; }
+	UFUNCTION(BlueprintPure, Category = "Rift|Encounter") int32 GetAliveEnemyDefinitionCount(FName EnemyDefinitionId) const;
+	const TArray<FPREncounterSpawnEntry>& GetEncounterSpawnEntries() const;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Spawning")
 	TSubclassOf<AActor> SpawnedEnemyClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Encounter") FName EncounterRegionId = FName(TEXT("Region.Default"));
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Encounter") TObjectPtr<UPREnemyRosterDataAsset> EnemyRoster;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Encounter") TArray<FPREncounterSpawnEntry> EncounterSpawnEntries;
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Rift|Spawning")
@@ -82,7 +87,9 @@ protected:
 private:
 	void HandleWaveTimerElapsed();
 	void PruneDeadEnemies() const;
+	void BuildRuntimeRosterEntries();
 	bool ChooseEncounterSpawnTransform(const FPREncounterSpawnRequest& Request, FTransform& OutTransform, FString& OutRejectionReason) const;
+	const struct FPREnemyRosterEntry* FindRosterEntry(FName DefinitionId) const;
 
 	UFUNCTION()
 	void HandleSpawnedActorDestroyed(AActor* DestroyedActor);
@@ -95,6 +102,7 @@ private:
 
 	UPROPERTY(Transient)
 	mutable TArray<TObjectPtr<AActor>> AliveEnemies;
+	UPROPERTY(Transient) TArray<FPREncounterSpawnEntry> RuntimeRosterSpawnEntries;
 	TMap<TWeakObjectPtr<AActor>, FPREncounterSpawnRequest> EncounterUnits;
 	UPROPERTY(Transient) TArray<TObjectPtr<APREncounterExclusionVolume>> EncounterExclusionVolumes;
 

@@ -2,8 +2,10 @@
 
 #include "Characters/PRCharacter.h"
 #include "Enemies/PREnemyCharacter.h"
-#include "EngineUtils.h"
 #include "Engine/World.h"
+#include "GameFramework/GameStateBase.h"
+#include "GameFramework/PlayerState.h"
+#include "TimerManager.h"
 
 APREnemyAIController::APREnemyAIController()
 {
@@ -19,27 +21,32 @@ void APREnemyAIController::BeginPlay()
 void APREnemyAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
-	RefreshTarget();
+	// Defined enemies are driven by UPREnemyBehaviorComponent timers. The
+	// legacy no-definition path remains tick-driven only for backward-compatible placed enemies.
+}
+
+void APREnemyAIController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	GetWorldTimerManager().ClearTimer(TargetRefreshTimer);
+	GetWorldTimerManager().ClearTimer(LegacyMeleeTimer);
+	Super::EndPlay(EndPlayReason);
 }
 
 void APREnemyAIController::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-
-	if (!HasAuthority())
+	const APREnemyCharacter* Enemy = Cast<APREnemyCharacter>(GetPawn());
+	if (!HasAuthority() || !Enemy || Enemy->GetEnemyDefinition())
 	{
 		return;
 	}
-
 	TimeSinceTargetRefresh += DeltaSeconds;
 	TimeSinceLastMeleeAttack += DeltaSeconds;
-
 	if (TimeSinceTargetRefresh >= FMath::Max(0.1f, TargetRefreshInterval))
 	{
 		TimeSinceTargetRefresh = 0.0f;
 		RefreshTarget();
 	}
-
 	if (TimeSinceLastMeleeAttack >= FMath::Max(0.1f, MeleeAttackInterval))
 	{
 		TimeSinceLastMeleeAttack = 0.0f;
@@ -62,13 +69,43 @@ bool APREnemyAIController::RefreshTarget()
 		return false;
 	}
 
-	MoveToActor(NewTarget, AcceptanceRadius, true, true, true, nullptr, true);
+	RequestMoveToTarget(NewTarget, AcceptanceRadius);
 	return true;
+}
+
+void APREnemyAIController::RequestMoveToTarget(APRCharacter* Target, const float InAcceptanceRadius)
+{
+	if (!HasAuthority() || !Target || !Target->IsAlive())
+	{
+		StopMovement();
+		return;
+	}
+	CurrentTarget = Target;
+	MoveToActor(Target, FMath::Max(0.0f, InAcceptanceRadius), true, true, true, nullptr, true);
+}
+
+void APREnemyAIController::StopForEnemyAction()
+{
+	StopMovement();
 }
 
 void APREnemyAIController::HandleTargetRefresh()
 {
+	if (const APREnemyCharacter* Enemy = Cast<APREnemyCharacter>(GetPawn()))
+	{
+		// Definitions are driven by UPREnemyBehaviorComponent. This fallback only
+		// preserves movement for legacy placed enemies without a definition.
+		if (Enemy->GetEnemyDefinition())
+		{
+			return;
+		}
+	}
 	RefreshTarget();
+}
+
+void APREnemyAIController::HandleLegacyMeleeTimer()
+{
+	TryAttackCurrentTarget();
 }
 
 bool APREnemyAIController::TryAttackCurrentTarget()
@@ -77,19 +114,16 @@ bool APREnemyAIController::TryAttackCurrentTarget()
 	{
 		return false;
 	}
-
-	APREnemyCharacter* EnemyPawn = Cast<APREnemyCharacter>(GetPawn());
-	if (!EnemyPawn || EnemyPawn->IsDead())
+	APREnemyCharacter* Enemy = Cast<APREnemyCharacter>(GetPawn());
+	if (!Enemy || Enemy->IsDead() || Enemy->GetEnemyDefinition())
 	{
 		return false;
 	}
-
 	if (!IsValid(CurrentTarget.Get()))
 	{
 		RefreshTarget();
 	}
-
-	return EnemyPawn->TryMeleeAttack(CurrentTarget.Get());
+	return Enemy->TryMeleeAttack(CurrentTarget.Get());
 }
 
 APRCharacter* APREnemyAIController::FindNearestLivingPlayer() const
@@ -105,9 +139,14 @@ APRCharacter* APREnemyAIController::FindNearestLivingPlayer() const
 	float BestDistanceSquared = TNumericLimits<float>::Max();
 	const FVector Origin = ControlledPawn->GetActorLocation();
 
-	for (TActorIterator<APRCharacter> CharacterIt(World); CharacterIt; ++CharacterIt)
+	const AGameStateBase* GameState = World->GetGameState();
+	if (!GameState)
 	{
-		APRCharacter* Candidate = *CharacterIt;
+		return nullptr;
+	}
+	for (const TObjectPtr<APlayerState>& CandidatePlayerState : GameState->PlayerArray)
+	{
+		APRCharacter* Candidate = CandidatePlayerState ? Cast<APRCharacter>(CandidatePlayerState->GetPawn()) : nullptr;
 		if (!Candidate || !Candidate->IsAlive())
 		{
 			continue;

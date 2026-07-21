@@ -187,6 +187,14 @@ void UPRAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 			SetHealth(FMath::Clamp(OldHealth - DamageToHealth, 0.0f, GetMaxHealth()));
 		}
 
+		const float TotalResolvedDamage = DamageAbsorbedByShield + FMath::Min(DamageToHealth, OldHealth);
+		if (IPRCombatUnitInterface* CombatUnit = Cast<IPRCombatUnitInterface>(Data.Target.GetAvatarActor()))
+		{
+			CombatUnit->HandleCombatUnitDamageResolved(
+				Data.EffectSpec.GetEffectContext().GetOriginalInstigator(),
+				TotalResolvedDamage);
+		}
+
 		FPRDamageRequest DamageRequest;
 		if (DecodeStructuredDamageRequest(Data.EffectSpec, DamageRequest))
 		{

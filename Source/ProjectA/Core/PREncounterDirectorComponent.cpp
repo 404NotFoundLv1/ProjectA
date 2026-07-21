@@ -181,6 +181,7 @@ FPREncounterScalingSnapshot UPREncounterDirectorComponent::BuildScalingSnapshot(
 	{
 		Scaling.RiftStability = GameState->GetRiftStability();
 		Scaling.RiskEnemyBudgetMultiplier = FMath::Max(0.0f, GameState->GetRiftRiskSnapshot().EnemyBudgetMultiplier);
+		Scaling.RiskTier = GameState->GetRiftRiskSnapshot().CurrentTier;
 		float StandingHealthTotal = 0.0f;
 		int32 StandingPlayerCount = 0;
 		for (APlayerState* PlayerState : GameState->PlayerArray)
@@ -280,13 +281,24 @@ FPREncounterSpawnRequest UPREncounterDirectorComponent::BuildBasicRequest(const 
 	Request.DecisionOrdinal = DecisionOrdinal;
 	Request.RunSeed = RunSeed;
 	const TArray<FPREncounterSpawnEntry>& Entries = Manager->GetEncounterSpawnEntries();
+	const APRRiftGameMode* GameMode = Cast<APRRiftGameMode>(GetOwner());
+	const bool bEliteReinforcements = GameMode && GameMode->GetRiftRuleComponent()
+		&& GameMode->GetRiftRuleComponent()->HasModifier(TEXT("Modifier.EliteReinforcements"));
 	if (!Entries.IsEmpty())
 	{
 		TArray<const FPREncounterSpawnEntry*> SortedEntries;
 		const float RemainingThreat = CalculateTargetThreatBudget(Scaling) - GetAliveThreat();
 		for (const FPREncounterSpawnEntry& Entry : Entries)
 		{
-			if (Entry.EnemyClass && Entry.ThreatCost > 0.0f && Entry.ThreatCost <= RemainingThreat && Entry.SelectionWeight > 0.0f && CanSpawnCategory(Entry.Category, Scaling)) SortedEntries.Add(&Entry);
+			if (Entry.EnemyClass && Entry.ThreatCost > 0.0f && Entry.ThreatCost <= RemainingThreat
+				&& Entry.SelectionWeight > 0.0f && Scaling.FrozenPlayerCount >= Entry.MinimumFrozenPlayerCount
+				&& static_cast<uint8>(Scaling.RiskTier) >= static_cast<uint8>(Entry.MinimumRiskTier)
+				&& (Entry.MaxAlive <= 0 || Manager->GetAliveEnemyDefinitionCount(Entry.EnemyDefinitionId) < Entry.MaxAlive)
+				&& CanSpawnCategory(Entry.Category, Scaling)
+				&& (Entry.Category != EPREncounterUnitCategory::Elite || bEliteReinforcements))
+			{
+				SortedEntries.Add(&Entry);
+			}
 		}
 		SortedEntries.Sort([](const FPREncounterSpawnEntry& Left, const FPREncounterSpawnEntry& Right) { return Left.EntryId.LexicalLess(Right.EntryId); });
 		if (!SortedEntries.IsEmpty())
@@ -298,13 +310,8 @@ FPREncounterSpawnRequest UPREncounterDirectorComponent::BuildBasicRequest(const 
 			const FPREncounterSpawnEntry* Selected = SortedEntries.Last();
 			for (const FPREncounterSpawnEntry* Entry : SortedEntries) { Pick -= Entry->SelectionWeight; if (Pick <= 0.0f) { Selected = Entry; break; } }
 			const FPREncounterSpawnEntry& Entry = *Selected;
-			Request.EntryId = Entry.EntryId; Request.EnemyClass = Entry.EnemyClass; Request.Category = Entry.Category; Request.ThreatCost = Entry.ThreatCost;
+			Request.EntryId = Entry.EntryId; Request.EnemyDefinitionId = Entry.EnemyDefinitionId; Request.EnemyClass = Entry.EnemyClass; Request.Category = Entry.Category; Request.ThreatCost = Entry.ThreatCost; Request.PackSize = Entry.PackSize;
 		}
-	}
-	const APRRiftGameMode* GameMode = Cast<APRRiftGameMode>(GetOwner());
-	if (GameMode && GameMode->GetRiftRuleComponent() && GameMode->GetRiftRuleComponent()->HasModifier(TEXT("Modifier.EliteReinforcements")) && CanSpawnCategory(EPREncounterUnitCategory::Elite, Scaling) && CalculateTargetThreatBudget(Scaling) - GetAliveThreat() >= 3.0f)
-	{
-		Request.bElite = true; Request.Category = EPREncounterUnitCategory::Elite; Request.ThreatCost = 3.0f;
 	}
 	return Request;
 }

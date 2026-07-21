@@ -10,6 +10,7 @@
 #include "Core/PRObjectiveGraphComponent.h"
 #include "Core/PRRiftObjectiveActor.h"
 #include "Enemies/PREnemyCharacter.h"
+#include "Enemies/PREnemyRosterDataAsset.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "NavigationSystem.h"
@@ -44,6 +45,7 @@ void APRSpawnManager::BeginPlay()
 
 	if (HasAuthority())
 	{
+		BuildRuntimeRosterEntries();
 		DiscoverSpawnPoints();
 	}
 }
@@ -172,11 +174,39 @@ int32 APRSpawnManager::ExecuteEncounterSpawnRequest(const FPREncounterSpawnReque
 	{
 		return 0;
 	}
+	if (Request.PackSize > 1)
+	{
+		FPREncounterSpawnRequest SingleRequest = Request;
+		SingleRequest.PackSize = 1;
+		int32 Spawned = 0;
+		for (int32 Index = 0; Index < Request.PackSize && GetAliveEnemyCount() < GetMaxAliveEnemiesForScaling(); ++Index)
+		{
+			Spawned += ExecuteEncounterSpawnRequest(SingleRequest);
+		}
+		return Spawned;
+	}
+	FPREncounterSpawnRequest ResolvedRequest = Request;
+	const FName RequestedDefinitionId = !Request.EnemyDefinitionId.IsNone() ? Request.EnemyDefinitionId : Request.EntryId;
+	const FPREnemyRosterEntry* RosterEntry = FindRosterEntry(RequestedDefinitionId);
+	if (!Request.EnemyDefinitionId.IsNone() && !RosterEntry)
+	{
+		UE_LOG(LogProjectA, Warning, TEXT("Encounter spawn rejected unknown enemy definition '%s'."), *Request.EnemyDefinitionId.ToString());
+		return 0;
+	}
+	if (RosterEntry && RosterEntry->Definition)
+	{
+		ResolvedRequest.EnemyDefinitionId = RosterEntry->Definition->EnemyId;
+		ResolvedRequest.EntryId = RosterEntry->Definition->EnemyId;
+		ResolvedRequest.ThreatCost = RosterEntry->Definition->ThreatCost;
+		ResolvedRequest.Category = RosterEntry->Definition->EncounterCategory;
+		ResolvedRequest.bElite = RosterEntry->Definition->Tier == EPREnemyTier::Elite;
+	}
 	UWorld* World = GetWorld();
-	UClass* EnemyClass = Request.EnemyClass ? Request.EnemyClass.Get() : (SpawnedEnemyClass ? SpawnedEnemyClass.Get() : APREnemyCharacter::StaticClass());
+	UClass* EnemyClass = RosterEntry && RosterEntry->EnemyClass ? RosterEntry->EnemyClass.Get()
+		: (Request.EnemyClass ? Request.EnemyClass.Get() : (SpawnedEnemyClass ? SpawnedEnemyClass.Get() : APREnemyCharacter::StaticClass()));
 	FTransform SpawnTransform;
 	FString RejectionReason;
-	if (!World || !EnemyClass || !ChooseEncounterSpawnTransform(Request, SpawnTransform, RejectionReason))
+	if (!World || !EnemyClass || !ChooseEncounterSpawnTransform(ResolvedRequest, SpawnTransform, RejectionReason))
 	{
 		return 0;
 	}
@@ -184,10 +214,15 @@ int32 APRSpawnManager::ExecuteEncounterSpawnRequest(const FPREncounterSpawnReque
 	if (!SpawnedActor) return 0;
 	if (APREnemyCharacter* Enemy = Cast<APREnemyCharacter>(SpawnedActor))
 	{
+		if (RosterEntry && !Enemy->SetEnemyDefinition(RosterEntry->Definition))
+		{
+			SpawnedActor->Destroy();
+			return 0;
+		}
 		Enemy->SetSpawnHealthMultiplier(GetEnemyHealthMultiplierForScaling());
 		if (APRRiftGameMode* RiftGameMode = World->GetAuthGameMode<APRRiftGameMode>())
 		{
-			if (Request.bElite && RiftGameMode->GetRiftRuleComponent())
+			if (ResolvedRequest.bElite && RiftGameMode->GetRiftRuleComponent())
 			{
 				const FPRMissionRuleSnapshot Rules = RiftGameMode->GetRiftRuleComponent()->GetRuleSnapshot();
 				Enemy->SetSpawnHealthMultiplier(GetEnemyHealthMultiplierForScaling() * Rules.EliteHealthMultiplier);
@@ -205,16 +240,93 @@ int32 APRSpawnManager::ExecuteEncounterSpawnRequest(const FPREncounterSpawnReque
 	{
 		if (APRRiftGameMode* RiftGameMode = World->GetAuthGameMode<APRRiftGameMode>())
 			if (UPRRiftRuleComponent* Rules = RiftGameMode->GetRiftRuleComponent()) Rules->ApplyRulesToEnemy(Enemy);
-		if (Request.bElite)
+		if (ResolvedRequest.bElite)
 			if (UPRAbilitySystemComponent* AbilitySystem = Enemy->GetProjectRiftAbilitySystemComponent()) AbilitySystem->AddLooseGameplayTag(ProjectRiftGameplayTags::State_Enemy_Elite);
 	}
 	SpawnedActor->SetReplicates(true);
 	SpawnedActor->SetReplicateMovement(true);
 	SpawnedActor->OnDestroyed.AddDynamic(this, &APRSpawnManager::HandleSpawnedActorDestroyed);
 	AliveEnemies.Add(SpawnedActor);
-	EncounterUnits.Add(SpawnedActor, Request);
+	EncounterUnits.Add(SpawnedActor, ResolvedRequest);
 	++SpawnedWaveCount;
 	return 1;
+}
+
+const TArray<FPREncounterSpawnEntry>& APRSpawnManager::GetEncounterSpawnEntries() const
+{
+	return RuntimeRosterSpawnEntries.IsEmpty() ? EncounterSpawnEntries : RuntimeRosterSpawnEntries;
+}
+
+void APRSpawnManager::BuildRuntimeRosterEntries()
+{
+	RuntimeRosterSpawnEntries.Reset();
+	if (!EnemyRoster)
+	{
+		return;
+	}
+	FString Diagnostic;
+	if (!EnemyRoster->ValidateRoster(Diagnostic))
+	{
+		UE_LOG(LogProjectA, Error, TEXT("Enemy roster '%s' rejected: %s"), *GetNameSafe(EnemyRoster), *Diagnostic);
+		return;
+	}
+	for (const FPREnemyRosterEntry& Entry : EnemyRoster->Entries)
+	{
+		FPREncounterSpawnEntry& RuntimeEntry = RuntimeRosterSpawnEntries.AddDefaulted_GetRef();
+		RuntimeEntry.EntryId = Entry.Definition->EnemyId;
+		RuntimeEntry.EnemyDefinitionId = Entry.Definition->EnemyId;
+		RuntimeEntry.EnemyClass = Entry.EnemyClass;
+		RuntimeEntry.ThreatCost = Entry.Definition->ThreatCost;
+		RuntimeEntry.Category = Entry.Definition->EncounterCategory;
+		RuntimeEntry.SelectionWeight = Entry.SelectionWeight;
+		RuntimeEntry.PackSize = Entry.PackSize;
+		RuntimeEntry.MinimumFrozenPlayerCount = Entry.MinimumFrozenPlayerCount;
+		RuntimeEntry.MaxAlive = Entry.MaxAlive;
+		RuntimeEntry.MinimumRiskTier = Entry.MinimumRiskTier;
+	}
+}
+
+const FPREnemyRosterEntry* APRSpawnManager::FindRosterEntry(const FName DefinitionId) const
+{
+	if (!EnemyRoster || DefinitionId.IsNone())
+	{
+		return nullptr;
+	}
+	for (const FPREnemyRosterEntry& Entry : EnemyRoster->Entries)
+	{
+		if (Entry.Definition && Entry.Definition->EnemyId == DefinitionId)
+		{
+			return &Entry;
+		}
+	}
+	return nullptr;
+}
+
+int32 APRSpawnManager::SpawnSummonedEnemies(const FName DefinitionId, const int32 RequestedCount)
+{
+	if (!HasAuthority() || DefinitionId.IsNone() || RequestedCount <= 0)
+	{
+		return 0;
+	}
+	int32 ExistingSummons = 0;
+	for (const TPair<TWeakObjectPtr<AActor>, FPREncounterSpawnRequest>& Pair : EncounterUnits)
+	{
+		if (Pair.Key.IsValid() && Pair.Value.bSummoned) ++ExistingSummons;
+	}
+	int32 Spawned = 0;
+	for (int32 Index = 0; Index < FMath::Min3(RequestedCount, 6 - ExistingSummons, 6); ++Index)
+	{
+		if (GetAliveEnemyCount() >= GetMaxAliveEnemiesForScaling()) break;
+		FPREncounterSpawnRequest Request;
+		Request.EntryId = DefinitionId;
+		Request.EnemyDefinitionId = DefinitionId;
+		Request.ThreatCost = 0.5f;
+		Request.Category = EPREncounterUnitCategory::Melee;
+		Request.bSummoned = true;
+		Request.ObjectiveNodeId = ActiveObjective ? ActiveObjective->GetObjectiveNodeId() : NAME_None;
+		Spawned += ExecuteEncounterSpawnRequest(Request);
+	}
+	return Spawned;
 }
 
 float APRSpawnManager::GetAliveEncounterThreat() const
@@ -229,6 +341,23 @@ int32 APRSpawnManager::GetAliveEncounterCategoryCount(const EPREncounterUnitCate
 {
 	int32 Count = 0;
 	for (const TPair<TWeakObjectPtr<AActor>, FPREncounterSpawnRequest>& Pair : EncounterUnits) if (Pair.Key.IsValid() && Pair.Value.Category == Category) ++Count;
+	return Count;
+}
+
+int32 APRSpawnManager::GetAliveEnemyDefinitionCount(const FName EnemyDefinitionId) const
+{
+	if (EnemyDefinitionId.IsNone())
+	{
+		return 0;
+	}
+	int32 Count = 0;
+	for (const TPair<TWeakObjectPtr<AActor>, FPREncounterSpawnRequest>& Pair : EncounterUnits)
+	{
+		if (Pair.Key.IsValid() && (Pair.Value.EnemyDefinitionId == EnemyDefinitionId || Pair.Value.EntryId == EnemyDefinitionId))
+		{
+			++Count;
+		}
+	}
 	return Count;
 }
 

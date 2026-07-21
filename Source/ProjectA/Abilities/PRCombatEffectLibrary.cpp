@@ -4,6 +4,8 @@
 #include "Abilities/PRHitStaggerGameplayEffect.h"
 #include "Abilities/PRRoleModuleGameplayEffects.h"
 #include "Abilities/PRStatusGameplayEffect.h"
+#include "Abilities/PRTemporaryShieldGameplayEffect.h"
+#include "Abilities/PREnemyTemporaryShieldGameplayEffect.h"
 #include "Abilities/PRAttributeSet.h"
 #include "AbilitySystemComponent.h"
 #include "Characters/PRCharacter.h"
@@ -383,6 +385,34 @@ bool UPRCombatEffectLibrary::ApplyShieldGeneratorAuraToTarget(
 	return true;
 }
 
+bool UPRCombatEffectLibrary::ApplyEnemyTemporaryShieldToTarget(
+	UAbilitySystemComponent* SourceAbilitySystem,
+	UAbilitySystemComponent* TargetAbilitySystem,
+	const float ShieldAmount,
+	const float DurationSeconds,
+	UObject* SourceObject)
+{
+	if (!HasAuthoritativeActorInfo(SourceAbilitySystem) || !HasAuthoritativeActorInfo(TargetAbilitySystem)
+		|| !FMath::IsFinite(ShieldAmount) || ShieldAmount <= 0.0f
+		|| !FMath::IsFinite(DurationSeconds) || DurationSeconds <= 0.0f)
+	{
+		return false;
+	}
+	const APREnemyCharacter* SourceEnemy = Cast<APREnemyCharacter>(SourceAbilitySystem->GetAvatarActor());
+	const APREnemyCharacter* TargetEnemy = Cast<APREnemyCharacter>(TargetAbilitySystem->GetAvatarActor());
+	if (!SourceEnemy || !TargetEnemy || SourceEnemy->IsDead() || TargetEnemy->IsDead())
+	{
+		return false;
+	}
+	FGameplayEffectSpecHandle Spec = SourceAbilitySystem->MakeOutgoingSpec(UPREnemyTemporaryShieldGameplayEffect::StaticClass(), 1.0f,
+		MakeCombatEffectContext(SourceAbilitySystem, TargetAbilitySystem, SourceObject));
+	if (!Spec.IsValid()) return false;
+	Spec.Data->SetDuration(DurationSeconds, true);
+	Spec.Data->SetSetByCallerMagnitude(ProjectRiftGameplayTags::Data_Status_Magnitude, ShieldAmount);
+	SourceAbilitySystem->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), TargetAbilitySystem);
+	return true;
+}
+
 bool UPRCombatEffectLibrary::ApplyDamageToTarget(
 	UAbilitySystemComponent* SourceAbilitySystem,
 	UAbilitySystemComponent* TargetAbilitySystem,
@@ -608,6 +638,13 @@ void UPRCombatEffectLibrary::DispatchResolvedDamageFeedbackInternal(
 	{
 		return;
 	}
+	if (const APREnemyCharacter* EnemyTarget = Cast<APREnemyCharacter>(ResolveCombatActor(TargetAbilitySystem)))
+	{
+		if (EnemyTarget->IsHeavyHitReactionsOnly() && RequestedStrength != EPRHitReactionStrength::Heavy)
+		{
+			return;
+		}
+	}
 
 	FPRActiveStaggerState ExistingStaggers = FindActiveHitStaggers(TargetAbilitySystem);
 	if (ExistingStaggers.Handles.IsEmpty() && FeedbackComponent)
@@ -682,6 +719,13 @@ FActiveGameplayEffectHandle UPRCombatEffectLibrary::ApplyStatusEffectToTarget(
 	{
 		return FActiveGameplayEffectHandle();
 	}
+	if (const APREnemyCharacter* EnemyTarget = Cast<APREnemyCharacter>(ResolveCombatActor(TargetAbilitySystem)))
+	{
+		if (EnemyTarget->IsStatusImmune(StatusTag))
+		{
+			return FActiveGameplayEffectHandle();
+		}
+	}
 	if (StatusTag == ProjectRiftGameplayTags::State_Stunned)
 	{
 		ClearHitStagger(TargetAbilitySystem);
@@ -732,6 +776,9 @@ void UPRCombatEffectLibrary::ClearNegativeStatusEffects(UAbilitySystemComponent*
 	NegativeStatusTags.AddTag(ProjectRiftGameplayTags::State_Stunned);
 	NegativeStatusTags.AddTag(ProjectRiftGameplayTags::State_HitStaggered);
 	NegativeStatusTags.AddTag(ProjectRiftGameplayTags::Status_Debuff_Revealed);
+	NegativeStatusTags.AddTag(ProjectRiftGameplayTags::Status_Debuff_Parasitized);
+	NegativeStatusTags.AddTag(ProjectRiftGameplayTags::State_AbilityDisrupted);
+	NegativeStatusTags.AddTag(ProjectRiftGameplayTags::Status_Grace_Disruption);
 	TargetAbilitySystem->RemoveActiveEffectsWithGrantedTags(NegativeStatusTags);
 	if (UPRCombatFeedbackComponent* FeedbackComponent = ResolveFeedbackComponent(TargetAbilitySystem))
 	{
@@ -797,6 +844,14 @@ FString UPRCombatEffectLibrary::GetActiveNegativeStatusText(const UAbilitySystem
 	if (TargetAbilitySystem->HasMatchingGameplayTag(ProjectRiftGameplayTags::Status_Debuff_Revealed))
 	{
 		ActiveStatuses.Add(TEXT("REVEALED"));
+	}
+	if (TargetAbilitySystem->HasMatchingGameplayTag(ProjectRiftGameplayTags::Status_Debuff_Parasitized))
+	{
+		ActiveStatuses.Add(TEXT("PARASITIZED"));
+	}
+	if (TargetAbilitySystem->HasMatchingGameplayTag(ProjectRiftGameplayTags::State_AbilityDisrupted))
+	{
+		ActiveStatuses.Add(TEXT("ABILITY-DISRUPTED"));
 	}
 
 	return ActiveStatuses.IsEmpty() ? TEXT("None") : FString::Join(ActiveStatuses, TEXT(" | "));

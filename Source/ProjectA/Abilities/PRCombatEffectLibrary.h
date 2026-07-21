@@ -53,6 +53,14 @@ public:
 		UAbilitySystemComponent* TargetAbilitySystem,
 		UObject* SourceObject = nullptr);
 
+	/** Enemy-only temporary shield support. It never opens player friendly-fire/support paths. */
+	static bool ApplyEnemyTemporaryShieldToTarget(
+		UAbilitySystemComponent* SourceAbilitySystem,
+		UAbilitySystemComponent* TargetAbilitySystem,
+		float ShieldAmount,
+		float DurationSeconds,
+		UObject* SourceObject = nullptr);
+
 	static bool ApplyDamageToTarget(
 		UAbilitySystemComponent* SourceAbilitySystem,
 		UAbilitySystemComponent* TargetAbilitySystem,

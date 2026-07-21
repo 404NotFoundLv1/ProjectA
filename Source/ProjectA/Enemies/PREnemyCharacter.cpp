@@ -13,9 +13,13 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Core/PRGameplayTags.h"
+#include "Core/PRAssetManager.h"
 #include "Core/PRRiftGameMode.h"
 #include "Core/PRRiftRuleComponent.h"
 #include "Enemies/PREnemyAIController.h"
+#include "Enemies/PREnemyBehaviorComponent.h"
+#include "Enemies/PREnemyDefinitionDataAsset.h"
+#include "Enemies/PREnemyThreatComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerState.h"
 #include "GameplayAbilitySpec.h"
@@ -38,6 +42,8 @@ APREnemyCharacter::APREnemyCharacter()
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 	AttributeSet = CreateDefaultSubobject<UPRAttributeSet>(TEXT("AttributeSet"));
 	CombatFeedbackComponent = CreateDefaultSubobject<UPRCombatFeedbackComponent>(TEXT("CombatFeedbackComponent"));
+	EnemyThreatComponent = CreateDefaultSubobject<UPREnemyThreatComponent>(TEXT("EnemyThreatComponent"));
+	EnemyBehaviorComponent = CreateDefaultSubobject<UPREnemyBehaviorComponent>(TEXT("EnemyBehaviorComponent"));
 	EnemyMeleeAbilityClass = UGA_EnemyMeleeAttack::StaticClass();
 
 	AIControllerClass = APREnemyAIController::StaticClass();
@@ -86,15 +92,18 @@ void APREnemyCharacter::BeginPlay()
 		AbilitySystemComponent->InitAbilityActorInfo(this, this);
 		if (HasAuthority())
 		{
-			const float InitialMaxHealth = FMath::Max(MaxHealth * SpawnHealthMultiplier, 1.0f);
+			const FPREnemyAttributeDefinition* DefinitionAttributes = EnemyDefinition ? &EnemyDefinition->Attributes : nullptr;
+			const float InitialMaxHealth = FMath::Max((DefinitionAttributes ? DefinitionAttributes->MaxHealth : MaxHealth) * SpawnHealthMultiplier, 1.0f);
 			AttributeSet->SetMaxHealth(InitialMaxHealth);
 			AttributeSet->SetHealth(InitialMaxHealth);
-			AttributeSet->SetMaxShield(0.0f);
-			AttributeSet->SetShield(0.0f);
+			const float MaxShield = DefinitionAttributes ? DefinitionAttributes->MaxShield : 0.0f;
+			const float InitialShield = DefinitionAttributes ? DefinitionAttributes->InitialShield : 0.0f;
+			AttributeSet->SetMaxShield(MaxShield);
+			AttributeSet->SetShield(FMath::Min(InitialShield, MaxShield));
 			AttributeSet->SetMaxEnergy(0.0f);
 			AttributeSet->SetEnergy(0.0f);
-			AttributeSet->SetAttackPower(10.0f * SpawnAttackPowerMultiplier);
-			AttributeSet->SetMoveSpeed(360.0f);
+			AttributeSet->SetAttackPower((DefinitionAttributes ? DefinitionAttributes->AttackPower : 10.0f) * SpawnAttackPowerMultiplier);
+			AttributeSet->SetMoveSpeed(DefinitionAttributes ? DefinitionAttributes->MoveSpeed : 360.0f);
 			AttributeSet->SetCooldownReduction(0.0f);
 			AttributeSet->SetHealingPower(0.0f);
 			AttributeSet->SetPollutionResistance(0.0f);
@@ -110,12 +119,21 @@ void APREnemyCharacter::BeginPlay()
 	}
 
 	InitializeHealthBarWidget();
+	if (!HasAuthority())
+	{
+		ResolveEnemyDefinitionFromId();
+	}
+	if (HasAuthority() && EnemyBehaviorComponent && EnemyDefinition)
+	{
+		EnemyBehaviorComponent->StartBehavior();
+	}
 }
 
 void APREnemyCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(APREnemyCharacter, HuntTargetId);
+	DOREPLIFETIME(APREnemyCharacter, EnemyDefinitionId);
 }
 
 UAbilitySystemComponent* APREnemyCharacter::GetAbilitySystemComponent() const
@@ -139,6 +157,23 @@ void APREnemyCharacter::HandleCombatUnitHealthDepleted(const FGameplayEffectCont
 		}
 	}
 	HandleDeath(DeathInstigator);
+}
+
+void APREnemyCharacter::HandleCombatUnitDamageResolved(AActor* DamageSource, const float ResolvedDamage)
+{
+	if (!HasAuthority() || !EnemyThreatComponent || ResolvedDamage <= 0.0f)
+	{
+		return;
+	}
+	APRCharacter* PlayerSource = Cast<APRCharacter>(DamageSource);
+	if (!PlayerSource)
+	{
+		if (APawn* SourcePawn = Cast<APawn>(DamageSource))
+		{
+			PlayerSource = Cast<APRCharacter>(SourcePawn);
+		}
+	}
+	EnemyThreatComponent->AddThreat(PlayerSource, ResolvedDamage);
 }
 
 float APREnemyCharacter::TakeDamage(
@@ -174,6 +209,16 @@ float APREnemyCharacter::GetHealthPercent() const
 
 float APREnemyCharacter::GetAttackDamage() const
 {
+	if (EnemyDefinition)
+	{
+		for (const FPREnemyActionDefinition& Action : EnemyDefinition->Actions)
+		{
+			if (Action.Kind == EPREnemyActionKind::Melee && Action.BaseDamage > 0.0f)
+			{
+				return Action.BaseDamage;
+			}
+		}
+	}
 	const UGA_EnemyMeleeAttack* MeleeAbility = EnemyMeleeAbilityClass
 		? EnemyMeleeAbilityClass->GetDefaultObject<UGA_EnemyMeleeAttack>()
 		: nullptr;
@@ -194,6 +239,50 @@ void APREnemyCharacter::SetSpawnAttackPowerMultiplier(const float InMultiplier)
 	{
 		SpawnAttackPowerMultiplier = FMath::IsFinite(InMultiplier) ? FMath::Clamp(InMultiplier, 0.1f, 20.0f) : 1.0f;
 	}
+}
+
+bool APREnemyCharacter::SetEnemyDefinition(UPREnemyDefinitionDataAsset* InDefinition)
+{
+	if (!HasAuthority() || HasActorBegunPlay() || !InDefinition)
+	{
+		return false;
+	}
+
+	FString Diagnostic;
+	if (!InDefinition->ValidateDefinition(Diagnostic))
+	{
+		return false;
+	}
+
+	EnemyDefinition = InDefinition;
+	EnemyDefinitionId = InDefinition->EnemyId;
+	return !EnemyDefinitionId.IsNone();
+}
+
+void APREnemyCharacter::OnRep_EnemyDefinitionId()
+{
+	ResolveEnemyDefinitionFromId();
+}
+
+void APREnemyCharacter::ResolveEnemyDefinitionFromId()
+{
+	if (!EnemyDefinition && !EnemyDefinitionId.IsNone())
+	{
+		if (UPRAssetManager* AssetManager = UPRAssetManager::Get())
+		{
+			EnemyDefinition = AssetManager->LoadEnemyDefinitionSync(EnemyDefinitionId);
+		}
+	}
+}
+
+bool APREnemyCharacter::IsStatusImmune(const FGameplayTag StatusTag) const
+{
+	return StatusTag.IsValid() && EnemyDefinition && EnemyDefinition->ImmunityTags.HasTagExact(StatusTag);
+}
+
+bool APREnemyCharacter::IsHeavyHitReactionsOnly() const
+{
+	return EnemyDefinition && EnemyDefinition->bHeavyHitReactionsOnly;
 }
 
 FString APREnemyCharacter::GetActiveStatusText() const
@@ -291,7 +380,12 @@ APRPickupActor* APREnemyCharacter::SpawnDeathLoot()
 		return nullptr;
 	}
 
-	UPRLootTableDataAsset* LootTableToUse = DeathLootTable.Get();
+	UPRLootTableDataAsset* LootTableToUse = EnemyDefinition && EnemyDefinition->LootTable
+		? EnemyDefinition->LootTable.Get() : DeathLootTable.Get();
+	if (EnemyDefinition && !EnemyDefinition->bDropsLoot)
+	{
+		return nullptr;
+	}
 	if (!LootTableToUse)
 	{
 		LootTableToUse = NewObject<UPRLootTableDataAsset>(this);
@@ -300,7 +394,8 @@ APRPickupActor* APREnemyCharacter::SpawnDeathLoot()
 	const FVector SpawnLocation = GetActorLocation() + FVector(0.0f, 0.0f, 28.0f);
 	FPRRewardSourceContext RewardSource;
 	RewardSource.SourceType = EPRRewardSourceType::Enemy;
-	RewardSource.SourceId = TEXT("Enemy.Basic");
+	RewardSource.SourceId = EnemyDefinition && !EnemyDefinition->EnemyId.IsNone()
+		? EnemyDefinition->EnemyId : FName(TEXT("Enemy.Basic"));
 	if (const APRRiftGameMode* RiftGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<APRRiftGameMode>() : nullptr)
 	{
 		RewardSource.Seed = RiftGameMode->AllocateRewardSeed(RewardSource.SourceType, RewardSource.SourceId, FGuid(), 0);

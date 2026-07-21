@@ -1,6 +1,7 @@
 #include "UI/PREnemyHealthBarWidget.h"
 
 #include "Enemies/PREnemyCharacter.h"
+#include "Enemies/PREnemyDefinitionDataAsset.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Notifications/SProgressBar.h"
@@ -75,9 +76,12 @@ FText UPREnemyHealthBarWidget::BuildHealthText() const
 	}
 
 	const FString StatusText = Enemy->GetActiveStatusText();
+	const UPREnemyDefinitionDataAsset* Definition = Enemy->GetEnemyDefinition();
+	const FString EnemyName = Definition && !Definition->DisplayName.IsEmpty()
+		? Definition->DisplayName.ToString() : TEXT("HOSTILE");
 	return FText::FromString(StatusText == TEXT("None")
-		? FString::Printf(TEXT("HOSTILE %.0f / %.0f"), Enemy->GetHealth(), Enemy->GetMaxHealth())
-		: FString::Printf(TEXT("HOSTILE %.0f / %.0f  [%s]"), Enemy->GetHealth(), Enemy->GetMaxHealth(), *StatusText));
+		? FString::Printf(TEXT("%s %.0f / %.0f"), *EnemyName, Enemy->GetHealth(), Enemy->GetMaxHealth())
+		: FString::Printf(TEXT("%s %.0f / %.0f  [%s]"), *EnemyName, Enemy->GetHealth(), Enemy->GetMaxHealth(), *StatusText));
 }
 
 void UPREnemyHealthBarWidget::RefreshSlate()

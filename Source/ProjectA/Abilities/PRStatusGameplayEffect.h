@@ -59,3 +59,33 @@ public:
 	UPRReconRevealGameplayEffect(const FObjectInitializer& ObjectInitializer);
 	virtual FGameplayTag GetStatusTag() const override;
 };
+
+/** Three seconds of energy drain and a modest mobility penalty from a Parasite. */
+UCLASS()
+class PROJECTA_API UPRParasitizedStatusGameplayEffect : public UPRStatusGameplayEffect
+{
+	GENERATED_BODY()
+public:
+	UPRParasitizedStatusGameplayEffect(const FObjectInitializer& ObjectInitializer);
+	virtual FGameplayTag GetStatusTag() const override;
+};
+
+/** Blocks only role modules; weapon fire and dodge stay available. */
+UCLASS()
+class PROJECTA_API UPRAbilityDisruptedStatusGameplayEffect : public UPRStatusGameplayEffect
+{
+	GENERATED_BODY()
+public:
+	UPRAbilityDisruptedStatusGameplayEffect(const FObjectInitializer& ObjectInitializer);
+	virtual FGameplayTag GetStatusTag() const override;
+};
+
+/** Eight-second anti-repeat grace carrier for Ability Disruptor hits. */
+UCLASS()
+class PROJECTA_API UPRDisruptionGraceGameplayEffect : public UPRStatusGameplayEffect
+{
+	GENERATED_BODY()
+public:
+	UPRDisruptionGraceGameplayEffect(const FObjectInitializer& ObjectInitializer);
+	virtual FGameplayTag GetStatusTag() const override;
+};
