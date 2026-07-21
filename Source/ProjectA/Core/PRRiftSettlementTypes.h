@@ -20,6 +20,9 @@ struct PROJECTA_API FPRRiftSettlementData
 	FName MissionId = NAME_None;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Rift|Settlement")
+	int32 ContractVersion = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Rift|Settlement")
 	FGuid RunId;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Rift|Settlement")

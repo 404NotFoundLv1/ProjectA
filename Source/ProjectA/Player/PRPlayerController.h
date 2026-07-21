@@ -21,6 +21,7 @@ class UPRShipRepairWidget;
 class UPRCraftingWidget;
 class APRCraftingStation;
 class UPRRoleLoadoutWidget;
+class UPRMissionSelectionWidget;
 class UPRDiagnosticsWidget;
 class UPRWeaponHUDWidget;
 class UPRQuickbarHUDWidget;
@@ -52,6 +53,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Lobby|Travel")
 	void StartRiftMission();
+
+	UFUNCTION(BlueprintCallable, Category = "Lobby|Mission")
+	void SelectMissionContract(FName ContractId);
+	UFUNCTION(BlueprintCallable, Category="Lobby|Mission") void ToggleMissionSelectionPanel();
+	UFUNCTION(BlueprintCallable, Category="Lobby|Mission") void ShowMissionSelectionPanel();
+	UFUNCTION(BlueprintCallable, Category="Lobby|Mission") void HideMissionSelectionPanel();
 
 	UFUNCTION(BlueprintCallable, Category = "Pickup")
 	void TryPickup();
@@ -230,6 +237,9 @@ public:
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Lobby|Travel")
 	void ServerStartRiftMission();
 
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Lobby|Mission")
+	void ServerSelectMissionContract(FName ContractId);
+
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Pickup")
 	void ServerTryPickup(APRPickupActor* PickupActor);
 
@@ -371,6 +381,8 @@ private:
 	void CreateRiftSettlementUI();
 	void DestroyRiftSettlementUI();
 	void CreateShipRepairUI();
+	void CreateMissionSelectionUI();
+	void DestroyMissionSelectionUI();
 	void DestroyShipRepairUI();
 	void CreateCraftingUI();
 	void DestroyCraftingUI();
@@ -484,6 +496,8 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPRRoleLoadoutWidget> RoleLoadoutWidget;
+	UPROPERTY(EditDefaultsOnly, Category="Lobby|Mission") TSubclassOf<UPRMissionSelectionWidget> MissionSelectionWidgetClass;
+	UPROPERTY(Transient) TObjectPtr<UPRMissionSelectionWidget> MissionSelectionWidget;
 
 	bool bInventoryInputModeActive = false;
 	bool bSavedMouseCursorVisibilityForInventory = false;

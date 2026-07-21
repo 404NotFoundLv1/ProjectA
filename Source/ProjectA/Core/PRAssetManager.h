@@ -45,6 +45,7 @@ public:
 	UPRLootTableDataAsset* LoadLootTableSync(FName AssetName);
 	UPRRewardBudgetDataAsset* LoadRewardBudgetSync(FName AssetName);
 	UPRMissionProgressionDataAsset* LoadMissionSync(FName MissionId);
+	bool LoadMissionCatalog(TArray<UPRMissionProgressionDataAsset*>& OutCatalog);
 	UPRRoleDataAsset* LoadRoleSync(FName RoleId);
 	UPRRoleModuleDataAsset* LoadRoleModuleSync(FName ModuleId);
 	bool LoadRoleCatalog(TArray<UPRRoleDataAsset*>& OutRoles, TArray<UPRRoleModuleDataAsset*>& OutModules);

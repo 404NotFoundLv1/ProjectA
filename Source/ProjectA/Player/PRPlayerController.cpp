@@ -50,6 +50,7 @@
 #include "UI/PRLobbyReadyDebugWidget.h"
 #include "UI/PRRiftSettlementWidget.h"
 #include "UI/PRRoleLoadoutWidget.h"
+#include "UI/PRMissionSelectionWidget.h"
 #include "UI/PRShipRepairWidget.h"
 #include "UI/PRCraftingWidget.h"
 #include "UI/PRWeaponHUDWidget.h"
@@ -168,6 +169,7 @@ APRPlayerController::APRPlayerController()
 	ShipRepairWidgetClass = UPRShipRepairWidget::StaticClass();
 	CraftingWidgetClass = UPRCraftingWidget::StaticClass();
 	RoleLoadoutWidgetClass = UPRRoleLoadoutWidget::StaticClass();
+	MissionSelectionWidgetClass = UPRMissionSelectionWidget::StaticClass();
 	DiagnosticsWidgetClass = UPRDiagnosticsWidget::StaticClass();
 	HealthInjectorEffectClass = UPRHealthConsumableGameplayEffect::StaticClass();
 	ShieldPackEffectClass = UPRShieldConsumableGameplayEffect::StaticClass();
@@ -236,6 +238,7 @@ void APRPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	DestroyShipRepairUI();
 	DestroyCraftingUI();
 	DestroyRoleLoadoutUI();
+	DestroyMissionSelectionUI();
 	DestroyInventoryUI();
 	DestroyWeaponHUD();
 	DestroyQuickbarHUD();
@@ -337,6 +340,14 @@ void APRPlayerController::StartRiftMission()
 {
 	ServerStartRiftMission();
 }
+
+void APRPlayerController::SelectMissionContract(const FName ContractId)
+{
+	ServerSelectMissionContract(ContractId);
+}
+void APRPlayerController::ToggleMissionSelectionPanel(){ if(MissionSelectionWidget&&MissionSelectionWidget->GetVisibility()==ESlateVisibility::Visible) HideMissionSelectionPanel(); else ShowMissionSelectionPanel(); }
+void APRPlayerController::ShowMissionSelectionPanel(){ if(!IsLocalPlayerController()||!IsShipLobbyDebugWorld(GetWorld()))return; HideInventory();HideShipRepairPanel();HideRoleLoadoutPanel();CreateMissionSelectionUI();if(MissionSelectionWidget){MissionSelectionWidget->RefreshMissionDisplay();MissionSelectionWidget->SetVisibility(ESlateVisibility::Visible);bShowMouseCursor=true;FInputModeGameAndUI M;M.SetWidgetToFocus(MissionSelectionWidget->TakeWidget());SetInputMode(M);}}
+void APRPlayerController::HideMissionSelectionPanel(){if(MissionSelectionWidget)MissionSelectionWidget->SetVisibility(ESlateVisibility::Collapsed);SetInputMode(FInputModeGameOnly());}
 
 void APRPlayerController::TryPickup()
 {
@@ -1314,6 +1325,16 @@ void APRPlayerController::ServerStartRiftMission_Implementation()
 	}
 
 	LobbyGameMode->StartRiftMission(this);
+}
+
+void APRPlayerController::ServerSelectMissionContract_Implementation(const FName ContractId)
+{
+	UWorld* World = GetWorld();
+	APRShipLobbyGameMode* LobbyGameMode = World ? Cast<APRShipLobbyGameMode>(World->GetAuthGameMode()) : nullptr;
+	if (!LobbyGameMode || !LobbyGameMode->SelectMissionContract(this, ContractId))
+	{
+		ClientMessage(TEXT("Mission contract selection was rejected."));
+	}
 }
 
 void APRPlayerController::ServerTryPickup_Implementation(APRPickupActor* PickupActor)
@@ -2518,6 +2539,8 @@ void APRPlayerController::DestroyRoleLoadoutUI()
 		RoleLoadoutWidget = nullptr;
 	}
 }
+void APRPlayerController::CreateMissionSelectionUI(){if(!IsLocalPlayerController()||MissionSelectionWidget)return;if(!MissionSelectionWidgetClass)MissionSelectionWidgetClass=UPRMissionSelectionWidget::StaticClass();MissionSelectionWidget=CreateWidget<UPRMissionSelectionWidget>(this,MissionSelectionWidgetClass);if(MissionSelectionWidget){MissionSelectionWidget->SetVisibility(ESlateVisibility::Collapsed);MissionSelectionWidget->AddToPlayerScreen(42);MissionSelectionWidget->SetDesiredSizeInViewport(FVector2D(620,420));MissionSelectionWidget->SetAnchorsInViewport(FAnchors(.5f,.5f));MissionSelectionWidget->SetAlignmentInViewport(FVector2D(.5f,.5f));}}
+void APRPlayerController::DestroyMissionSelectionUI(){if(MissionSelectionWidget){MissionSelectionWidget->RemoveFromParent();MissionSelectionWidget=nullptr;}}
 
 void APRPlayerController::ApplyInventoryInputMode()
 {

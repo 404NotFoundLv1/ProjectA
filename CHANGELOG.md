@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.0] - 2026-07-21
+
+- Added server-authoritative mission contract definitions with deterministic Seed-based selection, reward previews, compact travel context, host chapter gating, and replicated lobby/rift state.
+- Added contract-version settlement audit data while preserving the existing profile/save format and legacy `MissionId` travel compatibility.
+
 ## [0.7.6] - 2026-07-21
 
 - Added event-driven inventory presentation ViewModel APIs, native fallback controls, stable GUID selection, paging, sort/filter contracts, equipment comparison data, and controller rebind support.

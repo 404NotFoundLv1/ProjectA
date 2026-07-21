@@ -84,7 +84,7 @@ bool FPRLobbyRiftLoopTest::RunTest(const FString& Parameters)
 	TestEqual(
 		TEXT("Lobby still travels to the rift test map as a listen server"),
 		LobbyDefaults ? LobbyDefaults->BuildRiftTravelURL() : FString(),
-		FString(TEXT("/Game/ProjectRift/Maps/L_Rift_Test?listen?MissionId=Mission.Rift.Test.Hold")));
+		FString(TEXT("/Game/ProjectRift/Maps/L_Rift_Test?listen?ContractId=Mission.Rift.Test.Hold?ContractVersion=1?Seed=1")));
 	TestEqual(
 		TEXT("Rift still returns to the ship lobby as a listen server"),
 		RiftDefaults ? RiftDefaults->BuildReturnToLobbyTravelURL() : FString(),

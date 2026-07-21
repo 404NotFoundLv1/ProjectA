@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "Persistence/PRProfileTypes.h"
+#include "Progression/PRMissionContractTypes.h"
 #include "PRMissionProgressionDataAsset.generated.h"
 
 class UWorld;
@@ -45,7 +46,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rewards")
 	TSoftObjectPtr<UPRRewardBudgetDataAsset> RewardBudget;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission|Contract")
+	FPRMissionContract Contract;
+
 	bool IsContractValid(FString* OutDiagnostic = nullptr) const;
+	bool ValidateMissionContract(FString* OutDiagnostic = nullptr) const;
+	FPRMissionDefinition BuildMissionDefinition(int32 Seed, FString* OutDiagnostic = nullptr) const;
 	bool IsEligible(const FPRProfileStoryProgress& Story) const;
 	bool ApplyCompletion(FPRProfileStoryProgress& Story) const;
 };

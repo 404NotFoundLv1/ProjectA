@@ -37,6 +37,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Lobby|Mission")
 	void RefreshTeamMissionState();
 
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Lobby|Mission")
+	bool SelectMissionContract(APlayerController* RequestingController, FName ContractId);
+
 	virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
 	virtual void BeginPlay() override;
@@ -52,4 +55,6 @@ private:
 	bool IsHostPlayerController(const APlayerController* RequestingController) const;
 	UPRMissionProgressionDataAsset* ResolveSelectedMission() const;
 	APlayerController* FindHostPlayerController() const;
+	int32 AllocateMissionSeed() const;
+	void ResetAllPlayerReadiness() const;
 };

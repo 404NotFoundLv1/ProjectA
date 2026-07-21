@@ -68,22 +68,52 @@ void APRRiftGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void APRRiftGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
 {
 	Super::InitGame(MapName, Options, ErrorMessage);
-	const FString RequestedMissionId = UGameplayStatics::ParseOption(Options, TEXT("MissionId"));
-	if (RequestedMissionId.IsEmpty())
+	const FString RawContractId = UGameplayStatics::ParseOption(Options, TEXT("ContractId"));
+	const FString RawLegacyMissionId = UGameplayStatics::ParseOption(Options, TEXT("MissionId"));
+	if (RawContractId.IsEmpty() && RawLegacyMissionId.IsEmpty())
+	{
+		// Direct test worlds and editor launches intentionally have no travel
+		// options; retain the class default mission in that legacy entry path.
+		return;
+	}
+	FPRMissionTravelContext TravelContext;
+	FString ContextDiagnostic;
+	if (!FPRMissionTravelContext::ParseOptions(Options, TravelContext, &ContextDiagnostic))
+	{
+		MissionId = NAME_None;
+		ErrorMessage = TEXT("The requested ProjectRift mission travel context is invalid.");
+		return;
+	}
+	if (TravelContext.ContractId.IsNone())
 	{
 		return;
 	}
-	const FName RequestedMissionName(*RequestedMissionId);
+	const FName RequestedMissionName = TravelContext.ContractId;
 	UPRAssetManager* AssetManager = UPRAssetManager::Get();
 	UPRMissionProgressionDataAsset* Mission = AssetManager ? AssetManager->LoadMissionSync(RequestedMissionName) : nullptr;
 	if (!Mission || Mission->MissionId != RequestedMissionName || !Mission->IsContractValid())
 	{
 		MissionId = NAME_None;
 		ErrorMessage = TEXT("The requested ProjectRift mission contract is invalid or unregistered.");
-		UE_LOG(LogProjectA, Error, TEXT("Rift mission option rejected. MissionId=%s"), *RequestedMissionId);
+		UE_LOG(LogProjectA, Error, TEXT("Rift mission option rejected. MissionId=%s"), *RequestedMissionName.ToString());
 		return;
 	}
 	MissionId = RequestedMissionName;
+	if (TravelContext.ContractVersion > 0)
+	{
+		if (TravelContext.ContractVersion != Mission->Contract.ContractVersion)
+		{
+			MissionId = NAME_None;
+			ErrorMessage = TEXT("The requested ProjectRift mission contract version is unavailable.");
+			return;
+		}
+		CurrentMissionDefinition = Mission->BuildMissionDefinition(TravelContext.Seed);
+		if (!CurrentMissionDefinition.IsValid())
+		{
+			MissionId = NAME_None;
+			ErrorMessage = TEXT("The requested ProjectRift mission definition is invalid.");
+		}
+	}
 }
 
 void APRRiftGameMode::Tick(const float DeltaSeconds)
@@ -155,7 +185,19 @@ bool APRRiftGameMode::StartRiftMission()
 
 	CurrentRunId = FGuid::NewGuid();
 	CurrentSettlementId = FGuid::NewGuid();
-	CurrentRunSeed = FMath::Rand();
+	if (!CurrentMissionDefinition.IsValid())
+	{
+		if (const UPRMissionProgressionDataAsset* Mission = ResolveMissionContract())
+		{
+			CurrentMissionDefinition = Mission->BuildMissionDefinition(FMath::RandRange(1, MAX_int32));
+		}
+	}
+	if (!CurrentMissionDefinition.IsValid())
+	{
+		return false;
+	}
+	CurrentRunSeed = CurrentMissionDefinition.Seed;
+	RiftGameState->SetTeamMissionDefinition(CurrentMissionDefinition, true);
 	EligibleRewardProfileIds.Reset();
 	if (const AGameStateBase* CurrentGameState = GameState)
 	{
@@ -402,6 +444,7 @@ FPRRiftSettlementData APRRiftGameMode::GenerateSettlementData(const EPRRiftMissi
 {
 	FPRRiftSettlementData Settlement;
 	Settlement.MissionId = MissionId;
+	Settlement.ContractVersion = CurrentMissionDefinition.ContractVersion;
 	Settlement.RunId = CurrentRunId;
 	Settlement.SettlementId = CurrentSettlementId;
 	Settlement.Result = Result;
@@ -551,6 +594,7 @@ FPRPlayerSettlementReceipt APRRiftGameMode::BuildPersonalSettlementReceipt(
 	}
 	Receipt.ProfileId = PlayerState->GetBoundProfileId();
 	Receipt.MissionId = MissionId;
+	Receipt.ContractVersion = CurrentMissionDefinition.ContractVersion;
 	Receipt.RunId = CurrentRunId;
 	Receipt.RunSeed = CurrentRunSeed;
 	Receipt.SettlementId = CurrentSettlementId;

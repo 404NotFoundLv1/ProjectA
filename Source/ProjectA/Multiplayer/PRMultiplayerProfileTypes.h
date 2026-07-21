@@ -67,6 +67,9 @@ struct PROJECTA_API FPRPlayerSettlementReceipt
 	FName MissionId = NAME_None;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Settlement")
+	int32 ContractVersion = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Settlement")
 	FGuid RunId;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Settlement")

@@ -220,6 +220,29 @@ UPRMissionProgressionDataAsset* UPRAssetManager::LoadMissionSync(const FName Mis
 		UPRMissionProgressionDataAsset::StaticClass()));
 }
 
+bool UPRAssetManager::LoadMissionCatalog(TArray<UPRMissionProgressionDataAsset*>& OutCatalog)
+{
+	OutCatalog.Reset();
+	TArray<FPrimaryAssetId> AssetIds;
+	GetPrimaryAssetIdList(UPRMissionProgressionDataAsset::MissionPrimaryAssetType, AssetIds);
+	AssetIds.Sort([](const FPrimaryAssetId& A, const FPrimaryAssetId& B) { return A.PrimaryAssetName.LexicalLess(B.PrimaryAssetName); });
+	TSet<FName> SeenMissionIds;
+	for (const FPrimaryAssetId& AssetId : AssetIds)
+	{
+		UPRMissionProgressionDataAsset* Mission = Cast<UPRMissionProgressionDataAsset>(LoadPrimaryAssetSync(AssetId, UPRMissionProgressionDataAsset::StaticClass()));
+		FString Diagnostic;
+		if (!Mission || SeenMissionIds.Contains(Mission->MissionId) || !Mission->IsContractValid(&Diagnostic))
+		{
+			UE_LOG(LogProjectA, Warning, TEXT("ProjectRift mission catalog entry is invalid. Asset=%s Diagnostic=%s"), *AssetId.ToString(), *Diagnostic);
+			OutCatalog.Reset();
+			return false;
+		}
+		SeenMissionIds.Add(Mission->MissionId);
+		OutCatalog.Add(Mission);
+	}
+	return true;
+}
+
 UPRRoleDataAsset* UPRAssetManager::LoadRoleSync(const FName RoleId)
 {
 	return Cast<UPRRoleDataAsset>(LoadPrimaryAssetSync(

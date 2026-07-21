@@ -128,6 +128,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Rift|Diagnostics")
 	int32 GetCurrentRunSeed() const { return CurrentRunSeed; }
 
+	UFUNCTION(BlueprintPure, Category = "Rift|Mission")
+	FPRMissionDefinition GetMissionDefinition() const { return CurrentMissionDefinition; }
+
 	UFUNCTION(BlueprintPure, Category = "Rift|Rewards")
 	int32 AllocateRewardSeed(EPRRewardSourceType SourceType, FName SourceId, FGuid RecipientProfileId, int32 Ordinal) const;
 
@@ -192,6 +195,9 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Rift|Diagnostics")
 	FName MissionId = FName(TEXT("Mission.Rift.Test.Hold"));
+
+	UPROPERTY(Transient)
+	FPRMissionDefinition CurrentMissionDefinition;
 
 	UPROPERTY(Transient)
 	TObjectPtr<APRRiftObjectiveActor> ActiveObjective;

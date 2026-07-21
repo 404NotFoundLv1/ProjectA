@@ -704,6 +704,12 @@ FPRProfileOperationResult UPRSaveSubsystem::ApplyMultiplayerSettlementReceipt(co
 		SetLastResult(Result);
 		return Result;
 	}
+	if (Receipt.ContractVersion > 0 && Receipt.ContractVersion != Mission->Contract.ContractVersion)
+	{
+		const FPRProfileOperationResult Result = FPRProfileOperationResult::MakeFailure(EPRProfileOperationStatus::ValidationFailed, TEXT("Settlement contract version does not match the registered mission."), Receipt.ProfileId);
+		SetLastResult(Result);
+		return Result;
+	}
 
 	UPRProfileSave* Candidate = DuplicateObject<UPRProfileSave>(ActiveProfile, this);
 	Candidate->Snapshot.BackpackItems = Receipt.SettledBackpackItems;

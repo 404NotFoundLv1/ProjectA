@@ -1,5 +1,7 @@
 #include "Progression/PRMissionProgressionDataAsset.h"
 
+#include "Misc/Crc.h"
+
 const FPrimaryAssetType UPRMissionProgressionDataAsset::MissionPrimaryAssetType(TEXT("ProjectRiftMission"));
 
 FPrimaryAssetId UPRMissionProgressionDataAsset::GetPrimaryAssetId() const
@@ -37,7 +39,60 @@ bool UPRMissionProgressionDataAsset::IsContractValid(FString* OutDiagnostic) con
 		UnlockIds.Add(UnlockId);
 	}
 
-	return true;
+	return ValidateMissionContract(OutDiagnostic);
+}
+
+bool UPRMissionProgressionDataAsset::ValidateMissionContract(FString* OutDiagnostic) const
+{
+	FPRMissionContract EffectiveContract = Contract;
+	// Existing authored mission assets predate the v0.8.0 struct.  Serialized
+	// zero values mean "use the test-contract defaults", not an invalid live
+	// mission; partial authored values still use normal fail-closed validation.
+	if (EffectiveContract.ContractVersion == 0 && EffectiveContract.BiomeId.IsNone()
+		&& EffectiveContract.DifficultyId.IsNone())
+	{
+		EffectiveContract = FPRMissionContract();
+	}
+	return EffectiveContract.IsValid(OutDiagnostic);
+}
+
+FPRMissionDefinition UPRMissionProgressionDataAsset::BuildMissionDefinition(const int32 Seed, FString* OutDiagnostic) const
+{
+	FPRMissionDefinition Definition;
+	if (Seed == 0)
+	{
+		if (OutDiagnostic) { *OutDiagnostic = TEXT("Mission definition requires a non-zero seed."); }
+		return Definition;
+	}
+	if (!IsContractValid(OutDiagnostic))
+	{
+		return Definition;
+	}
+
+	Definition.ContractId = MissionId;
+	FPRMissionContract EffectiveContract = Contract;
+	if (EffectiveContract.ContractVersion == 0 && EffectiveContract.BiomeId.IsNone() && EffectiveContract.DifficultyId.IsNone()) { EffectiveContract = FPRMissionContract(); }
+	Definition.ContractVersion = EffectiveContract.ContractVersion;
+	Definition.BiomeId = EffectiveContract.BiomeId;
+	Definition.DifficultyId = EffectiveContract.DifficultyId;
+	Definition.ModifierIds = EffectiveContract.ModifierIds;
+	Definition.ModifierIds.Sort(FNameLexicalLess());
+	Definition.RewardPreview = EffectiveContract.RewardPreview;
+	Definition.Seed = Seed;
+
+	FString SignatureSource = FString::Printf(TEXT("%s|%d|%s|%s|%d|%d|%d|%d|%d"),
+		*Definition.ContractId.ToString(), Definition.ContractVersion, *Definition.BiomeId.ToString(), *Definition.DifficultyId.ToString(), Definition.Seed,
+		Definition.RewardPreview.MinimumBudget, Definition.RewardPreview.MaximumBudget, Definition.RewardPreview.MinimumRarity, Definition.RewardPreview.MaximumRarity);
+	for (const FName ModifierId : Definition.ModifierIds)
+	{
+		SignatureSource += TEXT("|") + ModifierId.ToString();
+	}
+	for (const FName RewardTypeId : Definition.RewardPreview.RewardTypeIds)
+	{
+		SignatureSource += TEXT("|") + RewardTypeId.ToString();
+	}
+	Definition.DeterministicSignature = static_cast<int32>(FCrc::StrCrc32(*SignatureSource));
+	return Definition;
 }
 
 bool UPRMissionProgressionDataAsset::IsEligible(const FPRProfileStoryProgress& Story) const

@@ -21,17 +21,32 @@ APRShipLobbyGameMode::APRShipLobbyGameMode()
 FString APRShipLobbyGameMode::BuildRiftTravelURL() const
 {
 	FString MapPath = RiftTestMapPath;
-	FName MissionId = DefaultMissionId;
+	FPRMissionDefinition Definition;
 	if (const UPRMissionProgressionDataAsset* Mission = ResolveSelectedMission())
 	{
-		MissionId = Mission->MissionId;
+		if (const APRGameState* ProjectRiftGameState = GetGameState<APRGameState>())
+		{
+			Definition = ProjectRiftGameState->GetSelectedTeamMissionDefinition();
+		}
+		if (!Definition.IsValid())
+		{
+			Definition = Mission->BuildMissionDefinition(1);
+		}
 		const FString AssetMapPath = Mission->MissionMap.ToSoftObjectPath().GetLongPackageName();
 		if (!AssetMapPath.IsEmpty())
 		{
 			MapPath = AssetMapPath;
 		}
 	}
-	return FString::Printf(TEXT("%s?listen?MissionId=%s"), *MapPath, *MissionId.ToString());
+	if (!Definition.IsValid())
+	{
+		return FString::Printf(TEXT("%s?listen?MissionId=%s"), *MapPath, *DefaultMissionId.ToString());
+	}
+	FPRMissionTravelContext TravelContext;
+	TravelContext.ContractId = Definition.ContractId;
+	TravelContext.ContractVersion = Definition.ContractVersion;
+	TravelContext.Seed = Definition.Seed;
+	return FString::Printf(TEXT("%s?listen?%s"), *MapPath, *TravelContext.ToTravelOptions());
 }
 
 bool APRShipLobbyGameMode::ArePlayerStatesReadyForTravel(const TArray<APlayerState*>& PlayerStates) const
@@ -157,9 +172,11 @@ void APRShipLobbyGameMode::BeginPlay()
 	UPRMissionProgressionDataAsset* Mission = ResolveSelectedMission();
 	if (APRGameState* ProjectRiftGameState = GetGameState<APRGameState>())
 	{
-		ProjectRiftGameState->SetTeamMissionState(
-			Mission && Mission->IsContractValid() ? Mission->MissionId : DefaultMissionId,
-			false);
+		if (Mission && Mission->IsContractValid())
+		{
+			ProjectRiftGameState->SetTeamMissionDefinition(Mission->BuildMissionDefinition(AllocateMissionSeed()), false);
+		}
+		else { ProjectRiftGameState->SetTeamMissionState(DefaultMissionId, false); }
 	}
 	RefreshTeamMissionState();
 }
@@ -173,10 +190,39 @@ void APRShipLobbyGameMode::RefreshTeamMissionState()
 	UPRMissionProgressionDataAsset* Mission = ResolveSelectedMission();
 	if (APRGameState* ProjectRiftGameState = GetGameState<APRGameState>())
 	{
-		ProjectRiftGameState->SetTeamMissionState(
-			Mission && Mission->IsContractValid() ? Mission->MissionId : DefaultMissionId,
-			Mission && CanStartRiftMission());
+		if (Mission && Mission->IsContractValid() && !ProjectRiftGameState->GetSelectedTeamMissionDefinition().IsValid())
+		{
+			ProjectRiftGameState->SetTeamMissionDefinition(Mission->BuildMissionDefinition(AllocateMissionSeed()), false);
+		}
+		else if (Mission)
+		{
+			ProjectRiftGameState->SetTeamMissionDefinition(ProjectRiftGameState->GetSelectedTeamMissionDefinition(), CanStartRiftMission());
+		}
 	}
+}
+
+bool APRShipLobbyGameMode::SelectMissionContract(APlayerController* RequestingController, const FName ContractId)
+{
+	if (!HasAuthority() || !IsHostPlayerController(RequestingController))
+	{
+		return false;
+	}
+	UPRAssetManager* AssetManager = UPRAssetManager::Get();
+	UPRMissionProgressionDataAsset* Mission = AssetManager ? AssetManager->LoadMissionSync(ContractId) : nullptr;
+	APRPlayerState* HostPlayerState = RequestingController->GetPlayerState<APRPlayerState>();
+	if (!Mission || !Mission->IsContractValid() || !HostPlayerState || !Mission->IsEligible(HostPlayerState->GetBoundStoryProgress()))
+	{
+		RequestingController->ClientMessage(TEXT("That mission contract is unavailable."));
+		return false;
+	}
+	APRGameState* ProjectRiftGameState = GetGameState<APRGameState>();
+	if (!ProjectRiftGameState)
+	{
+		return false;
+	}
+	ProjectRiftGameState->SetTeamMissionDefinition(Mission->BuildMissionDefinition(AllocateMissionSeed()), false);
+	ResetAllPlayerReadiness();
+	return true;
 }
 
 bool APRShipLobbyGameMode::IsHostPlayerController(const APlayerController* RequestingController) const
@@ -189,13 +235,37 @@ UPRMissionProgressionDataAsset* APRShipLobbyGameMode::ResolveSelectedMission() c
 	FName MissionId = DefaultMissionId;
 	if (const APRGameState* ProjectRiftGameState = GetGameState<APRGameState>())
 	{
-		if (!ProjectRiftGameState->GetSelectedTeamMissionId().IsNone())
+		if (ProjectRiftGameState->GetSelectedTeamMissionDefinition().IsValid())
+		{
+			MissionId = ProjectRiftGameState->GetSelectedTeamMissionDefinition().ContractId;
+		}
+		else if (!ProjectRiftGameState->GetSelectedTeamMissionId().IsNone())
 		{
 			MissionId = ProjectRiftGameState->GetSelectedTeamMissionId();
 		}
 	}
 	UPRAssetManager* AssetManager = UPRAssetManager::Get();
 	return AssetManager ? AssetManager->LoadMissionSync(MissionId) : nullptr;
+}
+
+int32 APRShipLobbyGameMode::AllocateMissionSeed() const
+{
+	return FMath::RandRange(1, MAX_int32);
+}
+
+void APRShipLobbyGameMode::ResetAllPlayerReadiness() const
+{
+	if (!GameState)
+	{
+		return;
+	}
+	for (APlayerState* PlayerState : GameState->PlayerArray)
+	{
+		if (APRPlayerState* ProjectRiftPlayerState = Cast<APRPlayerState>(PlayerState))
+		{
+			ProjectRiftPlayerState->SetReady(false);
+		}
+	}
 }
 
 APlayerController* APRShipLobbyGameMode::FindHostPlayerController() const
