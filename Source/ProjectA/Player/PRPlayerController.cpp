@@ -267,6 +267,7 @@ void APRPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::Gamepad_DPad_Left, IE_Pressed, this, &APRPlayerController::UseQuickbarSlot4);
 		InputComponent->BindKey(EKeys::P, IE_Pressed, this, &APRPlayerController::ToggleReady);
 		InputComponent->BindKey(EKeys::O, IE_Pressed, this, &APRPlayerController::StartRiftMission);
+		InputComponent->BindKey(EKeys::M, IE_Pressed, this, &APRPlayerController::ToggleMissionSelectionPanel);
 		InputComponent->BindKey(EKeys::C, IE_Pressed, this, &APRPlayerController::ToggleRoleLoadoutPanel);
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &APRPlayerController::CancelPendingDeployable);
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &APRPlayerController::HideRoleLoadoutPanel);
@@ -345,7 +346,7 @@ void APRPlayerController::SelectMissionContract(const FName ContractId)
 {
 	ServerSelectMissionContract(ContractId);
 }
-void APRPlayerController::ToggleMissionSelectionPanel(){ if(MissionSelectionWidget&&MissionSelectionWidget->GetVisibility()==ESlateVisibility::Visible) HideMissionSelectionPanel(); else ShowMissionSelectionPanel(); }
+void APRPlayerController::ToggleMissionSelectionPanel(){ if(!IsShipLobbyDebugWorld(GetWorld()))return; if(!HasAuthority()){ClientMessage(TEXT("Only the lobby host can select a rift contract."));return;} if(MissionSelectionWidget&&MissionSelectionWidget->GetVisibility()==ESlateVisibility::Visible) HideMissionSelectionPanel(); else ShowMissionSelectionPanel(); }
 void APRPlayerController::ShowMissionSelectionPanel(){ if(!IsLocalPlayerController()||!IsShipLobbyDebugWorld(GetWorld()))return; HideInventory();HideShipRepairPanel();HideRoleLoadoutPanel();CreateMissionSelectionUI();if(MissionSelectionWidget){MissionSelectionWidget->RefreshMissionDisplay();MissionSelectionWidget->SetVisibility(ESlateVisibility::Visible);bShowMouseCursor=true;FInputModeGameAndUI M;M.SetWidgetToFocus(MissionSelectionWidget->TakeWidget());SetInputMode(M);}}
 void APRPlayerController::HideMissionSelectionPanel(){if(MissionSelectionWidget)MissionSelectionWidget->SetVisibility(ESlateVisibility::Collapsed);SetInputMode(FInputModeGameOnly());}
 
@@ -2168,7 +2169,7 @@ void APRPlayerController::RefreshLobbyReadyDebugDisplay()
 	}
 
 	FString ReadyList = FString::Printf(
-		TEXT("Lobby Team Status\nMission: %s | Contract: %s | Can start: %s\nProfile: %s | Host eligible: %s\nStart blocked by: %s\n1: Assault | C: Role Loadout | P: Ready | R: Ship Repair | Host O: Start Rift\n"),
+		TEXT("Lobby Team Status\nMission: %s | Contract: %s | Can start: %s\nProfile: %s | Host eligible: %s\nStart blocked by: %s\n1: Assault | C: Role Loadout | P: Ready | R: Ship Repair | Host M: Mission Contracts | Host O: Start Rift\n"),
 		TeamMissionId.IsNone() ? TEXT("None") : *TeamMissionId.ToString(),
 		Mission && Mission->IsContractValid() ? TEXT("VALID") : TEXT("INVALID"),
 		ProjectRiftGameState && ProjectRiftGameState->IsTeamMissionReady() ? TEXT("YES") : TEXT("NO"),
