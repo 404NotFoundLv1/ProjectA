@@ -1,11 +1,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/PREncounterDirectorTypes.h"
 #include "GameFramework/Actor.h"
 #include "PRSpawnManager.generated.h"
 
 class APREnemySpawnPoint;
 class APRRiftObjectiveActor;
+class APREncounterExclusionVolume;
 
 /**
  * Server-authoritative wave spawner for rift objectives.
@@ -58,9 +60,18 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Rift|Spawning")
 	float GetEnemyHealthMultiplierForScaling() const;
 
+	UFUNCTION(BlueprintPure, Category = "Rift|Encounter") FName GetEncounterRegionId() const { return EncounterRegionId; }
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Encounter") int32 ExecuteEncounterSpawnRequest(const FPREncounterSpawnRequest& Request);
+	UFUNCTION(BlueprintPure, Category = "Rift|Encounter") float GetAliveEncounterThreat() const;
+	UFUNCTION(BlueprintPure, Category = "Rift|Encounter") int32 GetAliveEncounterCategoryCount(EPREncounterUnitCategory Category) const;
+	const TArray<FPREncounterSpawnEntry>& GetEncounterSpawnEntries() const { return EncounterSpawnEntries; }
+
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Spawning")
 	TSubclassOf<AActor> SpawnedEnemyClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Encounter") FName EncounterRegionId = FName(TEXT("Region.Default"));
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rift|Encounter") TArray<FPREncounterSpawnEntry> EncounterSpawnEntries;
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Rift|Spawning")
 	bool bSpawningActive = false;
@@ -71,8 +82,7 @@ protected:
 private:
 	void HandleWaveTimerElapsed();
 	void PruneDeadEnemies() const;
-	FTransform ChooseSpawnTransform();
-	void EnsureFallbackSpawnPoint();
+	bool ChooseEncounterSpawnTransform(const FPREncounterSpawnRequest& Request, FTransform& OutTransform, FString& OutRejectionReason) const;
 
 	UFUNCTION()
 	void HandleSpawnedActorDestroyed(AActor* DestroyedActor);
@@ -85,6 +95,8 @@ private:
 
 	UPROPERTY(Transient)
 	mutable TArray<TObjectPtr<AActor>> AliveEnemies;
+	TMap<TWeakObjectPtr<AActor>, FPREncounterSpawnRequest> EncounterUnits;
+	UPROPERTY(Transient) TArray<TObjectPtr<APREncounterExclusionVolume>> EncounterExclusionVolumes;
 
 	UPROPERTY(Transient)
 	int32 NextSpawnPointIndex = 0;

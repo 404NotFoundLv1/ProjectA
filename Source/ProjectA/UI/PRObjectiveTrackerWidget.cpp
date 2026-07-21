@@ -46,6 +46,13 @@ FText UPRObjectiveTrackerWidget::GetObjectiveTrackerText() const
 	{
 		Text += FString::Printf(TEXT("MOD: %s\n"), *Modifier.DisplayName.ToString());
 	}
+	const FPREncounterDirectorSnapshot& Encounter = RiftGameState->GetEncounterDirectorSnapshot();
+	if (Encounter.Phase != EPREncounterPhase::Inactive)
+	{
+		Text += FString::Printf(TEXT("DIRECTOR: %s  %.1f/%.1f  NEXT %.0fs\n"),
+			*StaticEnum<EPREncounterPhase>()->GetNameStringByValue(static_cast<int64>(Encounter.Phase)),
+			Encounter.AliveThreat, Encounter.TargetThreatBudget, Encounter.NextEventRemainingSeconds);
+	}
 	return FText::FromString(Text);
 }
 

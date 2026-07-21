@@ -343,8 +343,9 @@ FString UPRDiagnosticsWidget::BuildBodyText() const
 				*Player.SelectedRoleId.ToString(),
 				Player.bRepairPending ? TEXT("PENDING") : TEXT("CLEAR"));
 		}
+		const FPREncounterDirectorSnapshot& Encounter = Snapshot.Rift.EncounterDirector;
 		Text += FString::Printf(
-			TEXT("\nRift available: %s  |  Mission: %s\nRun: %s\nSettlement: %s (%s)\nObjective: %s  %.1f%%  |  Stability: %.1f  |  Time: %.1f\nAlive: %d  |  Extracted: %d  |  Kills: %d"),
+			TEXT("\nRift available: %s  |  Mission: %s\nRun: %s\nSettlement: %s (%s)\nObjective: %s  %.1f%%  |  Stability: %.1f  |  Time: %.1f\nAlive: %d  |  Extracted: %d  |  Kills: %d\nDirector: %s %.1f/%.1f (%d AI), next %.1fs, last %s%s"),
 			Snapshot.Rift.bAvailable ? TEXT("YES") : TEXT("NO"),
 			*Snapshot.Rift.MissionId.ToString(),
 			*GuidOrNone(Snapshot.Rift.RunId),
@@ -356,7 +357,11 @@ FString UPRDiagnosticsWidget::BuildBodyText() const
 			Snapshot.Rift.MissionTime,
 			Snapshot.Rift.AlivePlayers,
 			Snapshot.Rift.ExtractedPlayers,
-			Snapshot.Rift.KilledEnemies);
+			Snapshot.Rift.KilledEnemies,
+			*StaticEnum<EPREncounterPhase>()->GetNameStringByValue(static_cast<int64>(Encounter.Phase)),
+			Encounter.AliveThreat, Encounter.TargetThreatBudget, Encounter.AliveEnemyCount, Encounter.NextEventRemainingSeconds,
+			*Encounter.LastDecisionCode.ToString(),
+			Encounter.LastRejectionReason.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (%s)"), *Encounter.LastRejectionReason));
 		return Text;
 	}
 	case EPRDiagnosticsTab::Events:

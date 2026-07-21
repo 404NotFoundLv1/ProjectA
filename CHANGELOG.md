@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.3] - 2026-07-21
+
+- Added the server-authoritative Encounter Director, frozen-party threat budgets, pressure/cooldown/respite pacing and deterministic decision telemetry.
+- Migrated rift SpawnManager cadence to director-approved requests while retaining existing Blueprint activation APIs.
+- Added safe spawn-point metadata, objective/group filtering, minimum-distance, visible-cone and exclusion-volume rejection.
+- Tuned the compact `L_Rift_Test` safe-spawn radius from 1000 to 600 units so its existing valid spawn points remain reachable without allowing face-spawns.
+- Replicated a compact director snapshot and surfaced it in the objective tracker and diagnostics HUD.
+
 ## [0.8.2] - 2026-07-21
 
 - Added server-authoritative rift stability rules, four replicated risk bands, objective and alarm stability costs, and critical/collapse environmental pollution.

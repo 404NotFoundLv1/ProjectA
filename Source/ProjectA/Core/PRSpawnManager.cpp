@@ -1,6 +1,7 @@
 #include "Core/PRSpawnManager.h"
 
 #include "Core/PREnemySpawnPoint.h"
+#include "Core/PREncounterExclusionVolume.h"
 #include "Core/PRRiftGameState.h"
 #include "Core/PRRiftGameMode.h"
 #include "Core/PRRiftRuleComponent.h"
@@ -11,6 +12,8 @@
 #include "Enemies/PREnemyCharacter.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
+#include "NavigationSystem.h"
+#include "Characters/PRCharacter.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
@@ -81,22 +84,9 @@ bool APRSpawnManager::StartSpawningForObjective(APRRiftObjectiveActor* Objective
 	ActiveObjective = ObjectiveActor;
 	bSpawningActive = true;
 	DiscoverSpawnPoints();
-	SpawnWave();
-
-	const UPRProjectSettings* ProjectSettings = GetDefault<UPRProjectSettings>();
-	if (!ProjectSettings)
-	{
-		UE_LOG(LogProjectA, Error, TEXT("ProjectRift project settings are unavailable while starting the spawn wave timer; using the code default interval."));
-	}
-	const float SafeWaveInterval = ProjectSettings
-		? FMath::Max(0.1f, ProjectSettings->WaveInterval)
-		: 6.0f;
-	GetWorldTimerManager().SetTimer(WaveTimerHandle, this, &APRSpawnManager::HandleWaveTimerElapsed, SafeWaveInterval, true);
-
-	UE_LOG(LogProjectA, Log, TEXT("Rift spawn manager started. Manager=%s WaveInterval=%.1f SpawnPoints=%d"),
-		*GetNameSafe(this),
-		SafeWaveInterval,
-		SpawnPoints.Num());
+	// v0.8.3: cadence is owned by the GameMode encounter director. This method
+	// remains the legacy activation adapter used by Blueprint callers.
+	UE_LOG(LogProjectA, Log, TEXT("Rift spawn manager registered with encounter director. Manager=%s SpawnPoints=%d"), *GetNameSafe(this), SpawnPoints.Num());
 
 	return true;
 }
@@ -119,6 +109,7 @@ void APRSpawnManager::StopSpawning()
 		}
 	}
 	AliveEnemies.Reset();
+	EncounterUnits.Reset();
 	SpawnPoints.Reset();
 	NextSpawnPointIndex = 0;
 }
@@ -152,78 +143,20 @@ int32 APRSpawnManager::SpawnWave()
 		return 0;
 	}
 
-	UWorld* World = GetWorld();
-	UClass* EnemyClass = SpawnedEnemyClass ? SpawnedEnemyClass.Get() : APREnemyCharacter::StaticClass();
-	if (!World || !EnemyClass)
-	{
-		return 0;
-	}
-
 	int32 SpawnedCount = 0;
 	for (int32 SpawnIndex = 0; SpawnIndex < SpawnCount; ++SpawnIndex)
 	{
-		bool bEliteSpawn = false;
-		FActorSpawnParameters SpawnParameters;
-		SpawnParameters.Owner = this;
-		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-
-		const FTransform SpawnTransform = ChooseSpawnTransform();
-		AActor* SpawnedActor = World->SpawnActorDeferred<AActor>(EnemyClass, SpawnTransform, this, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
-		if (!SpawnedActor)
-		{
-			continue;
-		}
-		if (APREnemyCharacter* Enemy = Cast<APREnemyCharacter>(SpawnedActor))
-		{
-			Enemy->SetSpawnHealthMultiplier(GetEnemyHealthMultiplierForScaling());
-			const APRRiftGameMode* RiftGameMode = World->GetAuthGameMode<APRRiftGameMode>();
-			bEliteSpawn = RiftGameMode && RiftGameMode->GetRiftRuleComponent()
-				&& RiftGameMode->GetRiftRuleComponent()->HasModifier(FName(TEXT("Modifier.EliteReinforcements"))) && SpawnIndex == 0;
-			if (bEliteSpawn)
-			{
-				const FPRMissionRuleSnapshot Rules = RiftGameMode->GetRiftRuleComponent()->GetRuleSnapshot();
-				Enemy->SetSpawnHealthMultiplier(GetEnemyHealthMultiplierForScaling() * Rules.EliteHealthMultiplier);
-				Enemy->SetSpawnAttackPowerMultiplier(Rules.EliteAttackMultiplier);
-			}
-			const UPRObjectiveGraphComponent* ObjectiveGraph = RiftGameMode ? RiftGameMode->GetObjectiveGraphComponent() : nullptr;
-			const FPRObjectiveNodeDefinition* NodeDefinition = ObjectiveGraph && ActiveObjective
-				? ObjectiveGraph->FindNodeDefinition(ActiveObjective->GetObjectiveNodeId())
-				: nullptr;
-			if (NodeDefinition && NodeDefinition->ObjectiveType == EPRObjectiveType::Hunt)
-			{
-				Enemy->SetHuntTargetId(NodeDefinition->TargetId);
-			}
-		}
-		SpawnedActor->FinishSpawning(SpawnTransform);
-		if (APREnemyCharacter* Enemy = Cast<APREnemyCharacter>(SpawnedActor))
-		{
-			if (APRRiftGameMode* RiftGameMode = World->GetAuthGameMode<APRRiftGameMode>())
-			{
-				if (UPRRiftRuleComponent* Rules = RiftGameMode->GetRiftRuleComponent())
-				{
-					Rules->ApplyRulesToEnemy(Enemy);
-				}
-			}
-			if (bEliteSpawn)
-			{
-				if (UPRAbilitySystemComponent* AbilitySystem = Enemy->GetProjectRiftAbilitySystemComponent())
-				{
-					AbilitySystem->AddLooseGameplayTag(ProjectRiftGameplayTags::State_Enemy_Elite);
-				}
-			}
-		}
-
-		SpawnedActor->SetReplicates(true);
-		SpawnedActor->SetReplicateMovement(true);
-		SpawnedActor->OnDestroyed.AddDynamic(this, &APRSpawnManager::HandleSpawnedActorDestroyed);
-		AliveEnemies.Add(SpawnedActor);
-		++SpawnedCount;
+		FPREncounterSpawnRequest Request;
+		Request.EntryId = TEXT("Enemy.Basic");
+		Request.Category = EPREncounterUnitCategory::Melee;
+		Request.ThreatCost = 1.0f;
+		Request.ObjectiveNodeId = ActiveObjective ? ActiveObjective->GetObjectiveNodeId() : NAME_None;
+		SpawnedCount += ExecuteEncounterSpawnRequest(Request);
 	}
 
 	if (SpawnedCount > 0)
 	{
-		++SpawnedWaveCount;
-		UE_LOG(LogProjectA, Log, TEXT("Rift spawn wave spawned. Manager=%s Wave=%d Spawned=%d Alive=%d"),
+		UE_LOG(LogProjectA, Log, TEXT("Rift spawn wave spawned. Manager=%s Requests=%d Spawned=%d Alive=%d"),
 			*GetNameSafe(this),
 			SpawnedWaveCount,
 			SpawnedCount,
@@ -231,6 +164,72 @@ int32 APRSpawnManager::SpawnWave()
 	}
 
 	return SpawnedCount;
+}
+
+int32 APRSpawnManager::ExecuteEncounterSpawnRequest(const FPREncounterSpawnRequest& Request)
+{
+	if (!HasAuthority() || !bSpawningActive || Request.ThreatCost <= 0.0f)
+	{
+		return 0;
+	}
+	UWorld* World = GetWorld();
+	UClass* EnemyClass = Request.EnemyClass ? Request.EnemyClass.Get() : (SpawnedEnemyClass ? SpawnedEnemyClass.Get() : APREnemyCharacter::StaticClass());
+	FTransform SpawnTransform;
+	FString RejectionReason;
+	if (!World || !EnemyClass || !ChooseEncounterSpawnTransform(Request, SpawnTransform, RejectionReason))
+	{
+		return 0;
+	}
+	AActor* SpawnedActor = World->SpawnActorDeferred<AActor>(EnemyClass, SpawnTransform, this, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding);
+	if (!SpawnedActor) return 0;
+	if (APREnemyCharacter* Enemy = Cast<APREnemyCharacter>(SpawnedActor))
+	{
+		Enemy->SetSpawnHealthMultiplier(GetEnemyHealthMultiplierForScaling());
+		if (APRRiftGameMode* RiftGameMode = World->GetAuthGameMode<APRRiftGameMode>())
+		{
+			if (Request.bElite && RiftGameMode->GetRiftRuleComponent())
+			{
+				const FPRMissionRuleSnapshot Rules = RiftGameMode->GetRiftRuleComponent()->GetRuleSnapshot();
+				Enemy->SetSpawnHealthMultiplier(GetEnemyHealthMultiplierForScaling() * Rules.EliteHealthMultiplier);
+				Enemy->SetSpawnAttackPowerMultiplier(Rules.EliteAttackMultiplier);
+			}
+			if (const UPRObjectiveGraphComponent* Graph = RiftGameMode->GetObjectiveGraphComponent())
+			{
+				if (const FPRObjectiveNodeDefinition* Node = ActiveObjective ? Graph->FindNodeDefinition(ActiveObjective->GetObjectiveNodeId()) : nullptr)
+					if (Node->ObjectiveType == EPRObjectiveType::Hunt) Enemy->SetHuntTargetId(Node->TargetId);
+			}
+		}
+	}
+	SpawnedActor->FinishSpawning(SpawnTransform);
+	if (APREnemyCharacter* Enemy = Cast<APREnemyCharacter>(SpawnedActor))
+	{
+		if (APRRiftGameMode* RiftGameMode = World->GetAuthGameMode<APRRiftGameMode>())
+			if (UPRRiftRuleComponent* Rules = RiftGameMode->GetRiftRuleComponent()) Rules->ApplyRulesToEnemy(Enemy);
+		if (Request.bElite)
+			if (UPRAbilitySystemComponent* AbilitySystem = Enemy->GetProjectRiftAbilitySystemComponent()) AbilitySystem->AddLooseGameplayTag(ProjectRiftGameplayTags::State_Enemy_Elite);
+	}
+	SpawnedActor->SetReplicates(true);
+	SpawnedActor->SetReplicateMovement(true);
+	SpawnedActor->OnDestroyed.AddDynamic(this, &APRSpawnManager::HandleSpawnedActorDestroyed);
+	AliveEnemies.Add(SpawnedActor);
+	EncounterUnits.Add(SpawnedActor, Request);
+	++SpawnedWaveCount;
+	return 1;
+}
+
+float APRSpawnManager::GetAliveEncounterThreat() const
+{
+	PruneDeadEnemies();
+	float Threat = 0.0f;
+	for (const TPair<TWeakObjectPtr<AActor>, FPREncounterSpawnRequest>& Pair : EncounterUnits) if (Pair.Key.IsValid()) Threat += FMath::Max(0.0f, Pair.Value.ThreatCost);
+	return Threat;
+}
+
+int32 APRSpawnManager::GetAliveEncounterCategoryCount(const EPREncounterUnitCategory Category) const
+{
+	int32 Count = 0;
+	for (const TPair<TWeakObjectPtr<AActor>, FPREncounterSpawnRequest>& Pair : EncounterUnits) if (Pair.Key.IsValid() && Pair.Value.Category == Category) ++Count;
+	return Count;
 }
 
 int32 APRSpawnManager::DiscoverSpawnPoints()
@@ -250,10 +249,10 @@ int32 APRSpawnManager::DiscoverSpawnPoints()
 			SpawnPoints.Add(SpawnPoint);
 		}
 	}
-
-	if (SpawnPoints.IsEmpty())
+	EncounterExclusionVolumes.Reset();
+	for (TActorIterator<APREncounterExclusionVolume> VolumeIt(World); VolumeIt; ++VolumeIt)
 	{
-		EnsureFallbackSpawnPoint();
+		if (APREncounterExclusionVolume* Volume = *VolumeIt) EncounterExclusionVolumes.Add(Volume);
 	}
 
 	return SpawnPoints.Num();
@@ -324,10 +323,9 @@ int32 APRSpawnManager::GetMaxAliveEnemiesForScaling() const
 	const UPRProjectSettings* Settings = GetDefault<UPRProjectSettings>();
 	const int32 Base = Settings ? FMath::Max(1, Settings->MaxAliveEnemies) : 8;
 	const int32 PerPlayer = Settings ? FMath::Max(0, Settings->MaxAliveEnemiesPerAdditionalPlayer) : 2;
-	const int32 BaseCap = Base + FMath::Max(0, GetDifficultyPlayerCountForScaling() - 1) * PerPlayer;
-	const APRRiftGameState* RiftGameState = GetWorld() ? GetWorld()->GetGameState<APRRiftGameState>() : nullptr;
-	const float Multiplier = RiftGameState ? RiftGameState->GetRiftRiskSnapshot().EnemyBudgetMultiplier : 1.0f;
-	return FMath::Max(1, FMath::RoundToInt(BaseCap * Multiplier));
+	// This is a safety cap, not a threat target: risk may raise pressure but
+	// never permits more actors than the frozen-party hard limit.
+	return FMath::Max(1, Base + FMath::Max(0, GetDifficultyPlayerCountForScaling() - 1) * PerPlayer);
 }
 
 float APRSpawnManager::GetEnemyHealthMultiplierForScaling() const
@@ -345,55 +343,88 @@ void APRSpawnManager::PruneDeadEnemies() const
 	{
 		return !IsValid(Candidate);
 	});
+	for (auto It = const_cast<APRSpawnManager*>(this)->EncounterUnits.CreateIterator(); It; ++It)
+	{
+		if (!It.Key().IsValid()) It.RemoveCurrent();
+	}
 }
 
-FTransform APRSpawnManager::ChooseSpawnTransform()
-{
-	if (SpawnPoints.IsEmpty())
-	{
-		EnsureFallbackSpawnPoint();
-	}
-
-	if (!SpawnPoints.IsEmpty())
-	{
-		const int32 SafeIndex = NextSpawnPointIndex % SpawnPoints.Num();
-		NextSpawnPointIndex = (NextSpawnPointIndex + 1) % SpawnPoints.Num();
-		if (const APREnemySpawnPoint* SpawnPoint = SpawnPoints[SafeIndex])
-		{
-			return SpawnPoint->GetSpawnTransform();
-		}
-	}
-
-	return FTransform(GetActorRotation(), GetActorLocation() + FVector(600.0f, 0.0f, 60.0f));
-}
-
-void APRSpawnManager::EnsureFallbackSpawnPoint()
+bool APRSpawnManager::ChooseEncounterSpawnTransform(const FPREncounterSpawnRequest& Request, FTransform& OutTransform, FString& OutRejectionReason) const
 {
 	UWorld* World = GetWorld();
+	const UPRProjectSettings* Settings = GetDefault<UPRProjectSettings>();
+	const float MinimumDistance = Settings ? Settings->EncounterMinimumPlayerDistance : 1000.0f;
+	const int32 MaximumAttempts = Settings ? FMath::Max(1, Settings->EncounterMaximumCandidateAttempts) : 8;
+	const float NavigationRadius = Settings ? FMath::Max(0.0f, Settings->EncounterNavProjectionRadius) : 250.0f;
 	if (!World)
 	{
-		return;
+		OutRejectionReason = TEXT("World is unavailable.");
+		return false;
 	}
-
-	const FVector Origin = ActiveObjective ? ActiveObjective->GetActorLocation() : GetActorLocation();
-	const FVector FallbackLocation = Origin + FVector(650.0f, 0.0f, 60.0f);
-
-	FActorSpawnParameters SpawnParameters;
-	SpawnParameters.Owner = this;
-	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-	APREnemySpawnPoint* FallbackSpawnPoint = World->SpawnActor<APREnemySpawnPoint>(
-		APREnemySpawnPoint::StaticClass(),
-		FallbackLocation,
-		FRotator::ZeroRotator,
-		SpawnParameters);
-	if (FallbackSpawnPoint)
+	UNavigationSystemV1* NavigationSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+	if (!NavigationSystem)
 	{
-		SpawnPoints.Add(FallbackSpawnPoint);
+		OutRejectionReason = TEXT("Navigation system is unavailable.");
+		return false;
 	}
+	TArray<const APREnemySpawnPoint*> Candidates;
+	for (const APREnemySpawnPoint* Point : SpawnPoints)
+	{
+		if (IsValid(Point) && Point->AllowsObjectiveNode(Request.ObjectiveNodeId) && (Request.SpawnGroupId.IsNone() || Point->GetSpawnGroupId() == Request.SpawnGroupId)) Candidates.Add(Point);
+	}
+	Candidates.Sort([](const APREnemySpawnPoint& Left, const APREnemySpawnPoint& Right) { return Left.GetPathName() < Right.GetPathName(); });
+	FRandomStream Random(HashCombineFast(HashCombineFast(::GetTypeHash(Request.RunSeed), Request.ObjectiveNodeId.GetComparisonIndex().ToUnstableInt()), ::GetTypeHash(Request.DecisionOrdinal)));
+	for (int32 Attempt = 0; Attempt < MaximumAttempts && !Candidates.IsEmpty(); ++Attempt)
+	{
+		float TotalWeight = 0.0f;
+		for (const APREnemySpawnPoint* Point : Candidates) TotalWeight += FMath::Max(0.01f, Point->GetEncounterWeight());
+		float Pick = Random.FRandRange(0.0f, TotalWeight);
+		int32 SelectedIndex = Candidates.Num() - 1;
+		for (int32 Index = 0; Index < Candidates.Num(); ++Index) { Pick -= FMath::Max(0.01f, Candidates[Index]->GetEncounterWeight()); if (Pick <= 0.0f) { SelectedIndex = Index; break; } }
+		const APREnemySpawnPoint* Point = Candidates[SelectedIndex];
+		Candidates.RemoveAtSwap(SelectedIndex, EAllowShrinking::No);
+		FNavLocation ProjectedLocation;
+		if (!NavigationSystem->ProjectPointToNavigation(Point->GetActorLocation(), ProjectedLocation, FVector(NavigationRadius)))
+		{
+			continue;
+		}
+		const FVector Candidate = ProjectedLocation.Location;
+		constexpr float EnemyCapsuleRadius = 42.0f;
+		constexpr float EnemyCapsuleHalfHeight = 90.0f;
+		const FVector CapsuleCenter = ProjectRiftEncounterSpawn::GetCapsuleCenterForNavigationLocation(Candidate, EnemyCapsuleHalfHeight);
+		bool bSafe = true;
+		for (const APREncounterExclusionVolume* Volume : EncounterExclusionVolumes)
+		{
+			if (IsValid(Volume) && Volume->ExcludesLocation(Candidate)) { bSafe = false; break; }
+		}
+		if (World->OverlapBlockingTestByChannel(CapsuleCenter, FQuat::Identity, ECC_Pawn, FCollisionShape::MakeCapsule(EnemyCapsuleRadius, EnemyCapsuleHalfHeight))
+			|| World->OverlapBlockingTestByChannel(CapsuleCenter, FQuat::Identity, ECC_WorldStatic, FCollisionShape::MakeCapsule(EnemyCapsuleRadius, EnemyCapsuleHalfHeight)))
+		{
+			bSafe = false;
+		}
+		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); bSafe && It; ++It)
+		{
+			const APlayerController* Controller = It->Get();
+			const APawn* Pawn = Controller ? Controller->GetPawn() : nullptr;
+			if (Pawn && FVector::DistSquared(Pawn->GetActorLocation(), Candidate) < FMath::Square(MinimumDistance)) { bSafe = false; break; }
+			if (Controller && Pawn && Settings && FVector::Dist(Pawn->GetActorLocation(), Candidate) <= Settings->EncounterVisibilityCheckDistance)
+			{
+				FVector ViewLocation; FRotator ViewRotation;
+				Controller->GetPlayerViewPoint(ViewLocation, ViewRotation);
+				const FVector ToCandidate = (Candidate - ViewLocation).GetSafeNormal();
+				const float MinDot = FMath::Cos(FMath::DegreesToRadians(Settings->EncounterVisibilityConeHalfAngleDegrees));
+				FHitResult Hit;
+				if (FVector::DotProduct(ViewRotation.Vector(), ToCandidate) >= MinDot && !GetWorld()->LineTraceSingleByChannel(Hit, ViewLocation, Candidate, ECC_Visibility)) { bSafe = false; break; }
+			}
+		}
+		if (bSafe) { OutTransform = FTransform(Point->GetActorRotation(), CapsuleCenter, Point->GetActorScale3D()); return true; }
+	}
+	OutRejectionReason = TEXT("No configured spawn point passed the bounded navigation, collision, exclusion, distance, and visibility checks.");
+	return false;
 }
 
 void APRSpawnManager::HandleSpawnedActorDestroyed(AActor* DestroyedActor)
 {
 	AliveEnemies.Remove(DestroyedActor);
+	EncounterUnits.Remove(DestroyedActor);
 }

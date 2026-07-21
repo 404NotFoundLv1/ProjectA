@@ -8,6 +8,7 @@
 #include "Core/PRSpawnManager.h"
 #include "Core/PRObjectiveGraphComponent.h"
 #include "Core/PRRiftRuleComponent.h"
+#include "Core/PREncounterDirectorComponent.h"
 #include "Core/PRRiftObjectiveActor.h"
 #include "Core/PRObjectiveTypeActors.h"
 #include "Core/PRAssetManager.h"
@@ -42,6 +43,7 @@ APRRiftGameMode::APRRiftGameMode()
 	GameStateClass = APRRiftGameState::StaticClass();
 	ObjectiveGraphComponent = CreateDefaultSubobject<UPRObjectiveGraphComponent>(TEXT("ObjectiveGraphComponent"));
 	RiftRuleComponent = CreateDefaultSubobject<UPRRiftRuleComponent>(TEXT("RiftRuleComponent"));
+	EncounterDirectorComponent = CreateDefaultSubobject<UPREncounterDirectorComponent>(TEXT("EncounterDirectorComponent"));
 }
 
 void APRRiftGameMode::BeginPlay()
@@ -1341,16 +1343,14 @@ bool APRRiftGameMode::StartSpawnManagersForObjective(APRRiftObjectiveActor* Obje
 		}
 	}
 
-	bool bStartedAny = false;
-	for (const TObjectPtr<APRSpawnManager>& SpawnManager : SpawnManagers)
+	if (!EncounterDirectorComponent || SpawnManagers.IsEmpty())
 	{
-		if (SpawnManager && SpawnManager->StartSpawningForObjective(ObjectiveActor))
-		{
-			bStartedAny = true;
-		}
+		return false;
 	}
-
-	return bStartedAny;
+	TArray<APRSpawnManager*> DirectorManagers;
+	for (APRSpawnManager* SpawnManager : SpawnManagers) if (IsValid(SpawnManager)) DirectorManagers.Add(SpawnManager);
+	EncounterDirectorComponent->SetEncounterManagers(DirectorManagers);
+	return EncounterDirectorComponent->StartEncounter(ObjectiveActor, CurrentRunSeed);
 }
 
 bool APRRiftGameMode::RegisterEnemyKilled(APREnemyCharacter* Enemy, AController* Killer)
@@ -1398,6 +1398,11 @@ void APRRiftGameMode::StopSpawnManagers()
 		return;
 	}
 
+	if (EncounterDirectorComponent && EncounterDirectorComponent->IsEncounterActive())
+	{
+		EncounterDirectorComponent->StopEncounter();
+		return;
+	}
 	DiscoverSpawnManagers();
 	for (const TObjectPtr<APRSpawnManager>& SpawnManager : SpawnManagers)
 	{

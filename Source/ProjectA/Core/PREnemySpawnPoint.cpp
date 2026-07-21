@@ -13,3 +13,8 @@ FTransform APREnemySpawnPoint::GetSpawnTransform() const
 {
 	return GetActorTransform();
 }
+
+bool APREnemySpawnPoint::AllowsObjectiveNode(const FName ObjectiveNodeId) const
+{
+	return bEncounterSpawnEnabled && (AllowedObjectiveNodeIds.IsEmpty() || AllowedObjectiveNodeIds.Contains(ObjectiveNodeId));
+}

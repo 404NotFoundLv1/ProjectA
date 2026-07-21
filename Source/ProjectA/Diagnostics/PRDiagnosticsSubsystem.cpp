@@ -357,6 +357,7 @@ FPRDiagnosticSnapshot UPRDiagnosticsSubsystem::BuildSnapshot(APlayerController* 
 			Snapshot.Rift.AlivePlayers = RiftGameState->GetAlivePlayerCount();
 			Snapshot.Rift.ExtractedPlayers = RiftGameState->GetExtractedPlayerCount();
 			Snapshot.Rift.KilledEnemies = RiftGameState->GetKilledEnemyCount();
+			Snapshot.Rift.EncounterDirector = RiftGameState->GetEncounterDirectorSnapshot();
 			Snapshot.Rift.bSettlementReady = RiftGameState->IsSettlementReady();
 			const FPRRiftSettlementData Settlement = RiftGameState->GetSettlementData();
 			Snapshot.Rift.RunId = Settlement.RunId;

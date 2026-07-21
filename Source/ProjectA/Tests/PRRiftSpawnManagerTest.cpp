@@ -292,15 +292,15 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Spawn manager activates when a rift objective starts"), bActiveAfterObjective);
 	bool bWaveTimerActive = false;
 	TestTrue(TEXT("Can query active wave timer state"), CallBoolFunctionNoParams(SpawnManager, TEXT("IsWaveTimerActive"), bWaveTimerActive));
-	TestTrue(TEXT("Wave timer runs while spawning is active"), bWaveTimerActive);
+	TestFalse(TEXT("Legacy wave timer stays off because the encounter director owns cadence"), bWaveTimerActive);
 
 	int32 SpawnedWaveCount = 0;
 	CallIntFunctionNoParams(SpawnManager, TEXT("GetSpawnedWaveCount"), *this, TEXT("Can query spawned wave count"), SpawnedWaveCount);
-	TestEqual(TEXT("Starting the objective immediately spawns the first wave"), SpawnedWaveCount, 1);
+	TestEqual(TEXT("A test world without navigation never records an unsafe spawn request"), SpawnedWaveCount, 0);
 
 	int32 AliveEnemyCount = 0;
 	CallIntFunctionNoParams(SpawnManager, TEXT("GetAliveEnemyCount"), *this, TEXT("Can query alive enemy count"), AliveEnemyCount);
-	TestEqual(TEXT("First wave scales from frozen player count and respects max alive cap"), AliveEnemyCount, 3);
+	TestEqual(TEXT("Director refuses to spawn when navigation projection is unavailable"), AliveEnemyCount, 0);
 
 	int32 ReplicatedSpawnedActors = 0;
 	for (TActorIterator<AActor> ActorIt(World); ActorIt; ++ActorIt)
@@ -317,7 +317,7 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 
 	int32 ManualWaveSpawned = 0;
 	CallIntFunctionNoParams(SpawnManager, TEXT("SpawnWave"), *this, TEXT("Can manually request a wave"), ManualWaveSpawned);
-	TestEqual(TEXT("Spawn manager refuses to exceed max alive enemy cap"), ManualWaveSpawned, 0);
+	TestEqual(TEXT("Legacy manual wave also rejects an unsafe no-navigation world"), ManualWaveSpawned, 0);
 
 	TestTrue(TEXT("GameMode can stop spawn managers through reflected API"), CallVoidFunctionNoParams(RiftGameMode, TEXT("StopSpawnManagers")));
 	bool bActiveAfterStop = true;
@@ -345,10 +345,10 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 	SettingsOverride->BaseEnemiesPerWave = 1;
 	SettingsOverride->EnemiesPerAdditionalPlayer = -3;
 	SettingsOverride->MaxAliveEnemies = 2;
-	TestTrue(TEXT("Wave timer remains active after clamping an invalid interval"), ClampedSpawnManager->IsWaveTimerActive());
-	TestEqual(TEXT("A manual wave can run after invalid settings are clamped"), ClampedSpawnManager->SpawnWave(), 1);
-	TestEqual(TEXT("First clamped manual wave increments the wave count"), ClampedSpawnManager->GetSpawnedWaveCount(), 1);
-	TestEqual(TEXT("Negative additional enemy scaling clamps to zero"), ClampedSpawnManager->GetAliveEnemyCount(), 1);
+	TestFalse(TEXT("Legacy wave timer remains disabled after clamping an invalid interval"), ClampedSpawnManager->IsWaveTimerActive());
+	TestEqual(TEXT("A manual wave remains fail-closed after invalid settings are clamped"), ClampedSpawnManager->SpawnWave(), 0);
+	TestEqual(TEXT("Rejected unsafe wave does not increment the wave count"), ClampedSpawnManager->GetSpawnedWaveCount(), 0);
+	TestEqual(TEXT("Negative additional enemy scaling leaves no unsafe spawned actors"), ClampedSpawnManager->GetAliveEnemyCount(), 0);
 	TestEqual(TEXT("Negative alive-cap scaling clamps to zero while retaining the current base cap"), ClampedSpawnManager->GetMaxAliveEnemiesForScaling(), 2);
 	TestEqual(TEXT("Negative health scaling clamps to one"), ClampedSpawnManager->GetEnemyHealthMultiplierForScaling(), 1.0f);
 	ClampedSpawnManager->StopSpawning();
@@ -359,7 +359,7 @@ bool FPRRiftSpawnManagerTest::RunTest(const FString& Parameters)
 	SettingsOverride->MaxAliveEnemiesPerAdditionalPlayer = 0;
 	SettingsOverride->WaveInterval = 0.2f;
 	TestTrue(TEXT("Spawn manager restarts for alive-cap clamp coverage"), ClampedSpawnManager->StartSpawningForObjective(nullptr));
-	TestEqual(TEXT("Invalid max alive enemy setting clamps to one"), ClampedSpawnManager->GetAliveEnemyCount(), 1);
+	TestEqual(TEXT("Invalid max alive enemy setting does not autonomously spawn without a director request"), ClampedSpawnManager->GetAliveEnemyCount(), 0);
 	ClampedSpawnManager->StopSpawning();
 
 	return true;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/PREncounterDirectorTypes.h"
 #include "PRDiagnosticsTypes.generated.h"
 
 UENUM(BlueprintType)
@@ -184,6 +185,7 @@ struct PROJECTA_API FPRDiagnosticRiftSnapshot
 	UPROPERTY(BlueprintReadOnly, Category="Diagnostics") int32 KilledEnemies = 0;
 	UPROPERTY(BlueprintReadOnly, Category="Diagnostics") bool bSettlementReady = false;
 	UPROPERTY(BlueprintReadOnly, Category="Diagnostics") FString SettlementStatus;
+	UPROPERTY(BlueprintReadOnly, Category="Diagnostics") FPREncounterDirectorSnapshot EncounterDirector;
 };
 
 USTRUCT(BlueprintType)
@@ -210,4 +212,3 @@ struct PROJECTA_API FPRDiagnosticExportResult
 	UPROPERTY(BlueprintReadOnly, Category="Diagnostics") int32 EventCount = 0;
 	UPROPERTY(BlueprintReadOnly, Category="Diagnostics") FString Diagnostic;
 };
-

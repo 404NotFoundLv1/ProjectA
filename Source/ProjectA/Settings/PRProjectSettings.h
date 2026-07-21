@@ -67,6 +67,28 @@ public:
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Spawning", meta=(ClampMin="0.1", UIMin="0.1"))
 	float WaveInterval = 6.0f;
 
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="0.1")) float EncounterSampleInterval = 1.0f;
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="0.0")) float EncounterBaseThreatBudget = 4.0f;
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="0.0")) float EncounterThreatPerAdditionalPlayer = 2.0f;
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="1.0")) float EncounterMaximumThreatBudget = 16.0f;
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="0.0")) float EncounterMinimumPlayerDistance = 600.0f;
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="0.1")) float EncounterPressureDuration = 20.0f;
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="0.1")) float EncounterCooldownDuration = 8.0f;
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="0.1")) float EncounterReinforcementInterval = 6.0f;
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="0.0")) float EncounterTelegraphDuration = 1.5f;
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="0.1")) float EncounterUnsafeRetryDelay = 2.0f;
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="0.1")) float EncounterRespiteDuration = 12.0f;
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="0.1")) float EncounterRespiteCooldown = 45.0f;
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="0.0", ClampMax="1.0")) float EncounterLowHealthThreshold = 0.35f;
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="0.0", ClampMax="1.0")) float EncounterPostRespiteBudgetFloor = 0.5f;
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="1")) int32 EncounterMaximumCandidateAttempts = 8;
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="0.0")) float EncounterNavProjectionRadius = 250.0f;
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="0.0")) float EncounterVisibilityCheckDistance = 5000.0f;
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="0.0", ClampMax="180.0")) float EncounterVisibilityConeHalfAngleDegrees = 50.0f;
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="0")) int32 EncounterSoloEliteCap = 1;
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="0")) int32 EncounterLargePartyEliteCap = 2;
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="0")) int32 EncounterExploderCap = 1;
+
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Extraction", meta=(ClampMin="1.0", UIMin="1.0"))
 	float ExtractionRadius = 320.0f;
 

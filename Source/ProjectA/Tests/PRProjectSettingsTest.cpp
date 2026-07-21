@@ -115,7 +115,7 @@ bool FPRProjectSettingsTest::RunTest(const FString& Parameters)
 	TestSettingProperty(*this, SettingsClass, TEXT("MaxPollutionDamageReduction"), TEXT("0.0"), TEXT("1.0"));
 
 	TestEqual(TEXT("Initial stability default"), Settings->InitialRiftStability, 100.0f);
-	TestEqual(TEXT("Stability drain default"), Settings->RiftStabilityDrainPerSecond, 1.0f);
+	TestEqual(TEXT("Stability drain default"), Settings->RiftStabilityDrainPerSecond, 0.15f);
 	TestEqual(TEXT("Failed retention default"), Settings->FailedResourceRetentionRate, 0.5f);
 	TestEqual(TEXT("Return delay default"), Settings->ReturnToLobbyDelayAfterSettlement, 4.0f);
 	TestEqual(TEXT("Hold duration default"), Settings->ObjectiveHoldDuration, 30.0f);
@@ -135,9 +135,10 @@ bool FPRProjectSettingsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Rescue drone revive duration default"), Settings->DroneReviveDuration, 3.0f);
 	TestFloatSettingDefault(*this, SettingsClass, Settings, TEXT("AttackPowerDivisor"), 100.0f);
 	TestFloatSettingDefault(*this, SettingsClass, Settings, TEXT("MaxPollutionDamageReduction"), 0.8f);
+	TestFloatSettingDefault(*this, SettingsClass, Settings, TEXT("EncounterMinimumPlayerDistance"), 600.0f);
 
 	TestConfigValue(*this, TEXT("InitialRiftStability"), 100.0f);
-	TestConfigValue(*this, TEXT("RiftStabilityDrainPerSecond"), 1.0f);
+	TestConfigValue(*this, TEXT("RiftStabilityDrainPerSecond"), 0.15f);
 	TestConfigValue(*this, TEXT("FailedResourceRetentionRate"), 0.5f);
 	TestConfigValue(*this, TEXT("ReturnToLobbyDelayAfterSettlement"), 4.0f);
 	TestConfigValue(*this, TEXT("ObjectiveHoldDuration"), 30.0f);
@@ -157,6 +158,7 @@ bool FPRProjectSettingsTest::RunTest(const FString& Parameters)
 	TestConfigValue(*this, TEXT("DroneReviveDuration"), 3.0f);
 	TestConfigValue(*this, TEXT("AttackPowerDivisor"), 100.0f);
 	TestConfigValue(*this, TEXT("MaxPollutionDamageReduction"), 0.8f);
+	TestConfigValue(*this, TEXT("EncounterMinimumPlayerDistance"), 600.0f);
 
 	return true;
 }

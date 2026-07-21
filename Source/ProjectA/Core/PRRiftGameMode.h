@@ -21,6 +21,7 @@ class APRRescueDroneActor;
 class APRCharacter;
 class UPRObjectiveGraphComponent;
 class UPRRiftRuleComponent;
+class UPREncounterDirectorComponent;
 
 /**
  * Server-authoritative rule set for rift missions.
@@ -114,6 +115,7 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Rift|Rules")
 	UPRRiftRuleComponent* GetRiftRuleComponent() const { return RiftRuleComponent; }
+	UFUNCTION(BlueprintPure, Category = "Rift|Encounter") UPREncounterDirectorComponent* GetEncounterDirectorComponent() const { return EncounterDirectorComponent; }
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Rules")
 	bool ReportRiftAlarm(FName AlarmId, int32 Severity);
@@ -241,6 +243,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Rift|Rules")
 	TObjectPtr<UPRRiftRuleComponent> RiftRuleComponent;
+
+	UPROPERTY(VisibleAnywhere, Category = "Rift|Encounter")
+	TObjectPtr<UPREncounterDirectorComponent> EncounterDirectorComponent;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<APRSpawnManager>> SpawnManagers;

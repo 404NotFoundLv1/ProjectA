@@ -23,6 +23,7 @@ void APRRiftGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 
 	DOREPLIFETIME(APRRiftGameState, ObjectiveSummaries);
 	DOREPLIFETIME(APRRiftGameState, RiftRiskSnapshot);
+	DOREPLIFETIME(APRRiftGameState, EncounterDirectorSnapshot);
 	DOREPLIFETIME(APRRiftGameState, MissionRuleSnapshot);
 	DOREPLIFETIME(APRRiftGameState, MissionModifierSummaries);
 	DOREPLIFETIME(APRRiftGameState, SettlementData);
@@ -98,6 +99,15 @@ void APRRiftGameState::SetRiftRiskSnapshot(const FPRRiftRiskSnapshot& InRiskSnap
 	RiftRiskSnapshot.PeakRewardMultiplier = FMath::Clamp(RiftRiskSnapshot.PeakRewardMultiplier, 0.25f, 3.0f);
 	RiftRiskSnapshot.EnvironmentalPollutionDamage = FMath::Max(0.0f, RiftRiskSnapshot.EnvironmentalPollutionDamage);
 	RiftRiskSnapshot.EnvironmentalPulseIntervalSeconds = FMath::Max(0.0f, RiftRiskSnapshot.EnvironmentalPulseIntervalSeconds);
+}
+
+void APRRiftGameState::SetEncounterDirectorSnapshot(const FPREncounterDirectorSnapshot& InSnapshot)
+{
+	EncounterDirectorSnapshot = InSnapshot;
+	EncounterDirectorSnapshot.TargetThreatBudget = FMath::Max(0.0f, EncounterDirectorSnapshot.TargetThreatBudget);
+	EncounterDirectorSnapshot.AliveThreat = FMath::Max(0.0f, EncounterDirectorSnapshot.AliveThreat);
+	EncounterDirectorSnapshot.AliveEnemyCount = FMath::Max(0, EncounterDirectorSnapshot.AliveEnemyCount);
+	EncounterDirectorSnapshot.NextEventRemainingSeconds = FMath::Max(0.0f, EncounterDirectorSnapshot.NextEventRemainingSeconds);
 }
 
 void APRRiftGameState::SetMissionModifierSummaries(const TArray<FPRMissionModifierSummary>& InModifierSummaries)

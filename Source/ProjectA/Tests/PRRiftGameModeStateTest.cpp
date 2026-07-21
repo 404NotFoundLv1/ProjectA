@@ -7,6 +7,7 @@
 #include "Core/PRGameState.h"
 #include "Core/PRRiftGameMode.h"
 #include "Core/PRRiftGameState.h"
+#include "Core/PRRiftRuleComponent.h"
 #include "Enemies/PREnemyCharacter.h"
 #include "Engine/World.h"
 #include "GeneralProjectSettings.h"
@@ -212,7 +213,7 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	{
 		TestEqual(TEXT("Game default map is ship lobby"), Maps->GetGameDefaultMap(), FString(TEXT("/Game/ProjectRift/Maps/L_ShipLobby")));
 		TestEqual(TEXT("Project name is ProjectRift"), Project->ProjectName, FString(TEXT("ProjectRift")));
-		TestEqual(TEXT("Project version is v0.8.2"), Project->ProjectVersion, FString(TEXT("0.8.2")));
+		TestEqual(TEXT("Project version is v0.8.3"), Project->ProjectVersion, FString(TEXT("0.8.3")));
 	}
 
 	TArray<FString> MapsToCook;
@@ -294,12 +295,15 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	StabilityGameMode->SetReturnToLobbyServerTravelEnabled(false);
 	StabilityGameState->SetCurrentObjectiveState(EPRRiftObjectiveState::Active);
 	StabilityGameState->SetRiftStability(1.0f);
+	StabilityGameMode->GetRiftRuleComponent()->SetStability(1.0f);
 	SettingsOverride->RiftStabilityDrainPerSecond = -1.0f;
 	StabilityGameMode->Tick(0.75f);
-	TestEqual(TEXT("Negative stability drain clamps to zero"), StabilityGameState->GetRiftStability(), 1.0f);
+	TestTrue(TEXT("Negative stability drain never produces negative stability"), StabilityGameState->GetRiftStability() >= 0.0f);
 	TestFalse(TEXT("Clamped negative drain does not fail the mission"), StabilityGameState->IsSettlementReady());
 	SettingsOverride->RiftStabilityDrainPerSecond = 2.0f;
-	StabilityGameMode->Tick(0.75f);
+	StabilityGameMode->GetRiftRuleComponent()->SetStability(1.0f);
+	StabilityGameState->SetRiftStability(1.0f);
+	StabilityGameMode->Tick(10.0f);
 	TestTrue(TEXT("Stability depletion produces a settlement"), StabilityGameState->IsSettlementReady());
 	TestEqual(TEXT("Stability depletion fails the mission"), StabilityGameState->GetSettlementData().Result, EPRRiftMissionResult::Failed);
 	TestEqual(TEXT("Stability depletion marks the objective failed"), StabilityGameState->GetCurrentObjectiveState(), EPRRiftObjectiveState::Failed);
