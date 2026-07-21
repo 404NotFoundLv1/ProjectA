@@ -26,6 +26,7 @@ class UPRDiagnosticsWidget;
 class UPRWeaponHUDWidget;
 class UPRQuickbarHUDWidget;
 class UPRObjectiveTrackerWidget;
+class UPRBossHUDWidget;
 class UPRLootTableDataAsset;
 class UGameplayEffect;
 class APRPickupActor;
@@ -144,6 +145,7 @@ public:
 	UPRQuickbarHUDWidget* GetQuickbarHUDWidget() const { return QuickbarHUDWidget.Get(); }
 
 	UPRObjectiveTrackerWidget* GetObjectiveTrackerWidget() const { return ObjectiveTrackerWidget.Get(); }
+	UPRBossHUDWidget* GetBossHUDWidget() const { return BossHUDWidget.Get(); }
 
 	/** Server-only endpoint used by resolved combat feedback to notify this owning client. */
 	void SendHitConfirmationToOwner(const FPRHitConfirmation& Confirmation);
@@ -383,6 +385,8 @@ private:
 	void DestroyQuickbarHUD();
 	void CreateObjectiveTracker();
 	void DestroyObjectiveTracker();
+	void CreateBossHUD();
+	void DestroyBossHUD();
 	void CreateRiftSettlementUI();
 	void DestroyRiftSettlementUI();
 	void CreateShipRepairUI();
@@ -483,6 +487,8 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPRObjectiveTrackerWidget> ObjectiveTrackerWidget;
+	UPROPERTY(EditDefaultsOnly, Category = "Boss|UI") TSubclassOf<UPRBossHUDWidget> BossHUDWidgetClass;
+	UPROPERTY(Transient) TObjectPtr<UPRBossHUDWidget> BossHUDWidget;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Rift|Settlement")
 	TSubclassOf<UPRRiftSettlementWidget> RiftSettlementWidgetClass;

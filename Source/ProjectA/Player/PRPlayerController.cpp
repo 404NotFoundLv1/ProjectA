@@ -58,6 +58,7 @@
 #include "UI/PRWeaponHUDWidget.h"
 #include "UI/PRQuickbarHUDWidget.h"
 #include "UI/PRObjectiveTrackerWidget.h"
+#include "UI/PRBossHUDWidget.h"
 #include "Roles/PRRoleComponent.h"
 #include "Roles/PRRoleDataAsset.h"
 #include "Roles/PRRoleModuleDataAsset.h"
@@ -169,6 +170,7 @@ APRPlayerController::APRPlayerController()
 	WeaponHUDWidgetClass = UPRWeaponHUDWidget::StaticClass();
 	QuickbarHUDWidgetClass = UPRQuickbarHUDWidget::StaticClass();
 	ObjectiveTrackerWidgetClass = UPRObjectiveTrackerWidget::StaticClass();
+	BossHUDWidgetClass = UPRBossHUDWidget::StaticClass();
 	RiftSettlementWidgetClass = UPRRiftSettlementWidget::StaticClass();
 	ShipRepairWidgetClass = UPRShipRepairWidget::StaticClass();
 	CraftingWidgetClass = UPRCraftingWidget::StaticClass();
@@ -219,6 +221,7 @@ void APRPlayerController::BeginPlay()
 		CreateWeaponHUD();
 		CreateQuickbarHUD();
 		CreateObjectiveTracker();
+		CreateBossHUD();
 		CreateRiftSettlementUI();
 		CreateShipRepairUI();
 		CreateCraftingUI();
@@ -248,6 +251,7 @@ void APRPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	DestroyWeaponHUD();
 	DestroyQuickbarHUD();
 	DestroyObjectiveTracker();
+	DestroyBossHUD();
 	DestroyDiagnosticsUI();
 	DestroyLobbyReadyDebugHUD();
 	DestroyGASDebugHUD();
@@ -2452,6 +2456,29 @@ void APRPlayerController::DestroyObjectiveTracker()
 	{
 		ObjectiveTrackerWidget->RemoveFromParent();
 		ObjectiveTrackerWidget = nullptr;
+	}
+}
+
+void APRPlayerController::CreateBossHUD()
+{
+	if (!IsLocalPlayerController() || BossHUDWidget) { return; }
+	if (!BossHUDWidgetClass) { BossHUDWidgetClass = UPRBossHUDWidget::StaticClass(); }
+	BossHUDWidget = CreateWidget<UPRBossHUDWidget>(this, BossHUDWidgetClass);
+	if (!BossHUDWidget) { return; }
+	BossHUDWidget->InitializeForController(this);
+	BossHUDWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+	BossHUDWidget->AddToPlayerScreen(26);
+	BossHUDWidget->SetPositionInViewport(FVector2D(28.0f, 236.0f), false);
+	BossHUDWidget->SetAnchorsInViewport(FAnchors(0.0f, 0.0f));
+	BossHUDWidget->SetAlignmentInViewport(FVector2D::ZeroVector);
+}
+
+void APRPlayerController::DestroyBossHUD()
+{
+	if (BossHUDWidget)
+	{
+		BossHUDWidget->RemoveFromParent();
+		BossHUDWidget = nullptr;
 	}
 }
 

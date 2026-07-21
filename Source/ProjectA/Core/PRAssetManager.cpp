@@ -12,6 +12,7 @@
 #include "Crafting/PRCraftingRecipeDataAsset.h"
 #include "Enemies/PREnemyDefinitionDataAsset.h"
 #include "Enemies/PREnemyRosterDataAsset.h"
+#include "Bosses/PRBossDefinitionDataAsset.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Engine/StreamableManager.h"
 #include "Modules/ModuleManager.h"
@@ -122,6 +123,13 @@ FPrimaryAssetId UPRAssetManager::MakeEnemyRosterPrimaryAssetId(const FName Roste
 		: FPrimaryAssetId(UPREnemyRosterDataAsset::EnemyRosterPrimaryAssetType, RosterId);
 }
 
+FPrimaryAssetId UPRAssetManager::MakeBossPrimaryAssetId(const FName BossId)
+{
+	return BossId.IsNone()
+		? FPrimaryAssetId()
+		: FPrimaryAssetId(UPRBossDefinitionDataAsset::BossPrimaryAssetType, BossId);
+}
+
 void UPRAssetManager::StartInitialLoading()
 {
 	Super::StartInitialLoading();
@@ -155,6 +163,7 @@ void UPRAssetManager::RefreshPrimaryAssetCatalogs()
 	ScanPathsForPrimaryAssets(UPRCraftingRecipeDataAsset::CraftingRecipePrimaryAssetType, { TEXT("/Game/ProjectRift/Crafting") }, UPRCraftingRecipeDataAsset::StaticClass(), false);
 	ScanPathsForPrimaryAssets(UPREnemyDefinitionDataAsset::EnemyPrimaryAssetType, { TEXT("/Game/ProjectRift/Enemies/Definitions") }, UPREnemyDefinitionDataAsset::StaticClass(), false);
 	ScanPathsForPrimaryAssets(UPREnemyRosterDataAsset::EnemyRosterPrimaryAssetType, { TEXT("/Game/ProjectRift/Enemies/Rosters") }, UPREnemyRosterDataAsset::StaticClass(), false);
+	ScanPathsForPrimaryAssets(UPRBossDefinitionDataAsset::BossPrimaryAssetType, { TEXT("/Game/ProjectRift/Bosses/Definitions") }, UPRBossDefinitionDataAsset::StaticClass(), false);
 
 	ValidatePrimaryAssetType(UPRItemDataAsset::ItemPrimaryAssetType);
 	ValidatePrimaryAssetType(UPRAffixDefinitionDataAsset::AffixPrimaryAssetType);
@@ -168,6 +177,7 @@ void UPRAssetManager::RefreshPrimaryAssetCatalogs()
 	ValidatePrimaryAssetType(UPRCraftingRecipeDataAsset::CraftingRecipePrimaryAssetType);
 	ValidatePrimaryAssetType(UPREnemyDefinitionDataAsset::EnemyPrimaryAssetType);
 	ValidatePrimaryAssetType(UPREnemyRosterDataAsset::EnemyRosterPrimaryAssetType);
+	ValidatePrimaryAssetType(UPRBossDefinitionDataAsset::BossPrimaryAssetType);
 
 	TArray<UPRRoleDataAsset*> Roles;
 	TArray<UPRRoleModuleDataAsset*> RoleModules;
@@ -396,6 +406,13 @@ UPREnemyRosterDataAsset* UPRAssetManager::LoadEnemyRosterSync(const FName Roster
 	return Cast<UPREnemyRosterDataAsset>(LoadPrimaryAssetSync(
 		MakeEnemyRosterPrimaryAssetId(RosterId),
 		UPREnemyRosterDataAsset::StaticClass()));
+}
+
+UPRBossDefinitionDataAsset* UPRAssetManager::LoadBossDefinitionSync(const FName BossId)
+{
+	return Cast<UPRBossDefinitionDataAsset>(LoadPrimaryAssetSync(
+		MakeBossPrimaryAssetId(BossId),
+		UPRBossDefinitionDataAsset::StaticClass()));
 }
 
 bool UPRAssetManager::LoadEnemyCatalog(

@@ -21,4 +21,9 @@ public:
 	virtual void HandleCombatUnitHealthDepleted(const FGameplayEffectContextHandle& EffectContext) = 0;
 	/** Called only after the shared Damage meta attribute has resolved shield and health loss. */
 	virtual void HandleCombatUnitDamageResolved(AActor* DamageSource, float ResolvedDamage) {}
+	/** Extended resolved-damage hook retaining the original hit context for specialized combat units. */
+	virtual void HandleCombatUnitDamageResolved(AActor* DamageSource, float ResolvedDamage, const FGameplayEffectContextHandle& EffectContext)
+	{
+		HandleCombatUnitDamageResolved(DamageSource, ResolvedDamage);
+	}
 };

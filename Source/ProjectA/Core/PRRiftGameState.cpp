@@ -24,6 +24,7 @@ void APRRiftGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(APRRiftGameState, ObjectiveSummaries);
 	DOREPLIFETIME(APRRiftGameState, RiftRiskSnapshot);
 	DOREPLIFETIME(APRRiftGameState, EncounterDirectorSnapshot);
+	DOREPLIFETIME(APRRiftGameState, BossRuntimeSnapshot);
 	DOREPLIFETIME(APRRiftGameState, MissionRuleSnapshot);
 	DOREPLIFETIME(APRRiftGameState, MissionModifierSummaries);
 	DOREPLIFETIME(APRRiftGameState, SettlementData);
@@ -108,6 +109,13 @@ void APRRiftGameState::SetEncounterDirectorSnapshot(const FPREncounterDirectorSn
 	EncounterDirectorSnapshot.AliveThreat = FMath::Max(0.0f, EncounterDirectorSnapshot.AliveThreat);
 	EncounterDirectorSnapshot.AliveEnemyCount = FMath::Max(0, EncounterDirectorSnapshot.AliveEnemyCount);
 	EncounterDirectorSnapshot.NextEventRemainingSeconds = FMath::Max(0.0f, EncounterDirectorSnapshot.NextEventRemainingSeconds);
+}
+
+void APRRiftGameState::SetBossRuntimeSnapshot(const FPRBossRuntimeSnapshot& InSnapshot)
+{
+	BossRuntimeSnapshot = InSnapshot;
+	BossRuntimeSnapshot.HealthPercent = FMath::Clamp(BossRuntimeSnapshot.HealthPercent, 0.0f, 1.0f);
+	BossRuntimeSnapshot.TelegraphRemainingSeconds = FMath::Max(0.0f, BossRuntimeSnapshot.TelegraphRemainingSeconds);
 }
 
 void APRRiftGameState::SetMissionModifierSummaries(const TArray<FPRMissionModifierSummary>& InModifierSummaries)

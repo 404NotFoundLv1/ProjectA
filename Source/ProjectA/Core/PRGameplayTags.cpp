@@ -70,6 +70,9 @@ namespace ProjectRiftGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Combat_Support_Healed, "GameplayCue.Combat.Support.Healed", "Health restoration feedback");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Combat_Support_Purified, "GameplayCue.Combat.Support.Purified", "Purification feedback");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Combat_Status_Revealed, "GameplayCue.Combat.Status.Revealed", "Recon reveal feedback");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Boss_Telegraph_Warning, "GameplayCue.Boss.Telegraph.Warning", "Boss pattern warning telegraph");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Boss_PhaseTransition, "GameplayCue.Boss.PhaseTransition", "Boss phase transition feedback");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Boss_Staggered, "GameplayCue.Boss.Staggered", "Boss stagger feedback");
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill_Q, "Cooldown.Skill.Q", "Cooldown for Q skill");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill_E, "Cooldown.Skill.E", "Cooldown for E skill");

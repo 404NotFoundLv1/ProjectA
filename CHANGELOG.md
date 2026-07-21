@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.5] - 2026-07-22
+
+- Added a reusable, data-driven Boss definition and server-only timer scheduler with phase thresholds, weighted cooldown patterns, target policies, repeat protection, party-size scaling, compact replicated runtime state, and placeholder telegraphs.
+- Added generic Boss characters, encounter controllers, interruptible weak points, stagger and recovery boundaries, plus small GAS pattern abilities that continue to route all player damage and statuses through the shared combat path.
+- Added a native Boss HUD fallback and focused contract/data automation coverage. Profile schema remains v9 and no existing map or Blueprint was modified.
+
 ## [0.8.4] - 2026-07-22
 
 - Added a data-driven twelve-enemy roster (eight regulars and four elites), each with a concrete ProjectRift child Blueprint, authoritative attributes, threat cost, action timings, status payloads and placeholder identity color.

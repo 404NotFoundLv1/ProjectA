@@ -16,6 +16,7 @@ class UPRShipRepairDataAsset;
 class UPRCraftingRecipeDataAsset;
 class UPREnemyDefinitionDataAsset;
 class UPREnemyRosterDataAsset;
+class UPRBossDefinitionDataAsset;
 struct FStreamableHandle;
 
 DECLARE_DELEGATE_OneParam(FPRItemDataLoadComplete, UPRItemDataAsset*);
@@ -40,6 +41,7 @@ public:
 	static FPrimaryAssetId MakeCraftingRecipePrimaryAssetId(FName RecipeId);
 	static FPrimaryAssetId MakeEnemyPrimaryAssetId(FName EnemyId);
 	static FPrimaryAssetId MakeEnemyRosterPrimaryAssetId(FName RosterId);
+	static FPrimaryAssetId MakeBossPrimaryAssetId(FName BossId);
 
 	virtual void StartInitialLoading() override;
 
@@ -63,6 +65,7 @@ public:
 	UPREnemyDefinitionDataAsset* LoadEnemyDefinitionSync(FName EnemyId);
 	UPREnemyRosterDataAsset* LoadEnemyRosterSync(FName RosterId);
 	bool LoadEnemyCatalog(TArray<UPREnemyDefinitionDataAsset*>& OutDefinitions, TArray<UPREnemyRosterDataAsset*>& OutRosters);
+	UPRBossDefinitionDataAsset* LoadBossDefinitionSync(FName BossId);
 	TSharedPtr<FStreamableHandle> LoadItemDataAsync(FName ItemId, FPRItemDataLoadComplete Completion);
 	TSharedPtr<FStreamableHandle> LoadLootTableAsync(FName AssetName, FPRLootTableLoadComplete Completion);
 

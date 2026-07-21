@@ -6,6 +6,7 @@
 #include "Progression/PRObjectiveGraphTypes.h"
 #include "Progression/PRRiftRuleTypes.h"
 #include "Core/PREncounterDirectorTypes.h"
+#include "Bosses/PRBossTypes.h"
 #include "PRRiftGameState.generated.h"
 
 UENUM(BlueprintType)
@@ -67,6 +68,7 @@ public:
 	FPRRiftRiskSnapshot GetRiftRiskSnapshot() const { return RiftRiskSnapshot; }
 
 	UFUNCTION(BlueprintPure, Category = "Rift|Encounter") FPREncounterDirectorSnapshot GetEncounterDirectorSnapshot() const { return EncounterDirectorSnapshot; }
+	UFUNCTION(BlueprintPure, Category = "Rift|Boss") FPRBossRuntimeSnapshot GetBossRuntimeSnapshot() const { return BossRuntimeSnapshot; }
 
 	UFUNCTION(BlueprintPure, Category = "Rift|Rules")
 	FPRMissionRuleSnapshot GetMissionRuleSnapshot() const { return MissionRuleSnapshot; }
@@ -120,6 +122,7 @@ public:
 	void SetRiftRiskSnapshot(const FPRRiftRiskSnapshot& InRiskSnapshot);
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Encounter") void SetEncounterDirectorSnapshot(const FPREncounterDirectorSnapshot& InSnapshot);
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Boss") void SetBossRuntimeSnapshot(const FPRBossRuntimeSnapshot& InSnapshot);
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Rules")
 	void SetMissionRuleSnapshot(const FPRMissionRuleSnapshot& InRuleSnapshot);
@@ -174,6 +177,7 @@ protected:
 	FPRRiftRiskSnapshot RiftRiskSnapshot;
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Rift|Encounter") FPREncounterDirectorSnapshot EncounterDirectorSnapshot;
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Rift|Boss") FPRBossRuntimeSnapshot BossRuntimeSnapshot;
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Rift|Rules")
 	FPRMissionRuleSnapshot MissionRuleSnapshot;

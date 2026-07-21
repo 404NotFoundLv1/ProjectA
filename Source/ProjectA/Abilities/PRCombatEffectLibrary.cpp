@@ -8,6 +8,7 @@
 #include "Abilities/PREnemyTemporaryShieldGameplayEffect.h"
 #include "Abilities/PRAttributeSet.h"
 #include "AbilitySystemComponent.h"
+#include "Bosses/PRBossCharacter.h"
 #include "Characters/PRCharacter.h"
 #include "Combat/PRCombatFeedbackComponent.h"
 #include "Combat/PRCombatUnitInterface.h"
@@ -485,7 +486,11 @@ bool UPRCombatEffectLibrary::ApplyDamageRequestToTarget(
 		return false;
 	}
 
-	const FPRDamageRequest SanitizedRequest = MakeFailClosedDamageRequest(DamageRequest);
+	FPRDamageRequest SanitizedRequest = MakeFailClosedDamageRequest(DamageRequest);
+	if (const APRBossCharacter* BossTarget = Cast<APRBossCharacter>(ResolveCombatActor(TargetAbilitySystem)))
+	{
+		SanitizedRequest.BaseDamage *= BossTarget->GetWeakPointDamageMultiplier(SanitizedRequest.HitResult.GetComponent());
+	}
 	FGameplayTag DamageType = SanitizedRequest.DamageType;
 	if (!DamageType.IsValid())
 	{

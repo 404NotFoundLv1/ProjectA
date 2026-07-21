@@ -192,7 +192,8 @@ void UPRAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 		{
 			CombatUnit->HandleCombatUnitDamageResolved(
 				Data.EffectSpec.GetEffectContext().GetOriginalInstigator(),
-				TotalResolvedDamage);
+				TotalResolvedDamage,
+				Data.EffectSpec.GetEffectContext());
 		}
 
 		FPRDamageRequest DamageRequest;
