@@ -1,0 +1,19 @@
+{
+  "SchemaVersion": 1,
+  "Records": [
+    {
+      "AssetPath": "/Game/ProjectRift",
+      "bFolderCoverage": true,
+      "SourceKind": "ProjectOwned",
+      "SourceUri": "ProjectA internal production content",
+      "AuthorOrVendor": "ProjectA",
+      "CommercialUse": "Allowed",
+      "Modification": "Allowed",
+      "Attribution": "NotRequired",
+      "LicenseDocumentPath": "docs/projectrift/production/LicenseEvidence/ProjectOwnedDeclaration.md",
+      "ReviewedBy": "ProjectA",
+      "ReviewedDate": "2026-07-23",
+      "Notes": "Covers existing ProjectRift native, data, graybox, and placeholder assets. Imported third-party art, audio, fonts, and animations require exact records before production use."
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "SchemaVersion": 1,
+  "ProjectVersion": "0.9.0",
+  "ScanRoots": [
+    "/Game/ProjectRift"
+  ],
+  "AllowedExternalRoots": [
+    "/Engine",
+    "/Game/Characters",
+    "/Game/ThirdPerson"
+  ],
+  "AssetRules": [
+    { "ClassName": "Texture2D", "Prefix": "T_", "MaxDimension": 4096, "bRequirePowerOfTwo": false },
+    { "ClassName": "StaticMesh", "Prefix": "SM_", "bRequireSimpleCollision": true, "bRequireNaniteOrLods": true },
+    { "ClassName": "SkeletalMesh", "Prefix": "SK_" },
+    { "ClassName": "Material", "Prefix": "M_" },
+    { "ClassName": "MaterialInstanceConstant", "Prefix": "MI_", "bRequireMaterialInstance": true },
+    { "ClassName": "NiagaraSystem", "Prefix": "NS_" },
+    { "ClassName": "NiagaraEmitter", "Prefix": "NE_" },
+    { "ClassName": "SoundWave", "Prefix": "S_", "bRequireSoundClass": true },
+    { "ClassName": "SoundCue", "Prefix": "SC_", "bRequireSoundClass": true },
+    { "ClassName": "SoundMix", "Prefix": "SMix_" },
+    { "ClassName": "SoundClass", "Prefix": "SClass_" },
+    { "ClassName": "Blueprint", "Prefix": "BP_", "AcceptedPrefixes": [ "BP_", "GE_", "GC_" ] },
+    { "ClassName": "WidgetBlueprint", "Prefix": "WBP_" },
+    { "ClassName": "World", "Prefix": "L_" },
+    { "ClassName": "InputAction", "Prefix": "IA_" },
+    { "ClassName": "InputMappingContext", "Prefix": "IMC_" }
+  ],
+  "LevelContracts": [
+    {
+      "MapPath": "/Game/ProjectRift/Developer/Maps/L_ProductionValidation_Test",
+      "RequiredSpawnGroupIds": [ "Validation.Spawn" ],
+      "RequiredObjectiveNodeIds": [ "Objective.Validation.Hold" ],
+      "bRequiresExtractionSocket": true,
+      "bRequiresBossArena": true,
+      "RequiredStreamingPartitionIds": [ "Validation.Streaming" ]
+    },
+    {
+      "MapPath": "/Game/ProjectRift/Maps/L_Rift_Guardian",
+      "RequiredSpawnGroupIds": [],
+      "RequiredObjectiveNodeIds": [],
+      "bRequiresExtractionSocket": false,
+      "bRequiresBossArena": true,
+      "RequiredStreamingPartitionIds": []
+    }
+  ]
+}

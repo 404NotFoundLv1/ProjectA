@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.0] - 2026-07-23
+
+- Added the editor-only ProjectA production-validation module, strict ProjectRift asset/license policies, deterministic JSON/Markdown reports, and an unattended validation commandlet. Shipping gameplay and profile schema v9 remain unchanged.
+- Added production naming, directory, collision, LOD/Nanite, material, audio, performance, chapter-map interface, and license-evidence standards.
+- Added a dedicated developer validation map with SpawnGroup, ObjectiveSocket, ExtractionSocket, BossArena, and StreamingPartition coverage. Existing accepted maps and Blueprints were not edited.
+
 ## [0.8.6] - 2026-07-23
 
 - Added the production Rift Guardian contract, a dedicated cooked `L_Rift_Guardian` graybox, a 20-second director-driven prelude and a graph-bound Boss objective that opens extraction only after the Guardian is defeated.

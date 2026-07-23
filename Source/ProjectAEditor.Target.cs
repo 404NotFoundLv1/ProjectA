@@ -11,5 +11,6 @@ public class ProjectAEditorTarget : TargetRules
 		DefaultBuildSettings = BuildSettingsVersion.V7;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_8;
 		ExtraModuleNames.Add("ProjectA");
+		ExtraModuleNames.Add("ProjectAEditor");
 	}
 }
