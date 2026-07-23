@@ -9,6 +9,7 @@ class UPRBossSchedulerComponent;
 class UPRBossWeakPointComponent;
 class USphereComponent;
 class UPrimitiveComponent;
+struct FPRBossPhaseDefinition;
 
 /** A GAS enemy specialized for data-driven boss scheduling. */
 UCLASS()
@@ -31,6 +32,7 @@ public:
 	bool IsWeakPointHitComponent(const UPrimitiveComponent* HitComponent) const;
 	float GetWeakPointDamageMultiplier(const UPrimitiveComponent* HitComponent) const;
 	bool IsWeakPointExposed() const;
+	void ApplyPhaseModifiers(const FPRBossPhaseDefinition& PhaseDefinition);
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss") TObjectPtr<UPRBossSchedulerComponent> BossScheduler;

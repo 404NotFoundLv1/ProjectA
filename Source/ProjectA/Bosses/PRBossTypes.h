@@ -43,6 +43,15 @@ enum class EPRBossTelegraphShape : uint8
 	Targeted
 };
 
+/** Explicit anchor for a replicated Boss warning.  Defaults preserve v0.8.5 behaviour. */
+UENUM(BlueprintType)
+enum class EPRBossTelegraphOrigin : uint8
+{
+	Boss,
+	PrimaryTarget,
+	LockedTargetPoint
+};
+
 USTRUCT(BlueprintType)
 struct PROJECTA_API FPRBossPlayerCountScalar
 {
@@ -84,6 +93,9 @@ struct PROJECTA_API FPRBossTelegraphDefinition
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Telegraph") EPRBossTelegraphShape Shape = EPRBossTelegraphShape::None;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Telegraph", meta = (ClampMin = "0.0")) float DurationSeconds = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Telegraph", meta = (ClampMin = "0.0")) float Radius = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Telegraph") EPRBossTelegraphOrigin Origin = EPRBossTelegraphOrigin::PrimaryTarget;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Telegraph", meta = (ClampMin = "0.0")) float Length = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Telegraph", meta = (ClampMin = "0.0")) float Width = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Telegraph") FLinearColor Color = FLinearColor(1.0f, 0.15f, 0.05f, 1.0f);
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Telegraph") FGameplayTag CueTag;
 };
@@ -121,6 +133,8 @@ struct PROJECTA_API FPRBossAbilityPatternDefinition
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Pattern", meta = (ClampMin = "0.0")) float Weight = 1.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Pattern", meta = (ClampMin = "0.0")) float CooldownSeconds = 1.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Pattern", meta = (ClampMin = "0.0")) float ExecutionDurationSeconds = 0.35f;
+	/** Lifetime for a spawned pattern actor. Zero means the ability owns no persistent actor. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Pattern", meta = (ClampMin = "0.0")) float PersistentDurationSeconds = 0.0f;
 	/** Damage is resolved exclusively through the existing server-authoritative combat library. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Pattern", meta = (ClampMin = "0.0")) float BaseDamage = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Pattern", meta = (ClampMin = "0.0")) float EffectRadius = 0.0f;
@@ -128,11 +142,14 @@ struct PROJECTA_API FPRBossAbilityPatternDefinition
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Pattern") FPRHitReactionDefinition HitReaction;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Pattern") TArray<FPRTargetStatusEffectDefinition> TargetStatusEffects;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Pattern", meta = (ClampMin = "0")) int32 SummonCount = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Pattern", meta = (ClampMin = "0")) int32 AdditionalSummonsPerPlayer = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Pattern", meta = (ClampMin = "0")) int32 MaxSummons = 6;
 	/** Existing encounter-roster enemy definition used by UGA_BossSummon. Required when SummonCount is positive. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Pattern") FName SummonDefinitionId = NAME_None;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Pattern") FPRBossTargetingDefinition Targeting;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Pattern") FPRBossTelegraphDefinition Telegraph;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Pattern") bool bInterruptible = false;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Pattern") bool bLockTargetLocation = false;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Pattern") FName ArenaEventId = NAME_None;
 };
 
@@ -145,6 +162,10 @@ struct PROJECTA_API FPRBossPhaseDefinition
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Phase", meta = (ClampMin = "0.0", ClampMax = "1.0")) float StartHealthPercent = 1.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Phase") TArray<FName> EnabledPatternIds;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Phase") FGameplayTagContainer ImmunityTags;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Phase", meta = (ClampMin = "0.0")) float AttackPowerMultiplier = 1.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Phase", meta = (ClampMin = "0.0")) float MoveSpeedMultiplier = 1.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Phase", meta = (ClampMin = "0.01")) float CooldownMultiplier = 1.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Phase") FGameplayTag PhaseCueTag;
 };
 
 USTRUCT(BlueprintType)

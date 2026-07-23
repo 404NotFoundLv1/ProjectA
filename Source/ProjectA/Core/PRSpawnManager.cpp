@@ -302,7 +302,7 @@ const FPREnemyRosterEntry* APRSpawnManager::FindRosterEntry(const FName Definiti
 	return nullptr;
 }
 
-int32 APRSpawnManager::SpawnSummonedEnemies(const FName DefinitionId, const int32 RequestedCount)
+int32 APRSpawnManager::SpawnSummonedEnemies(const FName DefinitionId, const int32 RequestedCount, AActor* SummonOwner)
 {
 	if (!HasAuthority() || DefinitionId.IsNone() || RequestedCount <= 0)
 	{
@@ -324,7 +324,12 @@ int32 APRSpawnManager::SpawnSummonedEnemies(const FName DefinitionId, const int3
 		Request.Category = EPREncounterUnitCategory::Melee;
 		Request.bSummoned = true;
 		Request.ObjectiveNodeId = ActiveObjective ? ActiveObjective->GetObjectiveNodeId() : NAME_None;
-		Spawned += ExecuteEncounterSpawnRequest(Request);
+		const int32 SpawnResult = ExecuteEncounterSpawnRequest(Request);
+		Spawned += SpawnResult;
+		if (SpawnResult > 0 && SummonOwner && !AliveEnemies.IsEmpty() && IsValid(AliveEnemies.Last()))
+		{
+			AliveEnemies.Last()->SetOwner(SummonOwner);
+		}
 	}
 	return Spawned;
 }

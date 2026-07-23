@@ -8,6 +8,8 @@ class APRBossCharacter;
 class UPRBossDefinitionDataAsset;
 class USceneComponent;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPRBossEncounterDefeatedSignature, APRBossCharacter*, DefeatedBoss);
+
 /** Owns a reusable boss attempt and its recovery boundary; it intentionally has no per-frame Tick. */
 UCLASS(BlueprintType)
 class PROJECTA_API APRBossEncounterController : public AActor
@@ -27,6 +29,7 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Boss|Encounter") void NotifyBossDefeated(APRBossCharacter* DefeatedBoss);
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Boss|Encounter") FName ConsumePendingRewardId();
 	UFUNCTION(BlueprintPure, Category = "Boss|Encounter") APRBossCharacter* GetActiveBoss() const { return ActiveBoss; }
+	UPROPERTY(BlueprintAssignable, Category = "Boss|Encounter") FPRBossEncounterDefeatedSignature OnBossDefeated;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss") TObjectPtr<USceneComponent> SceneRoot;
@@ -43,6 +46,7 @@ protected:
 	UPROPERTY(Transient) FName PendingRewardId = NAME_None;
 
 private:
+	void ClearBossOwnedActors();
 	void StartAutoBossEncounter();
 	void MonitorRecovery();
 	int32 CountConnectedPlayers() const;

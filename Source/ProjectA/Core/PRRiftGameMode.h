@@ -22,6 +22,7 @@ class APRCharacter;
 class UPRObjectiveGraphComponent;
 class UPRRiftRuleComponent;
 class UPREncounterDirectorComponent;
+class APRBossObjectiveActor;
 
 /**
  * Server-authoritative rule set for rift missions.
@@ -139,6 +140,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Combat")
 	bool RegisterEnemyKilled(APREnemyCharacter* Enemy, AController* Killer);
+
+	/** Boss objectives retain Hunt semantics while recording one server-owned reward source per run. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Boss")
+	bool RegisterBossDefeated(APRBossObjectiveActor* ObjectiveActor, FName RewardId);
 
 	UFUNCTION(BlueprintPure, Category = "Rift|Mission")
 	bool HasRiftMissionStarted() const { return bRiftMissionStarted; }
@@ -263,6 +268,9 @@ private:
 	int32 CurrentRunSeed = 0;
 	UPROPERTY(Transient)
 	TArray<FGuid> EligibleRewardProfileIds;
+	/** Boss rewards are server-owned one-shot sources; only accepted defeats may enrich successful extraction rewards. */
+	UPROPERTY(Transient)
+	TSet<FName> AcceptedBossRewardIds;
 	FGuid FinalizedRunId;
 	TSet<TObjectKey<APlayerState>> ExtractedPlayerStates;
 	TSet<TObjectKey<APREnemyCharacter>> CountedKilledEnemies;

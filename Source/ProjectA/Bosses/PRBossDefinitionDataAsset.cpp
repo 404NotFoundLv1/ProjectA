@@ -19,7 +19,10 @@ bool UPRBossDefinitionDataAsset::ValidateDefinition(FString& OutDiagnostic) cons
 	TSet<FName> PhaseIds;
 	for (const FPRBossPhaseDefinition& Phase : Phases)
 	{
-		if (Phase.PhaseId.IsNone() || PhaseIds.Contains(Phase.PhaseId) || !FMath::IsFinite(Phase.StartHealthPercent) || Phase.StartHealthPercent < 0.0f || Phase.StartHealthPercent > 1.0f || Phase.StartHealthPercent >= PreviousThreshold)
+		if (Phase.PhaseId.IsNone() || PhaseIds.Contains(Phase.PhaseId) || !FMath::IsFinite(Phase.StartHealthPercent) || Phase.StartHealthPercent < 0.0f || Phase.StartHealthPercent > 1.0f || Phase.StartHealthPercent >= PreviousThreshold
+			|| !FMath::IsFinite(Phase.AttackPowerMultiplier) || Phase.AttackPowerMultiplier < 0.0f
+			|| !FMath::IsFinite(Phase.MoveSpeedMultiplier) || Phase.MoveSpeedMultiplier < 0.0f
+			|| !FMath::IsFinite(Phase.CooldownMultiplier) || Phase.CooldownMultiplier <= 0.0f)
 		{
 			OutDiagnostic = TEXT("Boss phases must have unique IDs and strictly descending health thresholds.");
 			return false;
@@ -49,7 +52,11 @@ bool UPRBossDefinitionDataAsset::ValidateDefinition(FString& OutDiagnostic) cons
 	TSet<FName> PatternIds;
 	for (const FPRBossAbilityPatternDefinition& Pattern : AbilityPatterns)
 	{
-		if (Pattern.PatternId.IsNone() || PatternIds.Contains(Pattern.PatternId) || !FMath::IsFinite(Pattern.Weight) || Pattern.Weight < 0.0f || !FMath::IsFinite(Pattern.CooldownSeconds) || Pattern.CooldownSeconds < 0.0f || !FMath::IsFinite(Pattern.ExecutionDurationSeconds) || Pattern.ExecutionDurationSeconds < 0.0f || !FMath::IsFinite(Pattern.BaseDamage) || Pattern.BaseDamage < 0.0f || !FMath::IsFinite(Pattern.EffectRadius) || Pattern.EffectRadius < 0.0f || !FMath::IsFinite(Pattern.Telegraph.DurationSeconds) || Pattern.Telegraph.DurationSeconds < 0.0f || (Pattern.BaseDamage > 0.0f && Pattern.Telegraph.Shape == EPRBossTelegraphShape::None) || (Pattern.SummonCount > 0 && Pattern.SummonDefinitionId.IsNone()))
+		const bool bInvalidLineTelegraph = Pattern.Telegraph.Shape == EPRBossTelegraphShape::Line
+			&& (!FMath::IsFinite(Pattern.Telegraph.Length) || Pattern.Telegraph.Length <= 0.0f || !FMath::IsFinite(Pattern.Telegraph.Width) || Pattern.Telegraph.Width <= 0.0f);
+		const bool bInvalidSummonScaling = Pattern.SummonCount < 0 || Pattern.AdditionalSummonsPerPlayer < 0 || Pattern.MaxSummons < 0
+			|| ((Pattern.SummonCount > 0 || Pattern.AdditionalSummonsPerPlayer > 0) && (Pattern.SummonDefinitionId.IsNone() || Pattern.MaxSummons <= 0));
+		if (Pattern.PatternId.IsNone() || PatternIds.Contains(Pattern.PatternId) || !FMath::IsFinite(Pattern.Weight) || Pattern.Weight < 0.0f || !FMath::IsFinite(Pattern.CooldownSeconds) || Pattern.CooldownSeconds < 0.0f || !FMath::IsFinite(Pattern.ExecutionDurationSeconds) || Pattern.ExecutionDurationSeconds < 0.0f || !FMath::IsFinite(Pattern.PersistentDurationSeconds) || Pattern.PersistentDurationSeconds < 0.0f || !FMath::IsFinite(Pattern.BaseDamage) || Pattern.BaseDamage < 0.0f || !FMath::IsFinite(Pattern.EffectRadius) || Pattern.EffectRadius < 0.0f || !FMath::IsFinite(Pattern.Telegraph.DurationSeconds) || Pattern.Telegraph.DurationSeconds < 0.0f || !FMath::IsFinite(Pattern.Telegraph.Length) || !FMath::IsFinite(Pattern.Telegraph.Width) || (Pattern.BaseDamage > 0.0f && Pattern.Telegraph.Shape == EPRBossTelegraphShape::None) || bInvalidLineTelegraph || bInvalidSummonScaling)
 		{
 			OutDiagnostic = TEXT("Boss ability patterns contain invalid identity, weight, cooldown, telegraph, or summon values.");
 			return false;

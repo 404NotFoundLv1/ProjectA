@@ -67,6 +67,7 @@ void UPRBossSchedulerComponent::ResetScheduler()
 	RecentPatterns.Reset();
 	WeakPointDamage = 0.0f;
 	CurrentTargets.Reset();
+	LockedTargetLocations.Reset();
 	DecisionOrdinal = 0;
 	RuntimeSnapshot = FPRBossRuntimeSnapshot();
 	if (const UPRBossDefinitionDataAsset* BossDefinition = Definition.Get())
@@ -76,6 +77,10 @@ void UPRBossSchedulerComponent::ResetScheduler()
 		RuntimeSnapshot.PhaseIndex = 0;
 		RuntimeSnapshot.PhaseId = BossDefinition->Phases[0].PhaseId;
 		RuntimeSnapshot.bVisible = true;
+		if (APRBossCharacter* BossActor = Boss.Get())
+		{
+			BossActor->ApplyPhaseModifiers(BossDefinition->Phases[0]);
+		}
 	}
 	PublishSnapshot();
 }
@@ -191,7 +196,12 @@ void UPRBossSchedulerComponent::SelectNextPattern()
 	TelegraphEndTime = Now + Candidate->Telegraph.DurationSeconds;
 	RuntimeSnapshot.bInterruptible = Candidate->bInterruptible;
 	CurrentTargets.Reset();
-	for (APRCharacter* Target : SelectTargets(Candidate->Targeting)) { CurrentTargets.Add(Target); }
+	LockedTargetLocations.Reset();
+	for (APRCharacter* Target : SelectTargets(Candidate->Targeting))
+	{
+		CurrentTargets.Add(Target);
+		LockedTargetLocations.Add(Target ? Target->GetActorLocation() : Boss->GetActorLocation());
+	}
 	if (!CurrentTargets.IsEmpty())
 	{
 		RuntimeSnapshot.PrimaryTargetId = FName(*GetNameSafe(CurrentTargets[0]->GetPlayerState()));
@@ -202,14 +212,28 @@ void UPRBossSchedulerComponent::SelectNextPattern()
 	}
 	RecentPatterns.Add(Candidate->PatternId);
 	while (RecentPatterns.Num() > BossDefinition->RecentPatternRepeatWindow) { RecentPatterns.RemoveAt(0); }
-	NextPatternTimes.Add(Candidate->PatternId, Now + Candidate->CooldownSeconds);
+	NextPatternTimes.Add(Candidate->PatternId, Now + Candidate->CooldownSeconds * (Phase ? Phase->CooldownMultiplier : 1.0f));
 	++DecisionOrdinal;
 	FVector TelegraphLocation = Boss->GetActorLocation();
-	if (!CurrentTargets.IsEmpty() && CurrentTargets[0].IsValid()) { TelegraphLocation = CurrentTargets[0]->GetActorLocation(); }
+	if (Candidate->Telegraph.Origin == EPRBossTelegraphOrigin::PrimaryTarget && !CurrentTargets.IsEmpty() && CurrentTargets[0].IsValid())
+	{
+		TelegraphLocation = CurrentTargets[0]->GetActorLocation();
+	}
+	else if (Candidate->Telegraph.Origin == EPRBossTelegraphOrigin::LockedTargetPoint)
+	{
+		TelegraphLocation = GetLockedTargetLocation();
+	}
+	FRotator TelegraphRotation = FRotator::ZeroRotator;
+	if (Candidate->Telegraph.Shape == EPRBossTelegraphShape::Line)
+	{
+		const FVector Direction = GetLockedTargetLocation() - Boss->GetActorLocation();
+		TelegraphRotation = Direction.IsNearlyZero() ? Boss->GetActorRotation() : Direction.Rotation();
+		TelegraphLocation = Boss->GetActorLocation() + Direction.GetSafeNormal() * (Candidate->Telegraph.Length * 0.5f);
+	}
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.Owner = Boss.Get();
 	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	ActiveTelegraph = GetWorld()->SpawnActor<APRBossTelegraphActor>(APRBossTelegraphActor::StaticClass(), TelegraphLocation, FRotator::ZeroRotator, SpawnParameters);
+	ActiveTelegraph = GetWorld()->SpawnActor<APRBossTelegraphActor>(APRBossTelegraphActor::StaticClass(), TelegraphLocation, TelegraphRotation, SpawnParameters);
 	if (ActiveTelegraph.IsValid()) { ActiveTelegraph->InitializeTelegraph(Candidate->Telegraph, Candidate->PatternId); }
 	if (APRBossCharacter* BossActor = Boss.Get())
 	{
@@ -266,6 +290,7 @@ void UPRBossSchedulerComponent::CompleteExecution()
 		RuntimeSnapshot.bInterruptible = false;
 		TelegraphEndTime = 0.0f;
 		CurrentTargets.Reset();
+		LockedTargetLocations.Reset();
 		if (ActiveTelegraph.IsValid()) { ActiveTelegraph->Destroy(); }
 		ActiveTelegraph.Reset();
 		PublishSnapshot();
@@ -279,7 +304,10 @@ void UPRBossSchedulerComponent::CompletePhaseTransition()
 		RuntimeSnapshot.State = EPRBossRuntimeState::Selecting;
 		if (APRBossCharacter* BossActor = Boss.Get())
 		{
-			BossActor->GetAbilitySystemComponent()->ExecuteGameplayCue(ProjectRiftGameplayTags::GameplayCue_Boss_PhaseTransition);
+			const FPRBossPhaseDefinition* Phase = Definition.IsValid() && Definition->Phases.IsValidIndex(RuntimeSnapshot.PhaseIndex)
+				? &Definition->Phases[RuntimeSnapshot.PhaseIndex] : nullptr;
+			BossActor->GetAbilitySystemComponent()->ExecuteGameplayCue(Phase && Phase->PhaseCueTag.IsValid()
+				? Phase->PhaseCueTag : ProjectRiftGameplayTags::GameplayCue_Boss_PhaseTransition);
 		}
 		PublishSnapshot();
 	}
@@ -292,6 +320,7 @@ void UPRBossSchedulerComponent::ClearStagger()
 	RuntimeSnapshot.ActivePatternId = NAME_None;
 	RuntimeSnapshot.bInterruptible = false;
 	CurrentTargets.Reset();
+	LockedTargetLocations.Reset();
 	PublishSnapshot();
 }
 
@@ -321,9 +350,23 @@ bool UPRBossSchedulerComponent::UpdatePhaseForHealthPercent()
 	RuntimeSnapshot.bInterruptible = false;
 	WeakPointDamage = 0.0f;
 	CurrentTargets.Reset();
+	LockedTargetLocations.Reset();
+	if (APRBossCharacter* BossActor = Boss.Get())
+	{
+		BossActor->ApplyPhaseModifiers(BossDefinition->Phases[DesiredPhase]);
+	}
 	GetWorld()->GetTimerManager().SetTimer(PhaseTransitionTimer, this, &UPRBossSchedulerComponent::CompletePhaseTransition, 0.5f, false);
 	PublishSnapshot();
 	return true;
+}
+
+FVector UPRBossSchedulerComponent::GetLockedTargetLocation(const int32 TargetIndex) const
+{
+	if (LockedTargetLocations.IsValidIndex(TargetIndex))
+	{
+		return LockedTargetLocations[TargetIndex];
+	}
+	return Boss.IsValid() ? Boss->GetActorLocation() : FVector::ZeroVector;
 }
 
 TArray<APRCharacter*> UPRBossSchedulerComponent::SelectTargets(const FPRBossTargetingDefinition& Targeting) const

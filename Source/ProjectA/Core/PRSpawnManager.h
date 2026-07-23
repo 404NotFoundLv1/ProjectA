@@ -64,7 +64,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Rift|Encounter") FName GetEncounterRegionId() const { return EncounterRegionId; }
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Rift|Encounter") int32 ExecuteEncounterSpawnRequest(const FPREncounterSpawnRequest& Request);
 	/** Server-only helper used by the Summoner action. Summons use the same caps and threat accounting as director spawns. */
-	int32 SpawnSummonedEnemies(FName DefinitionId, int32 RequestedCount);
+	int32 SpawnSummonedEnemies(FName DefinitionId, int32 RequestedCount, AActor* SummonOwner = nullptr);
 	UFUNCTION(BlueprintPure, Category = "Rift|Encounter") float GetAliveEncounterThreat() const;
 	UFUNCTION(BlueprintPure, Category = "Rift|Encounter") int32 GetAliveEncounterCategoryCount(EPREncounterUnitCategory Category) const;
 	UFUNCTION(BlueprintPure, Category = "Rift|Encounter") int32 GetAliveEnemyDefinitionCount(FName EnemyDefinitionId) const;

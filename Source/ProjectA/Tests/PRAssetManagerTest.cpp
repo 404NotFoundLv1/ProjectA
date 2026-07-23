@@ -125,9 +125,9 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 	const UGeneralProjectSettings* ProjectSettings = GetDefault<UGeneralProjectSettings>();
 	TestNotNull(TEXT("General project settings exist"), ProjectSettings);
 	TestEqual(
-		TEXT("Project version is v0.8.5"),
+		TEXT("Project version is v0.8.6"),
 		ProjectSettings ? ProjectSettings->ProjectVersion : FString(),
-		FString(TEXT("0.8.5")));
+		FString(TEXT("0.8.6")));
 
 	TestTrue(TEXT("Global manager is UPRAssetManager"), UAssetManager::Get().IsA<UPRAssetManager>());
 	TestEqual(
@@ -193,10 +193,11 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Objective sample is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("ObjectiveSample"))));
 	TestTrue(TEXT("Objective core is registered as a ProjectRift item"), ItemIds.Contains(UPRAssetManager::MakeItemPrimaryAssetId(TEXT("ObjectiveCore"))));
 	TestEqual(TEXT("Two ProjectRift loot tables are registered"), LootTableIds.Num(), 2);
-	TestEqual(TEXT("One ProjectRift reward budget is registered"), RewardBudgetIds.Num(), 1);
-	TestEqual(TEXT("Two ProjectRift missions are registered"), MissionIds.Num(), 2);
+	TestEqual(TEXT("Two ProjectRift reward budgets are registered"), RewardBudgetIds.Num(), 2);
+	TestEqual(TEXT("Three ProjectRift missions are registered"), MissionIds.Num(), 3);
 	TestTrue(TEXT("Objective graph mission is registered"), MissionIds.Contains(UPRAssetManager::MakeMissionPrimaryAssetId(TEXT("Mission.Rift.Test.ObjectiveGraph"))));
-	TestEqual(TEXT("One ProjectRift ship repair is registered"), ShipRepairIds.Num(), 1);
+	TestTrue(TEXT("Rift Guardian mission is registered"), MissionIds.Contains(UPRAssetManager::MakeMissionPrimaryAssetId(TEXT("Mission.Rift.Guardian"))));
+	TestEqual(TEXT("Two ProjectRift ship repairs are registered"), ShipRepairIds.Num(), 2);
 
 	UPRItemDataAsset* HealthInjector = Manager->LoadItemDataSync(TEXT("HealthInjector"));
 	TestNotNull(TEXT("HealthInjector loads by PrimaryAssetId"), HealthInjector);
@@ -237,10 +238,16 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 	UPRRewardBudgetDataAsset* RewardBudget = Manager->LoadRewardBudgetSync(TEXT("DA_Prologue_RiftTestRewardBudget"));
 	TestNotNull(TEXT("Prologue reward budget loads by PrimaryAssetId"), RewardBudget);
 	TestTrue(TEXT("Loaded prologue reward budget is valid"), RewardBudget && RewardBudget->IsValidRewardBudget());
+	UPRRewardBudgetDataAsset* GuardianRewardBudget = Manager->LoadRewardBudgetSync(TEXT("DA_RiftGuardianRewardBudget"));
+	TestNotNull(TEXT("Rift Guardian reward budget loads by PrimaryAssetId"), GuardianRewardBudget);
+	TestTrue(TEXT("Rift Guardian reward budget is valid"), GuardianRewardBudget && GuardianRewardBudget->IsValidRewardBudget());
 
 	UPRMissionProgressionDataAsset* TestMission = Manager->LoadMissionSync(TEXT("Mission.Rift.Test.Hold"));
 	TestNotNull(TEXT("Test mission loads by PrimaryAssetId"), TestMission);
 	TestTrue(TEXT("Loaded test mission contract is valid"), TestMission && TestMission->IsContractValid());
+	UPRMissionProgressionDataAsset* GuardianMission = Manager->LoadMissionSync(TEXT("Mission.Rift.Guardian"));
+	TestNotNull(TEXT("Rift Guardian mission loads by PrimaryAssetId"), GuardianMission);
+	TestTrue(TEXT("Loaded Rift Guardian mission contract is valid"), GuardianMission && GuardianMission->IsContractValid());
 
 	UPRShipRepairDataAsset* EngineRepair = Manager->LoadShipRepairSync(TEXT("Repair.Ship.Engine.Stage1"));
 	TestNotNull(TEXT("Engine repair loads by PrimaryAssetId"), EngineRepair);
@@ -252,9 +259,12 @@ bool FPRAssetManagerSyncTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Engine repair requires the prologue completion node"), EngineRepair && EngineRepair->RequiredCompletedStoryNodeIds.Contains(TEXT("Story.Prologue.RiftTestHold")));
 	TestTrue(TEXT("Engine repair unlocks Chapter One"), EngineRepair && EngineRepair->UnlockedChapterIdsOnCompletion.Contains(TEXT("Chapter.One")));
 	TestEqual(TEXT("Engine repair advances to Chapter One"), EngineRepair ? EngineRepair->NextChapterId : NAME_None, FName(TEXT("Chapter.One")));
+	UPRShipRepairDataAsset* EngineRepairStageTwo = Manager->LoadShipRepairSync(TEXT("Repair.Ship.Engine.Stage2"));
+	TestNotNull(TEXT("Second engine repair loads by PrimaryAssetId"), EngineRepairStageTwo);
+	TestTrue(TEXT("Second engine repair contract is valid"), EngineRepairStageTwo && EngineRepairStageTwo->IsContractValid());
 	TArray<UPRShipRepairDataAsset*> ShipRepairCatalog;
 	TestTrue(TEXT("AssetManager builds a valid ship repair catalog"), Manager->LoadShipRepairCatalog(ShipRepairCatalog));
-	TestEqual(TEXT("Loaded ship repair catalog contains one contract"), ShipRepairCatalog.Num(), 1);
+	TestEqual(TEXT("Loaded ship repair catalog contains two contracts"), ShipRepairCatalog.Num(), 2);
 
 	TArray<UPRCraftingRecipeDataAsset*> CraftingCatalog;
 	TestTrue(TEXT("AssetManager builds a valid crafting recipe catalog"), Manager->LoadCraftingRecipeCatalog(CraftingCatalog));

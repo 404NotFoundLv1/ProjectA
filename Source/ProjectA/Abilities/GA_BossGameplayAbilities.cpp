@@ -76,10 +76,12 @@ void UGA_BossSummon::ExecuteBossPattern(const FGameplayAbilitySpecHandle, const 
 {
 	APRBossCharacter* Boss = ActorInfo ? Cast<APRBossCharacter>(ActorInfo->AvatarActor.Get()) : nullptr;
 	const FPRBossAbilityPatternDefinition* Pattern = GetActivePattern(Boss);
-	if (!Boss || !Boss->HasAuthority() || !Pattern || Pattern->SummonCount <= 0 || Pattern->SummonDefinitionId.IsNone()) { return; }
+	if (!Boss || !Boss->HasAuthority() || !Pattern || (Pattern->SummonCount <= 0 && Pattern->AdditionalSummonsPerPlayer <= 0) || Pattern->SummonDefinitionId.IsNone()) { return; }
 	if (APRSpawnManager* SpawnManager = FindNearestSpawnManager(Boss))
 	{
-		SpawnManager->SpawnSummonedEnemies(Pattern->SummonDefinitionId, Pattern->SummonCount);
+		const int32 PlayerCount = Boss->GetBossScheduler() ? Boss->GetBossScheduler()->GetFrozenPlayerCount() : 1;
+		const int32 RequestedCount = Pattern->SummonCount + Pattern->AdditionalSummonsPerPlayer * FMath::Max(0, PlayerCount - 1);
+		SpawnManager->SpawnSummonedEnemies(Pattern->SummonDefinitionId, FMath::Min(RequestedCount, Pattern->MaxSummons), Boss);
 	}
 }
 

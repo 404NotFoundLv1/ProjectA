@@ -3,12 +3,15 @@
 #include "Bosses/PRBossCharacter.h"
 #include "Bosses/PRBossDefinitionDataAsset.h"
 #include "Bosses/PRBossSchedulerComponent.h"
+#include "Bosses/PRRiftGuardianPollutionField.h"
 #include "Abilities/PRCombatEffectLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "Core/PRRiftGameState.h"
 #include "Characters/PRCharacter.h"
 #include "Components/SceneComponent.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
+#include "Enemies/PREnemyCharacter.h"
 #include "ProjectA.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
@@ -100,6 +103,7 @@ void APRBossEncounterController::ResetBossEncounter()
 	PendingRewardId = NAME_None;
 	if (ActiveBoss)
 	{
+		ClearBossOwnedActors();
 		if (UAbilitySystemComponent* AbilitySystem = ActiveBoss->GetAbilitySystemComponent())
 		{
 			AbilitySystem->CancelAllAbilities();
@@ -132,6 +136,8 @@ void APRBossEncounterController::NotifyBossDefeated(APRBossCharacter* DefeatedBo
 		return;
 	}
 	PendingRewardId = BossDefinition->RewardId;
+	ClearBossOwnedActors();
+	OnBossDefeated.Broadcast(DefeatedBoss);
 	if (APRRiftGameState* RiftGameState = GetWorld() ? GetWorld()->GetGameState<APRRiftGameState>() : nullptr)
 	{
 		FPRBossRuntimeSnapshot Snapshot = DefeatedBoss->GetBossScheduler()
@@ -144,6 +150,28 @@ void APRBossEncounterController::NotifyBossDefeated(APRBossCharacter* DefeatedBo
 		Snapshot.bStaggered = false;
 		Snapshot.ActivePatternId = NAME_None;
 		RiftGameState->SetBossRuntimeSnapshot(Snapshot);
+	}
+}
+
+void APRBossEncounterController::ClearBossOwnedActors()
+{
+	if (!ActiveBoss || !GetWorld())
+	{
+		return;
+	}
+	for (TActorIterator<APRRiftGuardianPollutionField> It(GetWorld()); It; ++It)
+	{
+		if (It->GetOwner() == ActiveBoss)
+		{
+			It->Destroy();
+		}
+	}
+	for (TActorIterator<APREnemyCharacter> It(GetWorld()); It; ++It)
+	{
+		if (*It != ActiveBoss && It->GetOwner() == ActiveBoss)
+		{
+			It->Destroy();
+		}
 	}
 }
 

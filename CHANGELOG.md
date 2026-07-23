@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.6] - 2026-07-23
+
+- Added the production Rift Guardian contract, a dedicated cooked `L_Rift_Guardian` graybox, a 20-second director-driven prelude and a graph-bound Boss objective that opens extraction only after the Guardian is defeated.
+- Finalized the Guardian's data-driven two-phase encounter: 1600 base health with frozen-party scaling, radial shock, locked swept charge, persistent pollution field, crawler reinforcements, phase multipliers and guarded Boss reward accounting.
+- Added success-and-extraction-only personal Boss reward budget integration plus the manual, atomic `Repair.Ship.Engine.Stage2` progression contract. Profile schema remains v9.
+
 ## [0.8.5] - 2026-07-22
 
 - Added a reusable, data-driven Boss definition and server-only timer scheduler with phase thresholds, weighted cooldown patterns, target policies, repeat protection, party-size scaling, compact replicated runtime state, and placeholder telegraphs.

@@ -11,6 +11,7 @@
 #include "Core/PREncounterDirectorComponent.h"
 #include "Core/PRRiftObjectiveActor.h"
 #include "Core/PRObjectiveTypeActors.h"
+#include "Bosses/PRBossObjectiveActor.h"
 #include "Core/PRAssetManager.h"
 #include "Enemies/PREnemyCharacter.h"
 #include "Revive/PRRescueDroneActor.h"
@@ -71,6 +72,7 @@ void APRRiftGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	ActiveObjective = nullptr;
 	ExtractedPlayerStates.Reset();
 	CountedKilledEnemies.Reset();
+	AcceptedBossRewardIds.Reset();
 	PendingSettlementAcknowledgements.Reset();
 	ObjectiveGraphSnapshot = FPRObjectiveGraphSnapshot();
 	ObjectiveItemMissingSince.Reset();
@@ -247,6 +249,7 @@ bool APRRiftGameMode::StartRiftMission()
 	PendingSettlementAcknowledgements.Reset();
 	FailedSettlementAcknowledgementCount = 0;
 	CountedKilledEnemies.Reset();
+	AcceptedBossRewardIds.Reset();
 	ObjectiveGraphSnapshot = FPRObjectiveGraphSnapshot();
 	ObjectiveItemMissingSince.Reset();
 	NextObjectiveItemRecoveryCheckTime = 0.0f;
@@ -882,6 +885,15 @@ FPRPlayerSettlementReceipt APRRiftGameMode::BuildPersonalSettlementReceipt(
 			FPRRewardRuntimeModifiers RuntimeModifiers;
 			RuntimeModifiers.Multiplier = RiftRuleComponent ? RiftRuleComponent->GetRiskSnapshot().PeakRewardMultiplier : 1.0f;
 			RuntimeModifiers.FlatBonusBudget = ObjectiveGraphComponent ? ObjectiveGraphComponent->GetCompletedOptionalRewardBudget() : 0;
+			for (const FPRRewardBudgetSourceDefinition& SourceDefinition : RewardBudget->SourceDefinitions)
+			{
+				if (SourceDefinition.SourceType == EPRRewardSourceType::Boss
+					&& SourceDefinition.DistributionPolicy == EPRLootDistributionPolicy::PersonalSettlement
+					&& AcceptedBossRewardIds.Contains(SourceDefinition.SourceId))
+				{
+					RuntimeModifiers.FlatBonusBudget += FMath::Max(0, SourceDefinition.BudgetValue);
+				}
+			}
 			const FPRPersonalRewardGenerationResult Generated = UPRRewardGenerationLibrary::GeneratePersonalSettlementRewardWithModifiers(
 				RewardBudget,
 				Source,
@@ -893,6 +905,21 @@ FPRPlayerSettlementReceipt APRRiftGameMode::BuildPersonalSettlementReceipt(
 				Receipt.GrantedWarehouseItems = Generated.GrantedWarehouseItems;
 				Receipt.UpdatedLootProtectionState = Generated.UpdatedProtectionState;
 				Receipt.RewardAuditEntries = Generated.AuditEntries;
+				for (const FPRRewardBudgetSourceDefinition& SourceDefinition : RewardBudget->SourceDefinitions)
+				{
+					if (SourceDefinition.SourceType == EPRRewardSourceType::Boss
+						&& SourceDefinition.DistributionPolicy == EPRLootDistributionPolicy::PersonalSettlement
+						&& AcceptedBossRewardIds.Contains(SourceDefinition.SourceId))
+					{
+						FPRRewardAuditEntry& BossAudit = Receipt.RewardAuditEntries.AddDefaulted_GetRef();
+						BossAudit.Source.SourceType = EPRRewardSourceType::Boss;
+						BossAudit.Source.SourceId = SourceDefinition.SourceId;
+						BossAudit.Source.RecipientProfileId = Receipt.ProfileId;
+						BossAudit.Source.Seed = AllocateRewardSeed(BossAudit.Source.SourceType, BossAudit.Source.SourceId, BossAudit.Source.RecipientProfileId, 0);
+						BossAudit.RewardBudgetId = RewardBudget->GetFName();
+						BossAudit.BudgetSpent = FMath::Max(0, SourceDefinition.BudgetValue);
+					}
+				}
 				if (Generated.CommonChipCount > 0)
 				{
 					const int32 ExistingIndex = Receipt.SettledResourceWallet.IndexOfByPredicate([](const FPRProfileResourceBalance& Balance)
@@ -1388,6 +1415,20 @@ bool APRRiftGameMode::RegisterEnemyKilled(APREnemyCharacter* Enemy, AController*
 		*GetNameSafe(Enemy),
 		*GetNameSafe(Killer),
 		RiftGameState->GetKilledEnemyCount());
+	return true;
+}
+
+bool APRRiftGameMode::RegisterBossDefeated(APRBossObjectiveActor* ObjectiveActor, const FName RewardId)
+{
+	if (!HasAuthority() || !ObjectiveActor || RewardId.IsNone() || !HasObjectiveGraph() || AcceptedBossRewardIds.Contains(RewardId))
+	{
+		return false;
+	}
+	if (!ReportObjectiveNodeCount(ObjectiveActor->GetObjectiveNodeId(), 1))
+	{
+		return false;
+	}
+	AcceptedBossRewardIds.Add(RewardId);
 	return true;
 }
 

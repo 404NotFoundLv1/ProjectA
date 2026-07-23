@@ -213,7 +213,7 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	{
 		TestEqual(TEXT("Game default map is ship lobby"), Maps->GetGameDefaultMap(), FString(TEXT("/Game/ProjectRift/Maps/L_ShipLobby")));
 		TestEqual(TEXT("Project name is ProjectRift"), Project->ProjectName, FString(TEXT("ProjectRift")));
-		TestEqual(TEXT("Project version is v0.8.5"), Project->ProjectVersion, FString(TEXT("0.8.5")));
+		TestEqual(TEXT("Project version is v0.8.6"), Project->ProjectVersion, FString(TEXT("0.8.6")));
 	}
 
 	TArray<FString> MapsToCook;
@@ -228,6 +228,7 @@ bool FPRRiftGameModeStateTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Cook list contains main menu"), ContainsCookMap(TEXT("/Game/ProjectRift/Maps/L_MainMenu")));
 	TestTrue(TEXT("Cook list contains ship lobby"), ContainsCookMap(TEXT("/Game/ProjectRift/Maps/L_ShipLobby")));
 	TestTrue(TEXT("Cook list contains rift test"), ContainsCookMap(TEXT("/Game/ProjectRift/Maps/L_Rift_Test")));
+	TestTrue(TEXT("Cook list contains Rift Guardian"), ContainsCookMap(TEXT("/Game/ProjectRift/Maps/L_Rift_Guardian")));
 
 	FTestWorldWrapper StabilityWorldWrapper;
 	TestTrue(TEXT("Rift stability failure test world is created"), StabilityWorldWrapper.CreateTestWorld(EWorldType::Game));

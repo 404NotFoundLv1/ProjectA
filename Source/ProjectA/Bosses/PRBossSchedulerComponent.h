@@ -26,6 +26,8 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Boss|Scheduler") void NotifyWeakPointDamage(FName WeakPointId, float AppliedDamage);
 	UFUNCTION(BlueprintPure, Category = "Boss|Scheduler") FPRBossRuntimeSnapshot GetRuntimeSnapshot() const { return RuntimeSnapshot; }
 	const TArray<TWeakObjectPtr<APRCharacter>>& GetCurrentTargets() const { return CurrentTargets; }
+	FVector GetLockedTargetLocation(int32 TargetIndex = 0) const;
+	int32 GetFrozenPlayerCount() const { return FrozenPlayerCount; }
 	const FPRBossAbilityPatternDefinition* GetActivePatternDefinition() const;
 	bool IsWeakPointExposed() const { return RuntimeSnapshot.State == EPRBossRuntimeState::Executing && RuntimeSnapshot.bInterruptible; }
 
@@ -51,6 +53,7 @@ private:
 	TMap<FName, float> NextPatternTimes;
 	TArray<FName> RecentPatterns;
 	TArray<TWeakObjectPtr<APRCharacter>> CurrentTargets;
+	TArray<FVector> LockedTargetLocations;
 	TWeakObjectPtr<APRBossTelegraphActor> ActiveTelegraph;
 	int32 FrozenPlayerCount = 1;
 	int32 DecisionOrdinal = 0;

@@ -16,7 +16,8 @@ enum class EPRRewardSourceType : uint8
 {
 	Enemy,
 	MissionSettlement,
-	Objective
+	Objective,
+	Boss
 };
 
 USTRUCT(BlueprintType)

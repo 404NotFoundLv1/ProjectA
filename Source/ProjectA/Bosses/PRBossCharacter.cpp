@@ -150,6 +150,20 @@ void APRBossCharacter::HandleCombatUnitDamageResolved(
 	}
 }
 
+void APRBossCharacter::ApplyPhaseModifiers(const FPRBossPhaseDefinition& PhaseDefinition)
+{
+	if (!HasAuthority() || !BossDefinition || !AttributeSet)
+	{
+		return;
+	}
+	const FPRBossAttributeDefinition& Attributes = BossDefinition->Attributes;
+	const float DamageScale = BossDefinition->DamageScaling.GetForPlayerCount(FrozenPlayerCount);
+	AttributeSet->SetAttackPower(FMath::Max(0.0f, Attributes.AttackPower * DamageScale * PhaseDefinition.AttackPowerMultiplier));
+	const float NewMoveSpeed = FMath::Max(0.0f, Attributes.MoveSpeed * PhaseDefinition.MoveSpeedMultiplier);
+	AttributeSet->SetMoveSpeed(NewMoveSpeed);
+	GetCharacterMovement()->MaxWalkSpeed = NewMoveSpeed;
+}
+
 void APRBossCharacter::HandleCombatUnitHealthDepleted(const FGameplayEffectContextHandle& EffectContext)
 {
 	Super::HandleCombatUnitHealthDepleted(EffectContext);
