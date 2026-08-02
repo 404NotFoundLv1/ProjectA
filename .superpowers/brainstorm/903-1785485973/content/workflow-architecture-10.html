@@ -1,0 +1,40 @@
+<style>
+  .truths{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:20px 0 26px}
+  .truth{padding:14px;border:1px solid rgba(148,163,184,.2);border-radius:10px;background:rgba(255,255,255,.025)}
+  .truth b{display:block;color:#e9f2f3}.truth span{display:block;margin-top:5px;color:#91a5ac;font-size:.82rem}
+  .gates{display:grid;grid-template-columns:repeat(7,minmax(115px,1fr));gap:9px;margin-top:20px;overflow-x:auto;padding-bottom:8px}
+  .gate{position:relative;min-height:146px;padding:15px 13px;border:1px solid rgba(148,163,184,.22);border-radius:11px;background:rgba(255,255,255,.025)}
+  .gate:not(:last-child):after{content:"›";position:absolute;right:-12px;top:54px;z-index:2;color:#67d2d6;font-size:24px;background:#101a20;width:17px;text-align:center}
+  .gate i{font-style:normal;color:#67d2d6;font-size:.68rem;letter-spacing:.1em}.gate b{display:block;margin:8px 0 5px;color:#eaf1f2}.gate span{color:#8fa3aa;font-size:.77rem;line-height:1.4}
+  .paths{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px}.path{padding:16px 18px;border-radius:11px;background:rgba(255,255,255,.027);border:1px solid rgba(148,163,184,.18)}.path b{color:#efb65b}.path code{display:block;margin-top:8px;color:#bcd0d5;white-space:normal}
+  .stop{margin-top:20px;padding:15px 18px;border-left:3px solid #efb65b;background:rgba(239,182,91,.06);color:#afbdc2}.stop strong{color:#efb65b}
+  @media(max-width:900px){.truths{grid-template-columns:1fr 1fr}.paths{grid-template-columns:1fr}.gates{grid-template-columns:repeat(7,150px)}}
+</style>
+
+<div class="label">PROJECTRIFT · WORKFLOW SECTION 01</div>
+<h2>生产骨架：四个真相源，七道放行门</h2>
+<p class="subtitle">任何自动化工具都只能修改它负责的层；不能让概念图、生成网格或 UE 临时修补互相覆盖权威源。</p>
+
+<div class="truths">
+  <div class="truth"><b>视觉真相</b><span>批准后的视觉圣经、概念图与标注表</span></div>
+  <div class="truth"><b>几何真相</b><span>Blender 主文件、模块尺寸表和导出预设</span></div>
+  <div class="truth"><b>运行时真相</b><span>UE 导入资产、材质实例、蓝图装配与性能数据</span></div>
+  <div class="truth"><b>权利真相</b><span>来源、提示词、生成工具、修改记录与授权证据</span></div>
+</div>
+
+<div class="gates">
+  <div class="gate"><i>G0</i><b>资产简报</b><span>用途、镜头距离、状态、预算、命名齐全</span></div>
+  <div class="gate"><i>G1</i><b>度量白模</b><span>真实尺寸、枢轴、接缝、角色与镜头通过</span></div>
+  <div class="gate"><i>G2</i><b>概念锁定</b><span>固定白模视角回绘，正侧背与材质标注一致</span></div>
+  <div class="gate"><i>G3</i><b>首件资产</b><span>一个模块完整走完模型、UV、材质、碰撞</span></div>
+  <div class="gate"><i>G4</i><b>套件批产</b><span>只复制已证明的结构、材质和导出模板</span></div>
+  <div class="gate"><i>G5</i><b>UE 入库</b><span>目录、命名、授权、碰撞、LOD/Nanite 校验</span></div>
+  <div class="gate"><i>G6</i><b>样板舱</b><span>不用 DEMO 布局，以资产重建一间性能可测的舱室</span></div>
+</div>
+
+<div class="paths">
+  <div class="path"><b>源文件区（建议）</b><code>ProjectA/SourceArt/ProjectRift/ShipHub/{Briefs,Concept,Blender,Textures,Exports,License}</code></div>
+  <div class="path"><b>UE 生产区</b><code>/Game/ProjectRift/ShipHub/{Meshes,Materials,Textures,Blueprints,VFX,Maps}</code></div>
+</div>
+
+<div class="stop"><strong>硬性停线规则：</strong>任一 Gate 不通过就回到上一个权威源修改；不允许在 UE 里临时拉伸网格或复制材质来掩盖源资产问题。完整大厅只在样板舱通过后开始。</div>

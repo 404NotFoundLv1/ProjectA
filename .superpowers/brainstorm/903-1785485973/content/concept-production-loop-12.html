@@ -1,0 +1,34 @@
+<style>
+  .roles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin:20px 0}.role{padding:14px;border-radius:10px;border:1px solid rgba(148,163,184,.2);background:rgba(255,255,255,.025)}.role b{display:block;color:#eaf2f3}.role span{display:block;margin-top:5px;color:#91a5ac;font-size:.8rem}
+  .loop{display:grid;grid-template-columns:repeat(6,minmax(120px,1fr));gap:9px;overflow-x:auto;margin-top:22px;padding-bottom:8px}.stage{position:relative;min-height:148px;padding:14px 13px;border-radius:11px;border:1px solid rgba(148,163,184,.21);background:rgba(255,255,255,.025)}.stage:not(:last-child):after{content:"›";position:absolute;z-index:2;right:-12px;top:54px;color:#67d4d8;font-size:24px;background:#101a20;width:17px;text-align:center}.stage i{font-style:normal;color:#67d4d8;font-size:.68rem;letter-spacing:.1em}.stage b{display:block;margin:8px 0 5px;color:#edf3f4}.stage span{color:#8fa4ab;font-size:.77rem;line-height:1.4}
+  .outputs{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px}.output{padding:17px 18px;border-radius:11px;background:rgba(255,255,255,.027);border:1px solid rgba(148,163,184,.18)}.output b{color:#edb55c}.output ul{padding-left:17px;margin:9px 0 0;color:#a9bac0;font-size:.84rem}.output li+li{margin-top:5px}
+  .guardrails{margin-top:20px;padding:17px 19px;border-left:3px solid #edb55c;background:rgba(237,181,92,.06);color:#aebdc2}.guardrails strong{color:#efbc67}
+  @media(max-width:860px){.roles{grid-template-columns:1fr 1fr}.outputs{grid-template-columns:1fr}.loop{grid-template-columns:repeat(6,150px)}}
+</style>
+
+<div class="label">PROJECTRIFT · WORKFLOW SECTION 03</div>
+<h2>概念生产：AI 回绘受白模约束</h2>
+<p class="subtitle">用户只做方向审批；Codex 组织全部资产简报、生成、筛选、回绘、记录和下一环节交接。</p>
+
+<div class="roles">
+  <div class="role"><b>你 · 美术决策</b><span>只在 Gate 选择“接受、退回、改哪条原则”，无需画图或建模。</span></div>
+  <div class="role"><b>Codex · 制片与技术美术</b><span>写简报、固定镜头、生成版本、做一致性检查、维护台账。</span></div>
+  <div class="role"><b>ImageGen · 视觉探索</b><span>负责气氛、材质、损毁和表面细节；不是几何权威源。</span></div>
+  <div class="role"><b>Blender · 尺寸权威</b><span>输出白模、线稿、深度、法线和多视图，锁住结构一致性。</span></div>
+</div>
+
+<div class="loop">
+  <div class="stage"><i>C0</i><b>一页简报</b><span>功能、视距、结构语法、色彩、材质、状态、禁用项。</span></div>
+  <div class="stage"><i>C1</i><b>度量白模</b><span>正交六视图＋透视三视图＋ID 色块＋线稿。</span></div>
+  <div class="stage"><i>C2</i><b>探索九宫格</b><span>只比较大色块、护板层级和损毁节奏，不追微细节。</span></div>
+  <div class="stage"><i>C3</i><b>受控回绘</b><span>用白模作为参考，禁止移动门洞、接缝、枢轴和交互区。</span></div>
+  <div class="stage"><i>C4</i><b>设定包</b><span>关键帧、多视图、材质标注、三状态、灯光与贴花清单。</span></div>
+  <div class="stage"><i>C5</i><b>叠图验收</b><span>概念与白模半透明对齐，结构漂移即退回，不让模型猜背面。</span></div>
+</div>
+
+<div class="outputs">
+  <div class="output"><b>每个首件必须交付</b><ul><li>1 张批准关键帧</li><li>正／侧／背结构标注</li><li>材质与粗糙度区间表</li><li>损毁／修补／上线三联图</li><li>贴花、灯光、发光区域清单</li></ul></div>
+  <div class="output"><b>生成记录必须保留</b><ul><li>提示词、负面约束和输入图</li><li>工具、模型版本、日期和结果 ID</li><li>人工修改说明与原文件位置</li><li>商业使用、修改和署名依据</li><li>最终采用／淘汰原因</li></ul></div>
+</div>
+
+<div class="guardrails"><strong>停损机制：</strong>单个方向最多三轮生成；三轮仍无法保持结构一致，就返回简报或白模，不继续“抽卡”。AI 图片不能直接作为带光影的 Base Color、法线或 ORM 导入 UE，必须重建成可控材质数据。</div>

@@ -1,0 +1,56 @@
+<style>
+  .two-col { display:grid; grid-template-columns:.82fr 1.18fr; gap:22px; margin-top:24px; }
+  .locked-panel,.choice-panel { padding:25px; }
+  .status { color:#68d1d5; font-size:.74rem; font-weight:700; letter-spacing:.14em; }
+  .locked-panel h2 { margin:8px 0 12px; }
+  .spec { margin-top:18px; display:grid; gap:10px; }
+  .spec div { padding:12px 13px; border-left:2px solid #68d1d5; background:rgba(104,209,213,.045); color:#b7c7cc; }
+  .choice-panel h3 { margin-top:0; }
+  .choices { display:grid; gap:11px; margin-top:17px; }
+  .choice {
+    padding:15px 16px;
+    border:1px solid rgba(148,163,184,.23);
+    border-radius:11px;
+    background:rgba(255,255,255,.025);
+    cursor:pointer;
+  }
+  .choice:hover { border-color:rgba(238,177,73,.5); }
+  .choice b { display:block; color:#ecf3f4; }
+  .choice span { display:block; margin-top:5px; color:#93a8af; font-size:.87rem; }
+  .choice.rec { border-color:rgba(238,177,73,.37); background:rgba(238,177,73,.05); }
+  .choice.rec b::after { content:"推荐"; margin-left:8px; padding:2px 7px; border-radius:999px; background:rgba(238,177,73,.11); color:#f0ba5b; font-size:.68rem; vertical-align:2px; }
+  @media(max-width:800px){.two-col{grid-template-columns:1fr;}}
+</style>
+
+<div class="label">PROJECTRIFT · ART DIRECTION LOCK 02</div>
+<div class="two-col">
+  <section class="card locked-panel">
+    <div class="status">✓ QUALITY TARGET APPROVED</div>
+    <h2>写实化 PBR<br/>中等细节密度</h2>
+    <p class="subtitle">商业独立游戏目标，不按 AAA 团队规模透支生产能力。</p>
+    <div class="spec">
+      <div>可信大形与真实世界尺度优先</div>
+      <div>交互台近看成立，普通墙体依靠材质与贴花变化</div>
+      <div>高模只服务英雄资产和关键法线，不做无效微雕</div>
+      <div>所有资产从第一天就包含碰撞、LOD/Nanite 与性能预算</div>
+    </div>
+  </section>
+  <section class="card choice-panel">
+    <h3>下一项：工具成本边界</h3>
+    <p class="subtitle">无论选择哪一档，最终资产都必须登记来源、生成方式、修改记录和商业使用依据。</p>
+    <div class="choices">
+      <div class="choice rec" data-choice="free-core-paid-on-proof" onclick="toggleSelect(this)">
+        <b>免费主线，付费工具按验证价值启用</b>
+        <span>Blender＋UE 为长期底座；只有在样板资产证明确实节省时间时，才增加 Substance、AI API 或专用生成工具。</span>
+      </div>
+      <div class="choice" data-choice="strict-free-local" onclick="toggleSelect(this)">
+        <b>严格免费／本地工具</b>
+        <span>现金成本最低，但贴图、生成质量和自动化速度会受到限制，部分环节需要更多人工迭代。</span>
+      </div>
+      <div class="choice" data-choice="commercial-toolchain-ok" onclick="toggleSelect(this)">
+        <b>允许成熟商业工具链</b>
+        <span>可以直接规划 Substance 3D 等付费软件，提高材质生产稳定性，但会产生持续订阅或调用成本。</span>
+      </div>
+    </div>
+  </section>
+</div>

@@ -1,0 +1,24 @@
+<div style="max-width:960px;margin:0 auto">
+  <div class="label">PROJECTRIFT · 3D ART WORKFLOW</div>
+  <h2>真实 UE 灰盒已核对，概念图生成服务暂不可用</h2>
+  <p class="subtitle">ProjectA MCP 审计确认：当前大厅约 12×8 米，第三人称相机空间偏紧；现有资产是 10 个基础 Cube/Sphere、两个出生点、任务台、仓库、三座职能台、裂隙入口标记和两盏白色点光。地图保持未修改。</p>
+
+  <div class="options">
+    <div class="option" data-choice="cli-fallback" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>使用 ImageGen CLI 备用路径</h3>
+        <p>继续生成高质量 3D 概念图；需要你在本机设置 OPENAI_API_KEY，并会产生 API 调用费用。</p>
+      </div>
+    </div>
+    <div class="option" data-choice="interactive-blockout" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>先做交互式三维 Blockout</h3>
+        <p>不调用 ImageGen；先用真实尺寸验证模块、动线、相机和站点布局，但暂时不能可靠比较最终材质风格。</p>
+      </div>
+    </div>
+  </div>
+
+  <p class="subtitle" style="margin-top:22px">请点击选择，并在聊天中确认。未经确认不会启用 CLI 备用路径。</p>
+</div>

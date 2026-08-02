@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ProjectRift · 资产先行</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #081015;
+      --panel: #101b21;
+      --line: #29414b;
+      --text: #e9f1f2;
+      --muted: #8ca2aa;
+      --accent: #efb85b;
+      --cool: #6ad5d8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 75% 18%, rgba(106,213,216,.09), transparent 30%),
+        radial-gradient(circle at 20% 80%, rgba(239,184,91,.08), transparent 32%),
+        var(--bg);
+      color: var(--text);
+      font: 15px/1.5 "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+    main {
+      width: min(1100px, calc(100vw - 48px));
+      padding: 42px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: linear-gradient(145deg, rgba(18,30,37,.97), rgba(10,18,23,.97));
+      box-shadow: 0 28px 80px rgba(0,0,0,.42);
+    }
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 4vw, 48px);
+      line-height: 1.12;
+      letter-spacing: -.025em;
+    }
+    .lead {
+      max-width: 760px;
+      margin: 14px 0 32px;
+      color: var(--muted);
+      font-size: 17px;
+    }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 10px;
+      align-items: stretch;
+    }
+    .step {
+      position: relative;
+      min-height: 118px;
+      padding: 17px 16px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255,255,255,.025);
+    }
+    .step:not(:last-child)::after {
+      content: "›";
+      position: absolute;
+      z-index: 2;
+      top: 41px;
+      right: -15px;
+      width: 20px;
+      height: 28px;
+      color: var(--cool);
+      background: var(--panel);
+      font-size: 25px;
+      line-height: 25px;
+      text-align: center;
+    }
+    .n {
+      display: block;
+      margin-bottom: 15px;
+      color: var(--cool);
+      font: 700 11px/1 "Segoe UI", sans-serif;
+      letter-spacing: .12em;
+    }
+    .step b { display: block; font-size: 16px; }
+    .step small {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .note {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      margin-top: 28px;
+      padding: 17px 19px;
+      border-left: 3px solid var(--accent);
+      border-radius: 0 10px 10px 0;
+      background: rgba(239,184,91,.07);
+    }
+    .note strong { white-space: nowrap; color: var(--accent); }
+    .note span { color: #c6d2d5; }
+    footer {
+      margin-top: 20px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    @media (max-width: 900px) {
+      main { padding: 28px; }
+      .flow { grid-template-columns: repeat(2, 1fr); }
+      .step:not(:last-child)::after { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">ProjectRift · corrected dependency</p>
+    <h1>先定义世界，再造资产，最后搭地图</h1>
+    <p class="lead">生产地图是模块化美术资产的下游成果。现有 UE 大厅仅用于确认玩法功能，不参与决定造型、比例、构图或空间布局。</p>
+
+    <section class="flow" aria-label="资产先行工作流">
+      <div class="step"><span class="n">01</span><b>产品幻想</b><small>世界观、舰船身份、玩家体验</small></div>
+      <div class="step"><span class="n">02</span><b>视觉圣经</b><small>轮廓、色彩、材质、灯光语言</small></div>
+      <div class="step"><span class="n">03</span><b>概念设计</b><small>关键空间、构件与道具设计图</small></div>
+      <div class="step"><span class="n">04</span><b>模块套件</b><small>尺寸、拼接、材质与变化规则</small></div>
+      <div class="step"><span class="n">05</span><b>3D 生产</b><small>建模、贴图、碰撞、LOD、特效</small></div>
+      <div class="step"><span class="n">06</span><b>UE 建图</b><small>用已验证资产重建生产大厅</small></div>
+    </section>
+
+    <div class="note">
+      <strong>L_ShipLobby 的位置</strong>
+      <span>它只保留“这里需要任务、仓库、角色等玩法能力”的接口参考；空间组织本身可以全部推翻。</span>
+    </div>
+    <footer>正在终端中确认原创视觉方向的起点……</footer>
+  </main>
+</body>
+</html>

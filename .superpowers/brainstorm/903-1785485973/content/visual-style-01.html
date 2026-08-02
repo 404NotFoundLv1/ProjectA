@@ -1,0 +1,116 @@
+<style>
+  .style-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; margin-top:24px; }
+  .style-card { overflow:hidden; padding:0; }
+  .style-card .card-body { min-height:150px; }
+  .scene { position:relative; height:250px; overflow:hidden; background:#111827; }
+  .scene * { position:absolute; box-sizing:border-box; }
+  .ceiling { left:0; right:0; top:0; height:42px; }
+  .floor { left:-8%; right:-8%; bottom:-58px; height:142px; transform:perspective(300px) rotateX(58deg); }
+  .wall-left { left:0; top:40px; bottom:50px; width:24%; clip-path:polygon(0 0,100% 12%,100% 88%,0 100%); }
+  .wall-right { right:0; top:40px; bottom:50px; width:24%; clip-path:polygon(0 12%,100% 0,100% 100%,0 88%); }
+  .door { left:50%; bottom:55px; width:88px; height:126px; transform:translateX(-50%); border-radius:4px 4px 0 0; }
+  .door-inner { left:10px; right:10px; top:12px; bottom:0; border:2px solid rgba(255,255,255,.26); }
+  .beam { top:46px; bottom:54px; width:10px; opacity:.85; }
+  .beam.left { left:26%; } .beam.right { right:26%; }
+  .console { bottom:45px; width:62px; height:56px; border-radius:4px; }
+  .console.left { left:10%; transform:skewY(-7deg); }
+  .console.right { right:10%; transform:skewY(7deg); }
+  .light { height:4px; border-radius:4px; box-shadow:0 0 14px currentColor; }
+  .light.top { left:34%; right:34%; top:19px; }
+  .light.left { left:7%; width:46px; top:82px; transform:rotate(7deg); }
+  .light.right { right:7%; width:46px; top:82px; transform:rotate(-7deg); }
+  .hazard { left:8%; right:8%; bottom:13px; height:9px; opacity:.78; }
+  .swatches { display:flex; gap:8px; margin-top:14px; }
+  .swatch { position:static !important; width:28px; height:28px; border-radius:50%; border:1px solid rgba(255,255,255,.3); }
+  .tagline { margin-top:10px; color:#9ca3af; font-size:.9rem; }
+  .recommended { color:#fbbf24; font-weight:700; }
+
+  .industrial .scene { background:linear-gradient(#172027,#090d10); }
+  .industrial .ceiling,.industrial .wall-left,.industrial .wall-right { background:#26323a; }
+  .industrial .floor { background:repeating-linear-gradient(90deg,#252d31 0 32px,#151b1e 32px 35px); }
+  .industrial .door { background:#4c5558; border:5px solid #171c1f; }
+  .industrial .beam { background:#596368; }
+  .industrial .console { background:#343f43; border-top:5px solid #e39a26; }
+  .industrial .light { background:#ffd48a; color:#ffb545; }
+  .industrial .hazard { background:repeating-linear-gradient(135deg,#e49b27 0 13px,#1b2023 13px 26px); }
+
+  .clean .scene { background:linear-gradient(#5f7482,#1d2a32); }
+  .clean .ceiling,.clean .wall-left,.clean .wall-right { background:#aab7bd; }
+  .clean .floor { background:repeating-linear-gradient(90deg,#68767c 0 56px,#86949a 56px 58px); }
+  .clean .door { background:#d7e0e3; border:5px solid #5d7078; border-radius:22px 22px 0 0; }
+  .clean .beam { background:#dce4e6; }
+  .clean .console { background:#cbd7da; border-top:5px solid #4bd6ff; }
+  .clean .light { background:#bff3ff; color:#70dcff; }
+  .clean .hazard { background:#48d1ff; height:3px; }
+
+  .hybrid .scene { background:radial-gradient(circle at 50% 72%,#482d42,#0c1016 66%); }
+  .hybrid .ceiling,.hybrid .wall-left,.hybrid .wall-right { background:#20232b; }
+  .hybrid .floor { background:repeating-radial-gradient(circle at 50% 0,#34303a 0 18px,#171921 19px 35px); }
+  .hybrid .door { background:#302733; border:5px solid #17141a; clip-path:polygon(20% 0,80% 0,100% 20%,90% 100%,10% 100%,0 20%); }
+  .hybrid .beam { background:linear-gradient(#55475a,#28242c); width:14px; }
+  .hybrid .console { background:#352c39; border-top:5px solid #ef5bb4; }
+  .hybrid .light { background:#ff73c7; color:#ff4eb8; }
+  .hybrid .hazard { background:linear-gradient(90deg,transparent,#b957b7,transparent); height:5px; }
+  @media (max-width:900px) { .style-grid { grid-template-columns:1fr; } }
+</style>
+
+<h2>ProjectRift 舰船大厅：先选视觉母方向</h2>
+<p class="subtitle">这是工作流用的临时风格示意，不是生产资产。请选择最接近你想要的气质；后续仍会把它细化成原创设计语言。</p>
+
+<div class="cards style-grid">
+  <div class="card style-card industrial" data-choice="industrial-salvage" onclick="toggleSelect(this)">
+    <div class="scene">
+      <div class="ceiling"></div><div class="floor"></div>
+      <div class="wall-left"></div><div class="wall-right"></div>
+      <div class="beam left"></div><div class="beam right"></div>
+      <div class="door"><div class="door-inner"></div></div>
+      <div class="console left"></div><div class="console right"></div>
+      <div class="light top"></div><div class="light left"></div><div class="light right"></div>
+      <div class="hazard"></div>
+    </div>
+    <div class="card-body">
+      <h3>A · 工业拾荒舰 <span class="recommended">推荐</span></h3>
+      <p>粗犷硬表面、可见维修痕迹、暖色功能灯。模块化最容易落地，修船前后差异也最好表达。</p>
+      <div class="swatches"><span class="swatch" style="background:#151b1e"></span><span class="swatch" style="background:#596368"></span><span class="swatch" style="background:#e39a26"></span><span class="swatch" style="background:#93b7bd"></span></div>
+      <div class="tagline">关键词：可靠、受损、被持续维护、功能优先</div>
+    </div>
+  </div>
+
+  <div class="card style-card clean" data-choice="clean-expedition" onclick="toggleSelect(this)">
+    <div class="scene">
+      <div class="ceiling"></div><div class="floor"></div>
+      <div class="wall-left"></div><div class="wall-right"></div>
+      <div class="beam left"></div><div class="beam right"></div>
+      <div class="door"><div class="door-inner"></div></div>
+      <div class="console left"></div><div class="console right"></div>
+      <div class="light top"></div><div class="light left"></div><div class="light right"></div>
+      <div class="hazard"></div>
+    </div>
+    <div class="card-body">
+      <h3>B · 洁净远征舰</h3>
+      <p>浅色复合材料、蓝白照明、圆角舱体。识别清晰、制作规整，但受损与生存压力较弱。</p>
+      <div class="swatches"><span class="swatch" style="background:#d7e0e3"></span><span class="swatch" style="background:#82939a"></span><span class="swatch" style="background:#48d1ff"></span><span class="swatch" style="background:#20313b"></span></div>
+      <div class="tagline">关键词：专业、秩序、远征机构、科技可信</div>
+    </div>
+  </div>
+
+  <div class="card style-card hybrid" data-choice="rift-hybrid" onclick="toggleSelect(this)">
+    <div class="scene">
+      <div class="ceiling"></div><div class="floor"></div>
+      <div class="wall-left"></div><div class="wall-right"></div>
+      <div class="beam left"></div><div class="beam right"></div>
+      <div class="door"><div class="door-inner"></div></div>
+      <div class="console left"></div><div class="console right"></div>
+      <div class="light top"></div><div class="light left"></div><div class="light right"></div>
+      <div class="hazard"></div>
+    </div>
+    <div class="card-body">
+      <h3>C · 裂隙侵蚀混合体</h3>
+      <p>军用舰体与异常能量共存，轮廓更具辨识度。视觉身份最强，但建模、材质与 VFX 成本最高。</p>
+      <div class="swatches"><span class="swatch" style="background:#161821"></span><span class="swatch" style="background:#514456"></span><span class="swatch" style="background:#ef5bb4"></span><span class="swatch" style="background:#67d6c6"></span></div>
+      <div class="tagline">关键词：未知、污染、诱惑、舰船正在被改变</div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:22px">点击一张卡片选择。你也可以在聊天里说“以 A 为主，借用 B/C 的哪些部分”。</p>

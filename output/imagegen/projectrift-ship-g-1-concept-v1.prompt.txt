@@ -1,0 +1,20 @@
+Use case: stylized-concept
+Asset type: ProjectRift G-1 overall spaceship concept design board for realistic 3D game production
+
+Create an original high-end realistic 3D sci-fi spaceship concept design sheet for ProjectRift, suitable for an Unreal Engine production art bible.
+
+Ship concept: “Broken-Spine Expedition Ship,” a medium-sized human duty/expedition vessel and repairable home hub for a 1–4 person squad. Not a fighter, not a capital ship. Two compact armored hull masses are joined by a narrow, visibly damaged central spine. The exposed longitudinal keel, pressure corridor, trusses, utility pipes and cable runs have credible emergency braces, welded plates and field repairs. The broken and reinforced spine must dominate the large silhouette.
+
+Structure: blunt armored command bow with recessed sensors and protected observation apertures; modular midship habitat and mission compartments around standardized hardpoints, plausibly containing a central social/operations hall; dense aft machinery and propulsion block with reactor support, heat rejection and a shielded jump-core chamber; practical crash-support landing structures without aircraft wings; human-scale airlocks, maintenance doors, rails, ladders, lamps and access panels as scale cues, no people.
+
+Presentation: wide neutral dark studio concept board. One dominant cinematic three-quarter exterior hero view occupying roughly two-thirds of the image. Smaller clean side-profile and top-profile views of the exact same ship with consistent proportions. One partial cutaway inset showing the central hall and five distinct service modules—reactor, medical bay, communications array, armory and jump core—communicated visually through machinery, layout and restrained lighting, without written labels. Cleanly separated views and no decorative UI.
+
+State: early-to-mid restoration after a crash. Buckled armor, scorched seams, fractured outer keel, emergency truss reinforcement, welded patch plates, mismatched cool-gray replacement panels, protected exposed conduits and temporary maintenance lamps. Damaged but credible, stable and repairable, not destroyed. Repairs imply damaged → patched → operational progression.
+
+Style: grounded realistic PBR hard-surface design, medium detail density, strong large/medium/small form hierarchy, functional human industrial engineering, physically plausible materials, controlled bevels, restrained paneling, useful for 3D modeling. Approximately 70% deep gunmetal structure, 20% cool-gray armor, small amber maintenance accents and sparse cyan status lights. Rift influence appears only as a faint deep-violet glow inside the shielded jump core; absolutely no purple elsewhere. Worn paint, bare alloy repair edges, heat-darkened engine metal, ceramic thermal panels and realistic roughness.
+
+Lighting: controlled cool studio key with subtle warm maintenance practicals, readable shadows and enough fill to inspect the design. Serious, resilient, utilitarian and lived-in.
+
+Constraints: original design only; do not use the current UE demo map; no landscape, hangar, text, labels, logos, emblems, watermark, UI typography, people, creatures, weapons fire, explosions or motion blur. This is a visual/spatial design gate, not a dimensioned engineering drawing.
+
+Avoid: resemblance to existing franchises, sleek luxury yachts, clean white utopian ships, gothic styling, naval battleships, giant carriers, fighter wings, excessive random greebles, organic alien hulls, purple everywhere, excessive neon, unreadable silhouettes and inconsistent multi-view geometry.

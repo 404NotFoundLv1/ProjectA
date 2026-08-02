@@ -1,0 +1,36 @@
+<style>
+  .done-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin-top:21px}.done{padding:16px;border-radius:11px;border:1px solid rgba(148,163,184,.2);background:rgba(255,255,255,.025)}.done i{font-style:normal;color:#6fd6da;font-size:.68rem;letter-spacing:.1em}.done b{display:block;margin:7px 0;color:#eaf2f3}.done span{color:#91a5ac;font-size:.79rem;line-height:1.4}
+  .failures{margin-top:22px;border:1px solid rgba(148,163,184,.18);border-radius:12px;overflow:hidden}.frow{display:grid;grid-template-columns:180px 1fr 150px;gap:14px;padding:12px 16px;background:rgba(255,255,255,.018);color:#a7b8bd;font-size:.82rem}.frow:nth-child(even){background:rgba(255,255,255,.035)}.frow.header{color:#eaf2f3;font-weight:700;background:rgba(106,211,214,.07)}.frow b{color:#edb45a}.frow em{font-style:normal;color:#70d8dc}
+  .evidence{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:22px}.evidence section{padding:19px}.evidence h3{margin-top:0}.evidence ul{margin:0;padding-left:18px;color:#a7b8bd;font-size:.83rem}.evidence li+li{margin-top:6px}
+  .stop{margin-top:20px;padding:17px 19px;border-left:3px solid #edb45a;background:rgba(237,180,90,.06);color:#adbdc2}.stop strong{color:#efbb62}
+  @media(max-width:860px){.done-grid{grid-template-columns:1fr 1fr}.frow{grid-template-columns:1fr}.frow.header{display:none}.evidence{grid-template-columns:1fr}}
+</style>
+
+<div class="label">PROJECTRIFT · WORKFLOW SECTION 08</div>
+<h2>质量闭环：失败有回退点，完成有证据</h2>
+<p class="subtitle">“看起来差不多”不是 Gate。每一层必须同时留下视觉、技术、来源和运行时证据。</p>
+
+<div class="done-grid">
+  <div class="done"><i>D1</i><b>单件资产完成</b><span>源文件可重建；概念一致；尺寸、UV、碰撞、材质、授权和重导入通过。</span></div>
+  <div class="done"><i>D2</i><b>模块套件完成</b><span>全家族可无缩放拼接；无明显接缝／重复；状态系统共享且命名一致。</span></div>
+  <div class="done"><i>D3</i><b>样板舱完成</b><span>单人／四人镜头、交互、灯光、碰撞、材质与性能在固定机位可复测。</span></div>
+  <div class="done"><i>D4</i><b>正式大厅完成</b><span>玩法闭环、自动化、打包、视觉成长、性能、授权和源文件交接全部通过。</span></div>
+</div>
+
+<div class="failures">
+  <div class="frow header"><span>失败</span><span>规定动作</span><span>回退点</span></div>
+  <div class="frow"><b>图像生成不可用</b><span>继续白模、标注与材质规范；不擅自启用付费 API。</span><em>C1 白模</em></div>
+  <div class="frow"><b>概念结构漂移</b><span>叠图拒收，收紧 ID／深度／线稿约束；最多三轮。</span><em>C0／C1</em></div>
+  <div class="frow"><b>Blender 尺寸错误</b><span>重跑 1 m 基准件和场景模板；禁止在 UE 手动补 Scale。</span><em>M0／M1</em></div>
+  <div class="frow"><b>UV／法线／碰撞失败</b><span>回源文件修复并重导入；不在 UE 复制出修补版。</span><em>M2–M5</em></div>
+  <div class="frow"><b>授权不明确</b><span>阻止导入和引用，直到证据完整；无法证明则永久淘汰。</span><em>U0</em></div>
+  <div class="frow"><b>性能超预算</b><span>先定位材质、阴影、透明、贴花、实例或数据体积，再按证据降级。</span><em>U3／L3–L5</em></div>
+  <div class="frow"><b>UE／MCP 不可用</b><span>只诊断 ProjectA 和 8001；必要时安全重启本项目，不探测其他工程。</span><em>当前 Gate</em></div>
+</div>
+
+<div class="evidence">
+  <section class="card"><h3>每次 Gate 留存</h3><ul><li>固定机位截图／对比图</li><li>资产清单和尺寸报告</li><li>生成与人工修改台账</li><li>校验器 JSON／文本报告</li><li>失败原因和回退记录</li></ul></section>
+  <section class="card"><h3>正式大厅最终验证</h3><ul><li>ProjectRift 自动化测试</li><li>Development 打包与 LocalSmoke</li><li>Shipping 启动探测</li><li>图形化单人／四人验收</li><li>零脏资产和引用审计</li></ul></section>
+</div>
+
+<div class="stop"><strong>版本边界：</strong>工作流文档获批不等于开始美术版本。只有用户明确说“启动首件／启动某版本”后，才安装工具、创建 SourceArt、生成正式图像、建模或修改 UE 资产；每个小版本完成并验收后立即停止。</div>

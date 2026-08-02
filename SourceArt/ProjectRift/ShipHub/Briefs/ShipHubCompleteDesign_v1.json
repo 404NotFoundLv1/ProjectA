@@ -1,0 +1,30 @@
+{
+  "Schema": "projectrift.shiphub.complete-design.v1",
+  "Units": { "Blender": "m", "UnrealCentimetersPerMeter": 100, "SnapM": 0.5, "StructuralBayM": 4.0 },
+  "Axes": { "East": "+X", "NorthPods": "+Y", "Up": "+Z", "Origin": "Deck center" },
+  "Room": {
+    "ClearWidthM": 28.0, "ClearDepthM": 24.0, "ClearHeightM": 7.0,
+    "NominalHeightM": 8.0, "FloorThicknessM": 0.4, "WallThicknessM": 0.4,
+    "InnerVerticesM": [[-10,-12],[10,-12],[14,-8],[14,8],[10,12],[-10,12],[-14,8],[-14,-8]],
+    "MainPathMinWidthM": 5.0
+  },
+  "NavigationTable": { "CenterM": [0,0,0], "DiameterM": 8.0, "HeightM": 1.1, "DisplayDiameterM": 6.0 },
+  "Cryopods": {
+    "Count": 5, "CentersXM": [-4,-2,0,2,4], "BaseYM": 9.8,
+    "BoundsM": [1.6,1.6,3.0], "ReclineDegrees": 18.0,
+    "DoorOpenDegrees": 75.0, "DoorEnvelopeSouthM": 1.2,
+    "InteractionClearanceM": [2.0,2.5], "ExpansionInterfaceWidthM": 2.0
+  },
+  "Airlock": { "CenterM": [0,-12,0], "ClearOpeningM": [4.0,3.5], "DepthM": 1.2, "MusterAreaM": [8.0,5.0] },
+  "WestBays": { "PreparationYRangeM": [-8,0], "RepairCenterM": [-14,6,1.4] },
+  "EastBays": { "MedicalYRangeM": [-8,-4], "RoleYRangeM": [-4,-2], "JumpCoreCenterM": [14,6,3.0] },
+  "ConstructDocks": { "Count": 4, "DiameterM": 1.0, "RecessM": 0.08, "CentersM": [[-5.3,-5.3,0],[5.3,-5.3,0],[-5.3,5.3,0],[5.3,5.3,0]] },
+  "CeilingRing": { "InnerDiameterM": 10.0, "OuterDiameterM": 16.0, "LowestZM": 6.2, "HighestZM": 8.0, "Walkable": false },
+  "CharacterReference": { "CapsuleRadiusM": 0.42, "CapsuleHalfHeightM": 0.96, "CameraArmM": 4.0 },
+  "Deliverables": {
+    "Sheets": [
+      "A01_FloorPlan","A02_ReflectedCeilingPlan","A03_NorthElevation","A04_SouthElevation","A05_WestElevation","A06_EastElevation","A07_LongitudinalSection","A08_TransverseSection","A09_ExplodedModulePlan","A10_PerspectiveSheet","D01_Cryopod","D02_NavigationTable","D03_MainAirlock","D04_ConstructDock","D05_WallBayInterface"
+    ],
+    "Formats": ["blend","fbx","glb","pdf","png","svg","json","txt"]
+  }
+}

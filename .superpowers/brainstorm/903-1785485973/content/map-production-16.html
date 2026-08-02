@@ -1,0 +1,35 @@
+<style>
+  .source-row{display:grid;grid-template-columns:1fr 58px 1fr 58px 1fr;gap:10px;align-items:center;margin-top:22px}.source{padding:18px;border-radius:11px;border:1px solid rgba(148,163,184,.2);background:rgba(255,255,255,.025);min-height:122px}.source b{display:block;color:#eaf2f3}.source span{display:block;margin-top:7px;color:#91a5ac;font-size:.82rem}.arrow{text-align:center;color:#6fd7da;font-size:28px}
+  .passes{display:grid;grid-template-columns:repeat(6,minmax(122px,1fr));gap:9px;margin-top:22px;overflow-x:auto;padding-bottom:8px}.pass{position:relative;padding:14px 13px;min-height:148px;border-radius:11px;border:1px solid rgba(148,163,184,.2);background:rgba(255,255,255,.025)}.pass:not(:last-child):after{content:"›";position:absolute;right:-12px;top:54px;z-index:2;color:#6fd7da;background:#101a20;width:17px;text-align:center;font-size:24px}.pass i{font-style:normal;color:#6fd7da;font-size:.68rem;letter-spacing:.1em}.pass b{display:block;margin:8px 0 5px;color:#eaf2f3}.pass span{color:#8fa4ab;font-size:.76rem;line-height:1.4}
+  .layout{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:22px}.layout section{padding:19px}.layout h3{margin-top:0}.rule{padding:9px 0;border-top:1px solid rgba(148,163,184,.15);color:#a8b9be;font-size:.83rem}.rule b{color:#edb45a;margin-right:7px}
+  .handoff{margin-top:20px;padding:17px 19px;border-left:3px solid #edb45a;background:rgba(237,180,90,.06);color:#aebec3}.handoff strong{color:#efbb62}.handoff code{color:#c7d7da}
+  @media(max-width:880px){.source-row{grid-template-columns:1fr}.arrow{transform:rotate(90deg)}.layout{grid-template-columns:1fr}.passes{grid-template-columns:repeat(6,150px)}}
+</style>
+
+<div class="label">PROJECTRIFT · WORKFLOW SECTION 07</div>
+<h2>地图生产：玩法空间需求＋正式资产，重建大厅</h2>
+<p class="subtitle">现有 DEMO 地图不是输入；只有项目玩法合同与通过验收的资产套件可以进入布局设计。</p>
+
+<div class="source-row">
+  <div class="source"><b>输入 A · 玩法空间清单</b><span>组队、任务、仓库、制造、医疗、职能、修船、出发、剧情与教学。</span></div>
+  <div class="arrow">＋</div>
+  <div class="source"><b>输入 B · 批准资产套件</b><span>4 m 开间、门墙、转角、站点、灯光、三状态与跃迁核心。</span></div>
+  <div class="arrow">→</div>
+  <div class="source"><b>输出 · 全新生产大厅</b><span>先在隔离评审图搭建，最终迁入原有权威地图路径。</span></div>
+</div>
+
+<div class="passes">
+  <div class="pass"><i>L0</i><b>空间关系</b><span>只画功能邻接、视线、步行时间和四人聚集点。</span></div>
+  <div class="pass"><i>L1</i><b>模块装配</b><span>只用批准套件搭体量，禁止拉伸网格填缝。</span></div>
+  <div class="pass"><i>L2</i><b>玩法接线</b><span>放置现有交互类、出生、任务与旅行接口，保持类名和协议。</span></div>
+  <div class="pass"><i>L3</i><b>灯光状态</b><span>损毁／修补／上线三级照明与导视，不靠装饰灯滥用颜色。</span></div>
+  <div class="pass"><i>L4</i><b>场景叙事</b><span>贴花、线缆、维修痕迹、生活化道具和章节修复反馈。</span></div>
+  <div class="pass"><i>L5</i><b>性能验收</b><span>四人 PIE、碰撞、导航、交互、材质、灯影、加载与打包回归。</span></div>
+</div>
+
+<div class="layout">
+  <section class="card"><h3>空间规则</h3><div class="rule"><b>中心</b>任务／指挥节点承担首次进入后的视觉锚点。</div><div class="rule"><b>准备侧</b>仓库、制造、武器／职能形成短闭环。</div><div class="rule"><b>恢复侧</b>医疗与公共集结空间邻接，避免穿越拥堵。</div><div class="rule"><b>叙事端</b>损坏的跃迁核心位于可持续观察的视觉终点。</div><div class="rule"><b>出发端</b>裂隙／登舰接口有明确集结区和状态反馈。</div></section>
+  <section class="card"><h3>验收规则</h3><div class="rule"><b>四人</b>主路径可交错通行，站点前至少保留交互与等待空间。</div><div class="rule"><b>镜头</b>关键站点无频繁弹簧臂收缩，门框不遮挡交互反馈。</div><div class="rule"><b>识别</b>玩家从主要节点能辨认下一目的地，不依赖文字导航。</div><div class="rule"><b>成长</b>五个舰船模块的修复状态在空间、灯光和功能上均可辨。</div><div class="rule"><b>范围</b>大厅服务明确功能，不扩张成开放世界或无用途走廊。</div></section>
+</div>
+
+<div class="handoff"><strong>安全迁移：</strong>布局先在 <code>/Game/ProjectRift/Developer/Maps/L_ShipHub_LayoutReview</code> 评审；通过全部 Gate 后，才在已明确启动的正式版本中把批准内容迁入 <code>/Game/ProjectRift/Maps/L_ShipLobby</code>。保留地图路径和现有运行时接口，但完全替换 DEMO 几何与布局。</div>

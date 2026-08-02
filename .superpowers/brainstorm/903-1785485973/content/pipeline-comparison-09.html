@@ -1,0 +1,51 @@
+<style>
+  .pipeline-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:24px}
+  .pipeline{padding:22px;position:relative;overflow:hidden}
+  .pipeline.rec{border:1px solid rgba(102,210,214,.48);background:linear-gradient(160deg,rgba(102,210,214,.07),rgba(255,255,255,.02))}
+  .badge{font-size:.7rem;letter-spacing:.12em;color:#8fa5ad;font-weight:700}
+  .rec .badge{color:#70dade}
+  .pipeline h3{margin:8px 0 5px}
+  .sub{color:#92a6ad;font-size:.86rem;min-height:40px}
+  .flow{display:grid;gap:8px;margin:18px 0}
+  .flow span{position:relative;padding:10px 12px;border-radius:8px;background:rgba(255,255,255,.04);color:#c1cfd3;font-size:.84rem}
+  .flow span+span:before{content:"↓";position:absolute;top:-14px;left:50%;color:#61747b}
+  .scores{display:grid;grid-template-columns:108px 1fr;gap:7px 9px;align-items:center;font-size:.78rem;color:#8fa3aa}
+  .bar{height:6px;border-radius:8px;background:rgba(255,255,255,.07);overflow:hidden}.bar i{display:block;height:100%;border-radius:8px;background:#d39d51}.rec .bar i{background:#67d2d6}.risk{margin-top:16px;padding-top:13px;border-top:1px solid rgba(148,163,184,.16);color:#9eafb5;font-size:.83rem}
+  .decision{margin-top:22px;padding:19px 21px;border-left:3px solid #67d2d6;background:rgba(103,210,214,.055);border-radius:0 12px 12px 0;color:#bac9ce}.decision strong{color:#7be0e3}
+  @media(max-width:940px){.pipeline-grid{grid-template-columns:1fr}.sub{min-height:0}}
+</style>
+
+<div class="label">PROJECTRIFT · PIPELINE DECISION</div>
+<h2>三条画图—建模—UE 路线</h2>
+<p class="subtitle">比较对象是资产生产方法；任何路线都不以当前 L_ShipLobby 的尺寸或布局为输入。</p>
+
+<div class="pipeline-grid">
+  <article class="card pipeline" data-choice="concept-first" onclick="toggleSelect(this)">
+    <div class="badge">ROUTE A</div>
+    <h3>纯概念图先行</h3>
+    <div class="sub">先把空间和构件画完整，再由模型追图。</div>
+    <div class="flow"><span>AI 氛围图</span><span>多视图概念设定</span><span>Blender 追图建模</span><span>UE 拼装验证</span></div>
+    <div class="scores"><span>视觉探索</span><span class="bar"><i style="width:94%"></i></span><span>尺寸可靠</span><span class="bar"><i style="width:46%"></i></span><span>返工控制</span><span class="bar"><i style="width:54%"></i></span></div>
+    <div class="risk">主要风险：AI 多视图不一致，漂亮结构未必能模块拼接，问题直到建模后期才暴露。</div>
+  </article>
+
+  <article class="card pipeline rec" data-choice="asset-blockout-paintover" onclick="toggleSelect(this)">
+    <div class="badge">ROUTE B · RECOMMENDED</div>
+    <h3>资产白模＋概念回绘</h3>
+    <div class="sub">先冻结模块尺寸和接缝，再让图像生成服务于造型，而不是支配结构。</div>
+    <div class="flow"><span>视觉圣经＋模块表</span><span>Blender 真实尺寸白模</span><span>固定镜头 AI 回绘／材质探索</span><span>受控精模＋UE 样板舱验收</span></div>
+    <div class="scores"><span>视觉探索</span><span class="bar"><i style="width:86%"></i></span><span>尺寸可靠</span><span class="bar"><i style="width:98%"></i></span><span>返工控制</span><span class="bar"><i style="width:93%"></i></span></div>
+    <div class="risk">关键区别：这里做的是“资产套件白模”，不是沿用现有地图灰盒。生产地图仍在资产通过验收后重建。</div>
+  </article>
+
+  <article class="card pipeline" data-choice="generated-3d-first" onclick="toggleSelect(this)">
+    <div class="badge">ROUTE C</div>
+    <h3>生成式 3D 先行</h3>
+    <div class="sub">由图片／文本直接生成网格，再清理后导入。</div>
+    <div class="flow"><span>AI 概念图</span><span>Image-to-3D</span><span>重拓扑＋重做 UV</span><span>UE 修正与验收</span></div>
+    <div class="scores"><span>视觉探索</span><span class="bar"><i style="width:78%"></i></span><span>尺寸可靠</span><span class="bar"><i style="width:34%"></i></span><span>返工控制</span><span class="bar"><i style="width:39%"></i></span></div>
+    <div class="risk">适合孤立废料、小型杂物和远景原型；不适合作为墙板、舱门、转角等模块建筑的权威生产源。</div>
+  </article>
+</div>
+
+<div class="decision"><strong>推荐冻结 Route B。</strong> 它把“创意不受 DEMO 地图限制”和“模块必须能真实拼装”同时成立；Route A 作为早期气氛探索，Route C 只作为非关键道具加速器。</div>

@@ -1,0 +1,205 @@
+<style>
+  .direction-intro { max-width: 860px; }
+  .direction-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+    margin-top: 24px;
+  }
+  .direction-card {
+    overflow: hidden;
+    padding: 0;
+    border: 1px solid rgba(148, 163, 184, .24);
+  }
+  .direction-card .card-body { padding: 20px; }
+  .dna {
+    position: relative;
+    height: 230px;
+    overflow: hidden;
+    border-bottom: 1px solid rgba(148, 163, 184, .18);
+    background:
+      linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px),
+      radial-gradient(circle at 50% 60%, rgba(43, 78, 91, .42), transparent 58%),
+      #091218;
+    background-size: 24px 24px, 24px 24px, auto, auto;
+  }
+  .dna svg { width: 100%; height: 100%; display: block; }
+  .direction-card h3 { margin: 0 0 4px; font-size: 1.22rem; }
+  .descriptor { color: #93a9b2; font-size: .9rem; margin-bottom: 14px; }
+  .thesis { min-height: 78px; color: #d8e2e5; }
+  .grammar {
+    margin: 16px 0;
+    padding: 12px 13px;
+    border-radius: 10px;
+    background: rgba(255,255,255,.035);
+    color: #b9c8cd;
+    font-size: .88rem;
+  }
+  .grammar b { display: block; margin-bottom: 4px; color: #f0f5f6; }
+  .meter { display: grid; grid-template-columns: 82px 1fr; gap: 7px 10px; align-items: center; font-size: .82rem; color: #93a9b2; }
+  .bar { height: 7px; overflow: hidden; border-radius: 9px; background: rgba(255,255,255,.07); }
+  .bar i { display: block; height: 100%; border-radius: 9px; }
+  .direction-card ul { margin: 15px 0 0; padding-left: 18px; color: #aebfc5; font-size: .88rem; }
+  .direction-card li + li { margin-top: 6px; }
+  .recommended {
+    display: inline-block;
+    margin-left: 7px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(238, 177, 73, .14);
+    color: #f1be66;
+    font-size: .68rem;
+    vertical-align: 2px;
+    letter-spacing: .06em;
+  }
+  .a .bar i { background: #e7a64d; }
+  .b .bar i { background: #68bfd0; }
+  .c .bar i { background: #bd71ef; }
+  .recommendation {
+    margin-top: 22px;
+    padding: 18px 20px;
+    border: 1px solid rgba(238,177,73,.34);
+    border-radius: 13px;
+    background: linear-gradient(90deg, rgba(238,177,73,.10), rgba(93,213,213,.055));
+  }
+  .recommendation strong { color: #f1be66; }
+  .choice-note { margin-top: 18px; color: #9fb0b6; }
+  @media (max-width: 960px) {
+    .direction-grid { grid-template-columns: 1fr; }
+    .thesis { min-height: 0; }
+  }
+</style>
+
+<div class="direction-intro">
+  <div class="label">PROJECTRIFT · ORIGINAL STRUCTURAL DNA</div>
+  <h2>三套原创舰船视觉方向</h2>
+  <p class="subtitle">这是“结构基因与生产取舍板”，不是拿简图冒充概念原画。三套方案只从“异星迫降—反复裂隙行动—逐段修舰—最终返航”的产品幻想推导，不参考当前大厅布局。</p>
+</div>
+
+<div class="direction-grid">
+  <article class="card direction-card a" data-choice="broken-spine-expedition" onclick="toggleSelect(this)">
+    <div class="dna">
+      <svg viewBox="0 0 440 230" role="img" aria-label="断脊远征舰结构基因">
+        <defs>
+          <linearGradient id="aHull" x1="0" x2="1"><stop stop-color="#29383f"/><stop offset="1" stop-color="#63747a"/></linearGradient>
+          <filter id="aGlow"><feGaussianBlur stdDeviation="4"/></filter>
+        </defs>
+        <path d="M58 164 L98 75 L278 52 L382 94 L350 176 L141 194 Z" fill="#0c151a" stroke="#435962" stroke-width="2"/>
+        <path d="M75 151 L123 88 L283 70 L356 101 L328 158 L139 177 Z" fill="url(#aHull)" stroke="#839298" stroke-width="2"/>
+        <path d="M100 138 L150 98 L286 84 L330 104 L312 145 L150 159 Z" fill="#101b20" stroke="#26373e" stroke-width="10"/>
+        <path d="M122 138 L162 111 L277 99 L309 111 L299 131 L154 145 Z" fill="#192a30"/>
+        <g fill="#718087" stroke="#152127" stroke-width="3">
+          <path d="M118 87 l38 -22 42 -4 -18 36 -49 12z"/>
+          <path d="M201 60 l54 -6 31 18 -24 24 -66 3z"/>
+          <path d="M290 77 l40 15 22 22 -22 28 -29 -24z"/>
+          <path d="M104 118 l25 -9 18 48 -28 12 -26 -24z"/>
+        </g>
+        <path d="M150 165 L318 145" stroke="#e7a64d" stroke-width="5"/>
+        <path d="M177 160 L167 143 M228 154 L220 135 M277 149 L270 129" stroke="#e7a64d" stroke-width="3"/>
+        <circle cx="299" cy="128" r="10" fill="#efb85b"/>
+        <circle cx="299" cy="128" r="18" fill="#efb85b" opacity=".28" filter="url(#aGlow)"/>
+        <path d="M95 154 l-25 14 42 1 M347 105 l31 -8 -23 20" fill="none" stroke="#81959c" stroke-width="4"/>
+        <text x="22" y="28" fill="#e7a64d" font-size="11" letter-spacing="2">EXPOSED KEEL · CLIPPED MODULES · REPAIR SCARS</text>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>A · 断脊远征舰 <span class="recommended">推荐基线</span></h3>
+      <div class="descriptor">“一艘受伤但仍能被人理解、维修和重新信任的机器”</div>
+      <p class="thesis">承力龙骨、维修肋架和外挂舱段构成清楚层级。迫降撕开了舰体，玩家用来自五章的材料逐步把它重新接通。</p>
+      <div class="grammar"><b>造型语法</b>65% 方形承力框架 · 25% 削角护板 · 10% 圆形接口；不对称损伤，功能模块仍保持统一拼装规范。</div>
+      <div class="meter">
+        <span>项目辨识度</span><span class="bar"><i style="width:82%"></i></span>
+        <span>生产可控性</span><span class="bar"><i style="width:92%"></i></span>
+        <span>修复表现力</span><span class="bar"><i style="width:96%"></i></span>
+      </div>
+      <ul>
+        <li>最适合模块化套件与小团队生产。</li>
+        <li>风险：容易落入普通工业科幻；必须靠“断脊、章材修补、状态分层”建立专属身份。</li>
+      </ul>
+    </div>
+  </article>
+
+  <article class="card direction-card b" data-choice="shelter-fortress" onclick="toggleSelect(this)">
+    <div class="dna">
+      <svg viewBox="0 0 440 230" role="img" aria-label="层甲避难堡结构基因">
+        <defs>
+          <linearGradient id="bHull" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#728991"/><stop offset="1" stop-color="#26353b"/></linearGradient>
+          <filter id="bGlow"><feGaussianBlur stdDeviation="4"/></filter>
+        </defs>
+        <path d="M46 168 L83 69 L218 39 L362 69 L397 165 L332 193 L105 193 Z" fill="#0b151a" stroke="#42616a" stroke-width="2"/>
+        <path d="M66 156 L101 84 L220 60 L345 84 L375 156 L321 176 L112 176 Z" fill="url(#bHull)" stroke="#8da0a6" stroke-width="2"/>
+        <path d="M95 142 L123 96 L218 78 L322 98 L347 142 L310 158 L126 158 Z" fill="#18262c" stroke="#4e646c" stroke-width="6"/>
+        <path d="M129 132 L151 105 L219 94 L293 107 L315 134 L291 144 L151 144 Z" fill="#0e191e"/>
+        <path d="M79 137 L118 121 M357 136 L319 120 M104 92 L141 111 M337 92 L298 111" stroke="#91a6ad" stroke-width="8"/>
+        <rect x="176" y="113" width="88" height="31" rx="4" fill="#2f4952" stroke="#72c8d5" stroke-width="2"/>
+        <path d="M191 128 H248" stroke="#85e0eb" stroke-width="4"/>
+        <path d="M191 128 H248" stroke="#68bfd0" stroke-width="13" opacity=".2" filter="url(#bGlow)"/>
+        <path d="M112 165 H326" stroke="#151d20" stroke-width="6"/>
+        <text x="22" y="28" fill="#68bfd0" font-size="11" letter-spacing="2">LAYERED ARMOR · LOW CENTER · SHELTER LOGIC</text>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>B · 层甲避难堡</h3>
+      <div class="descriptor">“飞船已经不能飞，但它仍是四个人唯一安全的家”</div>
+      <p class="thesis">把舰体视为坠毁后的生存堡垒：低重心、厚隔舱、重门和层叠装甲。空间更压迫，安全区与裂隙任务形成强反差。</p>
+      <div class="grammar"><b>造型语法</b>55% 梯形壳体 · 35% 重型装甲层 · 10% 软质生存装备；宽、低、稳定，照明集中在安全动线。</div>
+      <div class="meter">
+        <span>项目辨识度</span><span class="bar"><i style="width:74%"></i></span>
+        <span>生产可控性</span><span class="bar"><i style="width:78%"></i></span>
+        <span>修复表现力</span><span class="bar"><i style="width:72%"></i></span>
+      </div>
+      <ul>
+        <li>生存情绪最强，适合强调“返航前的临时家园”。</li>
+        <li>风险：第三人称镜头易受低矮空间限制，模块重复也更明显。</li>
+      </ul>
+    </div>
+  </article>
+
+  <article class="card direction-card c" data-choice="rift-symbiotic-ship" onclick="toggleSelect(this)">
+    <div class="dna">
+      <svg viewBox="0 0 440 230" role="img" aria-label="裂隙共生舰结构基因">
+        <defs>
+          <radialGradient id="cCore"><stop stop-color="#f2d8ff"/><stop offset=".26" stop-color="#bc75ea"/><stop offset="1" stop-color="#321f48"/></radialGradient>
+          <filter id="cGlow"><feGaussianBlur stdDeviation="7"/></filter>
+        </defs>
+        <path d="M53 170 L102 77 L231 46 L365 92 L384 167 L315 192 L128 194 Z" fill="#0b1218" stroke="#3d4d59" stroke-width="2"/>
+        <path d="M74 155 L119 91 L225 66 L338 101 L359 153 L303 171 L137 175 Z" fill="#34424a" stroke="#707f86" stroke-width="2"/>
+        <path d="M105 147 L146 106 L223 87 L313 111 L335 143 L290 157 L150 159 Z" fill="#121d23"/>
+        <g fill="#241a32" stroke="#bd71ef" stroke-width="2">
+          <path d="M222 57 l19 33 -17 19 -20 -20z"/>
+          <path d="M247 76 l26 25 -9 25 -26 -19z"/>
+          <path d="M195 84 l-12 29 20 18 18 -27z"/>
+          <path d="M282 102 l25 15 -2 27 -28 -13z"/>
+        </g>
+        <ellipse cx="226" cy="111" rx="35" ry="43" fill="#bb70ea" opacity=".22" filter="url(#cGlow)"/>
+        <ellipse cx="226" cy="111" rx="20" ry="30" fill="url(#cCore)"/>
+        <path d="M226 79 C245 92 249 123 226 143 C204 126 201 94 226 79Z" fill="none" stroke="#ebcaff" stroke-width="2"/>
+        <path d="M92 154 C148 136 160 170 210 142 M244 143 C280 124 308 149 345 137" fill="none" stroke="#8f58b6" stroke-width="4"/>
+        <text x="22" y="28" fill="#bd71ef" font-size="11" letter-spacing="2">HUMAN FRAME · ANOMALOUS GRAFT · CHAPTER MUTATION</text>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>C · 裂隙共生舰</h3>
+      <div class="descriptor">“为了回家，舰船不得不接纳它原本要逃离的东西”</div>
+      <p class="thesis">人类舰体被回收的异常材料逐步改写，跃迁核心像第二套神经系统蔓延。每章修复都会改变舰内轮廓、光流与声音。</p>
+      <div class="grammar"><b>造型语法</b>60% 人造模块骨架 · 25% 非对称异常嫁接 · 15% 发光能量缝；直线秩序与连续曲面侵入形成冲突。</div>
+      <div class="meter">
+        <span>项目辨识度</span><span class="bar"><i style="width:98%"></i></span>
+        <span>生产可控性</span><span class="bar"><i style="width:48%"></i></span>
+        <span>修复表现力</span><span class="bar"><i style="width:91%"></i></span>
+      </div>
+      <ul>
+        <li>世界观张力和最终章回收最强。</li>
+        <li>风险：材质/VFX/形变成本高，也会提前透支五章裂隙的神秘感。</li>
+      </ul>
+    </div>
+  </article>
+</div>
+
+<div class="recommendation">
+  <strong>我的推荐：A 作为全舰唯一基线，C 只作为“跃迁核心与后期修复层”。</strong>
+  这样模块套件可控、第三人称可读、修复成长清楚，同时让裂隙侵入保持稀有与剧情重量；不是把两种风格平均混合。
+</div>
+
+<p class="choice-note">请选择 A、B、C，或接受推荐的 “A 基线 + C 限定层”。选择后我会冻结该方向的轮廓、色彩、材质、灯光和模块规则。</p>

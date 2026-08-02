@@ -1,0 +1,41 @@
+Use case: style-transfer
+Asset type: ProjectRift production-grade Unreal Engine 5 realistic 3D environment concept render
+Input image: Image 1 is the approved design, layout, cleanliness and composition target. Preserve all geometry, counts, functional zones and visual hierarchy.
+Primary request: Make the scene slightly more photorealistic and convincingly three-dimensional, as if it were a production UE5 environment rendered with high-quality physically based materials, Lumen-style indirect lighting, realistic reflection capture and cinematic color management. Keep the clean, low-noise visual design of v8. Do not reintroduce dirt, dense microdetails or dotted lights.
+
+PHYSICALLY BELIEVABLE GEOMETRY:
+- Give every armor panel, frame, deck plate, console edge and wall recess plausible manufactured thickness, consistent bevel radii and convincing contact seams.
+- Improve contact shadows and ambient occlusion where modules meet the deck, walls and structural ribs, especially beneath the central table, hibernation-pod bases and wall-integrated bays.
+- Make the five reclined hibernation capsules feel like heavy engineered machines mounted into load-bearing cradles, with realistic rubber gaskets, latches and restrained service connections.
+- Refine the floating construct with clearly articulated metal joints, actuator housings, optical glass and believable hover-thruster hardware while preserving its exact design and position.
+
+REALISTIC PBR MATERIAL SEPARATION:
+- Dark structural ribs: powder-coated or anodized aerospace aluminum with subtle broad roughness variation.
+- Removable wall and floor panels: clean graphite-gray composite and painted metal with distinct but restrained material response.
+- Work surfaces and central table rim: brushed metal and durable matte polymer, with realistic edge softness.
+- Hibernation glazing: laminated reinforced glass with correct thickness, soft internal condensation, subtle reflections and visible sleeping silhouettes; no milky plastic look.
+- Rubber seals and cable insulation: genuinely matte and slightly soft-looking.
+- Displays and cyan surfaces: luminous glass/screens with controlled brightness, visible dark glass outside lit pixels and minimal bloom.
+- Use very subtle localized handling wear and maintenance polish only where physically expected. No grunge overlay.
+
+LIGHTING / CAMERA:
+- Preserve the broad continuous practical light strips, but make their fixtures physically recessed and their illumination soft, directional and naturally falloff-based.
+- Add believable indirect bounce from cool-white lights onto dark walls and floor; preserve deep but readable shadows.
+- Introduce slight natural asymmetry in exposure and reflections so the scene does not look like a perfectly mirrored illustration.
+- Use realistic filmic highlight rolloff, neutral white balance with restrained cool bias, controlled cyan emission, low bloom and moderate contrast.
+- Camera should read as a 28 mm full-frame architectural interior photograph or high-end UE5 cinematic capture, with realistic perspective and no fisheye distortion.
+- Retain the clean semi-matte floor. Add broad, soft, physically plausible reflections only, never wetness or point sparkles.
+
+HARD INVARIANTS:
+- EXACTLY five clearly countable backward-reclined sealed hibernation pods, exactly one sleeping silhouette in each.
+- Exactly one enlarged circular central mission/navigation table, same size and four interaction faces.
+- Exactly one prominent floating spherical maintenance construct.
+- Exactly four flush floor charging sockets.
+- Preserve the left combined preparation/armory/fabrication bay, right medical and role/loadout bays, protected dormant jump core, single damaged repair interface and coolant vapor leak, overhead service ring, structural ribs, single floor, broad circulation ring, large single-room dimensions, camera location and 16:9 framing.
+
+CLEANLINESS INVARIANTS:
+- Preserve the large quiet armor panels, sparse fasteners, limited seam count, continuous lighting and clean stabilized-ship condition.
+- Preserve only one localized damaged/repair zone with restrained red emergency light.
+- Do not add filler props, extra consoles, crates, loose cables or decorative machinery.
+
+Avoid: stylized illustration, painterly concept art, plastic toy materials, gamey neon glow, excessive bloom, sterile flat CAD render, perfectly mirrored procedural look, dirty surfaces, wet floor, grunge, soot, rust, dense rivets, micro-greeble noise, dotted light field, excessive emissive points, changed layout, extra objects, more or fewer than five pods, extra drones, UI overlay, inset plan, logo, watermark.

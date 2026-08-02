@@ -1,0 +1,44 @@
+<style>
+  .compare-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:20px}
+  .concept{border:1px solid #3b4550;border-radius:14px;overflow:hidden;background:#151a20;cursor:pointer;transition:.2s ease;position:relative}
+  .concept:hover{transform:translateY(-2px);border-color:#d79a4a}.concept.selected{border:2px solid #f2aa50;box-shadow:0 0 0 3px rgba(242,170,80,.14)}
+  .concept img{display:block;width:100%;aspect-ratio:3/2;object-fit:cover;background:#090b0d}
+  .body{padding:14px}.body h3{margin:0 0 7px}.body p{margin:0;color:#abb6c0;font-size:13px;line-height:1.45}.note{margin-top:9px;color:#e0c18f;font-size:12px}
+  .recommended{position:absolute;right:9px;top:9px;padding:4px 9px;border-radius:999px;background:#d58b31;color:#111;font-size:11px;font-weight:800}
+  @media(max-width:1100px){.compare-grid{grid-template-columns:1fr}}
+</style>
+
+<h2>ProjectRift 单舱室：生成概念对比</h2>
+<p class="subtitle">三张图使用同一艘舰的材质、功能清单与修复状态，只比较空间骨架。点击选择你希望继续深化的一张。</p>
+
+<div class="compare-grid">
+  <div class="concept option" data-choice="a-generated" onclick="toggleSelect(this)">
+    <div class="recommended">推荐</div>
+    <img src="/files/comparison-a-ring.png" alt="A 环形作战大厅">
+    <div class="body">
+      <h3>A · 环形作战大厅</h3>
+      <p>中央任务岛与四周工位形成最短闭环，所有玩家和关键系统几乎始终处于同一视野。</p>
+      <div class="note">最适合：高频局外操作、1–4 人互相可见、低跑图成本。</div>
+    </div>
+  </div>
+
+  <div class="concept option" data-choice="b-generated" onclick="toggleSelect(this)">
+    <img src="/files/comparison-b-axial.png" alt="B 轴向维修甲板">
+    <div class="body">
+      <h3>B · 轴向维修甲板</h3>
+      <p>沿断脊建立长轴大厅，任务台在中段，功能站连续分布，跃迁核心构成远端目标。</p>
+      <div class="note">最适合：工业维修感、线性修复叙事、清晰舰船方向感。</div>
+    </div>
+  </div>
+
+  <div class="concept option" data-choice="c-generated" onclick="toggleSelect(this)">
+    <img src="/files/comparison-c-sunken.png" alt="C 下沉式核心剧场">
+    <div class="body">
+      <h3>C · 下沉式核心剧场</h3>
+      <p>浅下沉中央指挥区与开放环形工位共享一个大体量，核心成为强烈的视觉焦点。</p>
+      <div class="note">最适合：空间层次、剧情演出、模块修复的视觉变化。</div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:20px">建议重点比较：A 的操作效率、B 的舰船感、C 的空间表现力。选择后我们再把该方案修正为正式 G-1 舱室方向。</p>

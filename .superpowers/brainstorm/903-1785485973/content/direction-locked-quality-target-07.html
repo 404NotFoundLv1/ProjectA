@@ -1,0 +1,73 @@
+<style>
+  .lock-grid { display:grid; grid-template-columns:1.15fr .85fr; gap:22px; margin-top:24px; }
+  .locked {
+    padding:26px;
+    border:1px solid rgba(238,177,73,.38);
+    background:
+      radial-gradient(circle at 84% 20%, rgba(183,100,234,.14), transparent 34%),
+      linear-gradient(145deg,rgba(238,177,73,.08),rgba(24,40,48,.62));
+  }
+  .lockmark { color:#efbb5f; font-size:.75rem; letter-spacing:.14em; font-weight:700; }
+  .locked h2 { margin:8px 0 10px; }
+  .rule { display:grid; grid-template-columns:78px 1fr; gap:12px; padding:12px 0; border-top:1px solid rgba(148,163,184,.15); }
+  .rule:first-of-type { margin-top:18px; }
+  .rule b { color:#efbb5f; }
+  .rule span { color:#bdcbd0; }
+  .quality-panel { padding:24px; }
+  .quality-panel h3 { margin-top:0; }
+  .quality-list { display:grid; gap:10px; margin-top:16px; }
+  .quality {
+    padding:14px 15px;
+    border:1px solid rgba(148,163,184,.22);
+    border-radius:11px;
+    background:rgba(255,255,255,.025);
+    cursor:pointer;
+  }
+  .quality:hover { border-color:rgba(103,213,215,.55); }
+  .quality b { display:block; color:#e9f2f3; }
+  .quality span { display:block; margin-top:4px; color:#92a6ae; font-size:.86rem; }
+  .quality.recommended { border-color:rgba(103,213,215,.42); background:rgba(103,213,215,.055); }
+  .quality.recommended b::after {
+    content:"推荐";
+    margin-left:8px;
+    padding:2px 7px;
+    border-radius:999px;
+    color:#77dce0;
+    background:rgba(103,213,215,.11);
+    font-size:.68rem;
+    vertical-align:2px;
+  }
+  @media(max-width:820px){.lock-grid{grid-template-columns:1fr;}}
+</style>
+
+<div class="label">PROJECTRIFT · ART DIRECTION LOCK 01</div>
+<div class="lock-grid">
+  <section class="card locked">
+    <div class="lockmark">✓ APPROVED STRUCTURAL DNA</div>
+    <h2>A 基线＋C 限定层</h2>
+    <p class="subtitle">舰船不是由当前地图推导；生产地图将在模块资产完成后重建。</p>
+    <div class="rule"><b>常态层</b><span>断脊远征舰：承力龙骨、削角护板、外挂舱段、可见维修接口。</span></div>
+    <div class="rule"><b>叙事层</b><span>裂隙共生结构仅存在于跃迁核心，并随章节修复逐步扩散。</span></div>
+    <div class="rule"><b>成长层</b><span>断电损毁 → 临时拼补 → 系统接通 → 异常返航能力，必须一眼可辨。</span></div>
+    <div class="rule"><b>禁用项</b><span>全舰平均铺满紫色发光纹、洁净新舰感、用 DEMO 布局反推资产。</span></div>
+  </section>
+
+  <section class="card quality-panel">
+    <h3>下一项：画面精度目标</h3>
+    <p class="subtitle">它会决定概念图密度、模型面数、贴图方案、制作周期和所需软件。</p>
+    <div class="quality-list">
+      <div class="quality recommended" data-choice="grounded-semi-real-pbr" onclick="toggleSelect(this)">
+        <b>写实化 PBR，中等细节密度</b>
+        <span>可信材质＋清楚大形，近看经得住第三人称镜头；适合独立商业项目持续生产。</span>
+      </div>
+      <div class="quality" data-choice="aaa-photoreal" onclick="toggleSelect(this)">
+        <b>AAA 照片级写实</b>
+        <span>微细节和材质层极高，但人力、扫描素材、烘焙和优化成本显著增加。</span>
+      </div>
+      <div class="quality" data-choice="stylized-pbr" onclick="toggleSelect(this)">
+        <b>风格化 PBR</b>
+        <span>轮廓与色块更夸张，生产较稳，但会降低“受损执勤舰”的现实可信度。</span>
+      </div>
+    </div>
+  </section>
+</div>

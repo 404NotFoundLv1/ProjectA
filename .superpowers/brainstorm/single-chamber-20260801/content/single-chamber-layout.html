@@ -1,0 +1,89 @@
+<style>
+  .layout-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:22px}
+  .layout-card{border:1px solid #39414d;border-radius:14px;background:#14191f;overflow:hidden;cursor:pointer;transition:.2s ease;position:relative}
+  .layout-card:hover{transform:translateY(-2px);border-color:#d99a43}.layout-card.selected{border:2px solid #f0a84f;box-shadow:0 0 0 3px rgba(240,168,79,.15)}
+  .recommend{position:absolute;right:10px;top:10px;background:#d58b31;color:#101214;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:800;z-index:3}
+  .diagram{height:290px;background:linear-gradient(145deg,#10151a,#1b222a);position:relative;border-bottom:1px solid #303944;overflow:hidden}
+  .room{position:absolute;border:2px solid #697888;background:#202932;box-shadow:inset 0 0 22px rgba(0,0,0,.65)}
+  .station{position:absolute;display:flex;align-items:center;justify-content:center;text-align:center;padding:4px;border:1px solid #8b724f;background:#3a3024;color:#ffdca8;font-size:10px;font-weight:700;border-radius:5px;line-height:1.15}
+  .station.blue{border-color:#477f94;background:#203943;color:#aee8ff}.station.red{border-color:#8c5050;background:#3c2525;color:#ffc2bd}.station.green{border-color:#4d806b;background:#223a31;color:#b9f4d8}.station.violet{border-color:#65528b;background:#2d2541;color:#d8c8ff}
+  .center{position:absolute;display:flex;align-items:center;justify-content:center;text-align:center;background:#27333b;border:2px solid #8ca2ad;color:#e8f4f7;font-size:11px;font-weight:800;box-shadow:0 0 18px rgba(112,184,209,.14)}
+  .route{position:absolute;border:2px dashed rgba(100,201,218,.58);border-radius:999px}
+  .entry{position:absolute;background:#716048;color:#fff1d2;padding:5px 8px;font-size:9px;border-radius:4px;font-weight:800}
+  .caption{padding:16px 16px 18px}.caption h3{margin:0 0 7px;color:#f0f3f6}.caption p{margin:0;color:#aeb8c2;font-size:13px;line-height:1.45}.trade{margin-top:10px;color:#d4d9de;font-size:12px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px;color:#9eabb7;font-size:12px}.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;background:#8b724f}.dot.blue{background:#477f94}.dot.green{background:#4d806b}.dot.violet{background:#65528b}
+  @media(max-width:1000px){.layout-grid{grid-template-columns:1fr}.diagram{height:330px}}
+</style>
+
+<h2>ProjectRift：单一可移动大舱室布局</h2>
+<p class="subtitle">三种方案都只有一个玩家可自由移动的主房间；动力炉、医疗、通讯、军械和跃迁核心均作为大厅边缘的操作站、观察窗或不可进入设备区。请选择最适合后续概念图的空间骨架。</p>
+
+<div class="legend">
+  <span><i class="dot"></i>任务 / 制造 / 军械</span>
+  <span><i class="dot blue"></i>通讯 / 队伍 / 职能</span>
+  <span><i class="dot green"></i>医疗 / 仓储</span>
+  <span><i class="dot violet"></i>隔离跃迁核心</span>
+</div>
+
+<div class="layout-grid">
+  <div class="layout-card option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="recommend">推荐</div>
+    <div class="diagram">
+      <div class="room" style="left:7%;top:10%;width:86%;height:76%;border-radius:34px"></div>
+      <div class="route" style="left:21%;top:25%;width:58%;height:46%"></div>
+      <div class="center" style="left:35%;top:34%;width:30%;height:28%;border-radius:45%">中央任务台<br>组队 · 合同 · 出发</div>
+      <div class="station" style="left:10%;top:19%;width:22%;height:18%">制造 / 军械</div>
+      <div class="station green" style="left:10%;top:58%;width:22%;height:18%">医疗 / 净化</div>
+      <div class="station blue" style="right:10%;top:19%;width:22%;height:18%">通讯 / 情报</div>
+      <div class="station green" style="right:10%;top:58%;width:22%;height:18%">仓库 / 配装</div>
+      <div class="station violet" style="left:39%;top:12%;width:22%;height:13%">核心观察窗</div>
+      <div class="station red" style="left:39%;bottom:15%;width:22%;height:13%">修船 / 动力</div>
+      <div class="entry" style="left:42%;bottom:2%">出生 / 裂隙门</div>
+    </div>
+    <div class="caption">
+      <h3>A · 环形作战大厅</h3>
+      <p>中央操作岛承担任务选择、队伍准备和出发；所有成长与维护站点沿墙布置，形成短距离闭环。</p>
+      <div class="trade">优点：1–4 人互相可见、路径最短、第三人称镜头稳定。代价：需要用高度和灯光避免“圆形菜单房”。</div>
+    </div>
+  </div>
+
+  <div class="layout-card option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="diagram">
+      <div class="room" style="left:8%;top:24%;width:84%;height:50%;border-radius:12px"></div>
+      <div class="route" style="left:16%;top:39%;width:68%;height:18%"></div>
+      <div class="entry" style="left:7%;top:44%">出生</div>
+      <div class="station green" style="left:16%;top:28%;width:18%;height:16%">仓库 / 医疗</div>
+      <div class="station" style="left:16%;top:56%;width:18%;height:14%">军械 / 制造</div>
+      <div class="center" style="left:39%;top:34%;width:23%;height:30%;border-radius:8px">任务台<br>中央集结</div>
+      <div class="station blue" style="right:16%;top:28%;width:18%;height:16%">通讯 / 职能</div>
+      <div class="station red" style="right:16%;top:56%;width:18%;height:14%">修船 / 动力</div>
+      <div class="station violet" style="right:5%;top:39%;width:12%;height:20%">核心</div>
+    </div>
+    <div class="caption">
+      <h3>B · 轴向维修甲板</h3>
+      <p>大厅沿舰船断脊展开，玩家从出生端经过任务台走向跃迁核心；两侧是连续维修与成长工位。</p>
+      <div class="trade">优点：最能表现舰船结构与修复旅程。代价：跑动距离较长，4 人容易在一条轴线上拥堵。</div>
+    </div>
+  </div>
+
+  <div class="layout-card option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="diagram">
+      <div class="room" style="left:12%;top:8%;width:76%;height:80%;border-radius:48%"></div>
+      <div class="route" style="left:25%;top:22%;width:50%;height:54%"></div>
+      <div class="center" style="left:35%;top:33%;width:30%;height:34%;border-radius:50%">下沉指挥区<br>任务 · 准备</div>
+      <div class="station violet" style="left:39%;top:11%;width:22%;height:14%">悬置核心</div>
+      <div class="station" style="left:15%;top:25%;width:20%;height:16%">军械 / 制造</div>
+      <div class="station blue" style="right:15%;top:25%;width:20%;height:16%">通讯 / 职能</div>
+      <div class="station green" style="left:15%;bottom:22%;width:20%;height:16%">医疗 / 仓库</div>
+      <div class="station red" style="right:15%;bottom:22%;width:20%;height:16%">修船 / 动力</div>
+      <div class="entry" style="left:41%;bottom:3%">出生 / 出发</div>
+    </div>
+    <div class="caption">
+      <h3>C · 下沉式核心剧场</h3>
+      <p>仍是一个房间，但用环形夹层和下沉指挥区制造层次，跃迁核心成为高处可见的叙事焦点。</p>
+      <div class="trade">优点：视觉最强、修复状态展示丰富。代价：楼梯、遮挡、导航和第三人称摄像机风险最高。</div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:20px">点击一张方案卡片选择。我的推荐是 A：它最符合“一个房间完成全部局外操作”，同时最适合 1–4 人合作大厅。</p>

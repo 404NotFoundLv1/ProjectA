@@ -1,0 +1,31 @@
+<style>
+  .model-flow{display:grid;grid-template-columns:repeat(6,minmax(120px,1fr));gap:9px;overflow-x:auto;margin-top:22px;padding-bottom:8px}.mstep{position:relative;min-height:150px;padding:14px 13px;border-radius:11px;border:1px solid rgba(148,163,184,.2);background:rgba(255,255,255,.025)}.mstep:not(:last-child):after{content:"›";position:absolute;right:-12px;top:54px;z-index:2;color:#6dd7da;background:#101a20;width:17px;text-align:center;font-size:24px}.mstep i{font-style:normal;color:#6dd7da;font-size:.68rem;letter-spacing:.1em}.mstep b{display:block;margin:8px 0 5px;color:#eaf2f3}.mstep span{color:#8fa4ab;font-size:.77rem;line-height:1.4}
+  .details{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:22px}.detail{padding:19px}.detail h3{margin-top:0}.checks{display:grid;grid-template-columns:1fr 1fr;gap:8px}.check{padding:9px 10px;border-radius:8px;background:rgba(255,255,255,.03);color:#a8b9be;font-size:.8rem}.check:before{content:"✓";color:#6dd7da;margin-right:7px}.warning{margin-top:19px;padding:15px 18px;border-left:3px solid #edb55c;background:rgba(237,181,92,.06);color:#adbdc2}.warning strong{color:#efbb64}
+  @media(max-width:840px){.details{grid-template-columns:1fr}.model-flow{grid-template-columns:repeat(6,150px)}}
+</style>
+
+<div class="label">PROJECTRIFT · WORKFLOW SECTION 04</div>
+<h2>建模生产：参数化主文件＋自动校验</h2>
+<p class="subtitle">Blender 是几何权威源；Codex 通过 Python、非破坏修改器和渲染检查维护资产，用户无需手工建模。</p>
+
+<div class="model-flow">
+  <div class="mstep"><i>M0</i><b>场景模板</b><span>固定 LTS、单位、网格、集合、命名、相机和导出预设。</span></div>
+  <div class="mstep"><i>M1</i><b>参数骨架</b><span>脚本按 100/200/400 cm 生成边界、接缝、枢轴和接口。</span></div>
+  <div class="mstep"><i>M2</i><b>受控造型</b><span>Mirror／Array／Boolean／Bevel／Weighted Normal；模块边界锁定。</span></div>
+  <div class="mstep"><i>M3</i><b>细节分层</b><span>轮廓用几何，近景功能用模型，重复微细节交给材质与贴花。</span></div>
+  <div class="mstep"><i>M4</i><b>碰撞导出</b><span>简单 UCX 或 UE 基础碰撞；门洞与凹形件必须实测。</span></div>
+  <div class="mstep"><i>M5</i><b>批量校验</b><span>尺寸、原点、比例、法线、UV、材质槽、非流形和 FBX 清单。</span></div>
+</div>
+
+<div class="details">
+  <section class="card detail">
+    <h3>脚本自动负责</h3>
+    <div class="checks"><div class="check">建立标准集合和命名</div><div class="check">生成模块尺寸与接口</div><div class="check">设置枢轴与正方向</div><div class="check">创建预览相机和灯光</div><div class="check">生成 UCX 命名骨架</div><div class="check">逐资产导出 FBX</div><div class="check">输出尺寸和材质报告</div><div class="check">渲染九宫格审阅图</div></div>
+  </section>
+  <section class="card detail">
+    <h3>出厂阻断条件</h3>
+    <div class="checks"><div class="check">Transform 已应用且 Scale=1</div><div class="check">尺寸符合 50 cm 网格</div><div class="check">枢轴位于约定角点</div><div class="check">无意外非流形／重复面</div><div class="check">硬边与法线无黑斑</div><div class="check">结构件材质槽不超过 2</div><div class="check">碰撞不封死门洞</div><div class="check">导出后三角形方向稳定</div></div>
+  </section>
+</div>
+
+<div class="warning"><strong>生成式 3D 边界：</strong>生成网格可以作为废料与小道具的视觉草稿，但进入生产前必须重拓扑、重定尺寸、重做 UV、碰撞和授权审查；模块结构件不接受“自动生成后直接导入”。</div>

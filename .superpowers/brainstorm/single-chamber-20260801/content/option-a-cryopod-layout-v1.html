@@ -1,0 +1,94 @@
+<style>
+  .layout-wrap{display:grid;grid-template-columns:minmax(520px,1.45fr) minmax(300px,.7fr);gap:22px;align-items:start;margin-top:18px}
+  .plan{position:relative;border:1px solid #3b4652;border-radius:18px;overflow:hidden;background:radial-gradient(circle at 50% 48%,#26313b 0 18%,#19222b 19% 44%,#111820 45% 100%);aspect-ratio:1.38/1;box-shadow:inset 0 0 55px rgba(0,0,0,.55)}
+  .plan svg{width:100%;height:100%;display:block}
+  .notes{display:grid;gap:12px}.note{padding:14px 15px;border:1px solid #34404b;border-radius:12px;background:#151c23}.note h3{margin:0 0 6px;font-size:15px;color:#e7edf2}.note p{margin:0;color:#adb8c2;font-size:13px;line-height:1.5}
+  .tag{display:inline-block;margin-right:7px;padding:2px 7px;border-radius:999px;background:#27323c;color:#f2b35e;font-size:11px;font-weight:700;letter-spacing:.04em}.approval{margin-top:18px;padding:14px 16px;border-left:3px solid #efa84e;background:rgba(239,168,78,.08);color:#d8e0e6;border-radius:0 10px 10px 0}
+  @media(max-width:980px){.layout-wrap{grid-template-columns:1fr}.plan{min-height:470px}}
+</style>
+
+<h2>ProjectRift 舰船大厅 A：五仓环形布局草案</h2>
+<p class="subtitle">俯视功能布局，不是最终美术图。重点确认冬眠仓、多人选择动线与未来扩建的位置关系。</p>
+
+<div class="layout-wrap">
+  <div class="plan">
+    <svg viewBox="0 0 900 650" role="img" aria-label="环形舰船大厅五个冬眠仓的俯视布局">
+      <defs>
+        <linearGradient id="pod" x1="0" x2="1"><stop stop-color="#65727d"/><stop offset=".5" stop-color="#c4d0d7"/><stop offset="1" stop-color="#505e69"/></linearGradient>
+        <radialGradient id="core"><stop stop-color="#41515e"/><stop offset="1" stop-color="#1d2831"/></radialGradient>
+        <filter id="glow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+
+      <!-- outer pressure shell and circulation ring -->
+      <ellipse cx="450" cy="335" rx="405" ry="278" fill="none" stroke="#778691" stroke-width="18"/>
+      <ellipse cx="450" cy="335" rx="365" ry="238" fill="none" stroke="#35434e" stroke-width="5" stroke-dasharray="14 10"/>
+
+      <!-- cryopod bank on aft arc -->
+      <g fill="url(#pod)" stroke="#d5e1e7" stroke-width="2">
+        <rect x="250" y="68" width="70" height="142" rx="30" transform="rotate(-22 285 139)"/>
+        <rect x="332" y="42" width="70" height="142" rx="30" transform="rotate(-10 367 113)"/>
+        <rect x="415" y="32" width="70" height="142" rx="30"/>
+        <rect x="498" y="42" width="70" height="142" rx="30" transform="rotate(10 533 113)"/>
+        <rect x="580" y="68" width="70" height="142" rx="30" transform="rotate(22 615 139)"/>
+      </g>
+      <g fill="#7dd7e8" opacity=".85" filter="url(#glow)">
+        <circle cx="284" cy="124" r="7"/><circle cx="366" cy="102" r="7"/><circle cx="450" cy="91" r="7"/><circle cx="534" cy="102" r="7"/><circle cx="616" cy="124" r="7"/>
+      </g>
+      <text x="450" y="222" text-anchor="middle" fill="#dfe8ee" font-size="19" font-weight="700">5 × 固定角色冬眠仓</text>
+      <text x="450" y="243" text-anchor="middle" fill="#95a5b0" font-size="13">每仓侧置交互端，构造体待命时不阻挡舱门</text>
+
+      <!-- expansion interfaces -->
+      <g fill="#222c35" stroke="#efa84e" stroke-width="3" stroke-dasharray="8 6">
+        <rect x="105" y="115" width="92" height="104" rx="14" transform="rotate(-35 151 167)"/>
+        <rect x="703" y="115" width="92" height="104" rx="14" transform="rotate(35 749 167)"/>
+      </g>
+      <text x="117" y="246" fill="#efa84e" font-size="12">封闭扩展接口</text>
+      <text x="692" y="246" fill="#efa84e" font-size="12">封闭扩展接口</text>
+
+      <!-- central operation island -->
+      <ellipse cx="450" cy="360" rx="154" ry="102" fill="url(#core)" stroke="#82929d" stroke-width="5"/>
+      <ellipse cx="450" cy="360" rx="112" ry="70" fill="#111920" stroke="#55b7c8" stroke-width="3"/>
+      <circle cx="450" cy="360" r="34" fill="#26414a" stroke="#78d8e8" stroke-width="3" filter="url(#glow)"/>
+      <text x="450" y="351" text-anchor="middle" fill="#e8f4f6" font-size="15" font-weight="700">中央任务 / 航行台</text>
+      <text x="450" y="374" text-anchor="middle" fill="#a9bdc6" font-size="12">低矮、四向可操作</text>
+
+      <!-- four construct start/charging docks -->
+      <g fill="#e9a84e" stroke="#ffd18d" stroke-width="2">
+        <path d="M260 314 l16 10 0 18-16 10-16-10 0-18z"/>
+        <path d="M640 314 l16 10 0 18-16 10-16-10 0-18z"/>
+        <path d="M334 493 l16 10 0 18-16 10-16-10 0-18z"/>
+        <path d="M566 493 l16 10 0 18-16 10-16-10 0-18z"/>
+      </g>
+      <text x="205" y="304" fill="#ffc26d" font-size="12">构造体起始 / 充能位</text>
+      <text x="586" y="304" fill="#ffc26d" font-size="12">最多 4 名玩家</text>
+
+      <!-- side workstations -->
+      <g fill="#26333d" stroke="#60717d" stroke-width="3">
+        <rect x="80" y="294" width="92" height="176" rx="18"/>
+        <rect x="728" y="294" width="92" height="176" rx="18"/>
+      </g>
+      <text x="126" y="366" text-anchor="middle" fill="#d8e3e8" font-size="13" font-weight="700">维修</text><text x="126" y="384" text-anchor="middle" fill="#9dabb4" font-size="12">制造 / 储物</text>
+      <text x="774" y="366" text-anchor="middle" fill="#d8e3e8" font-size="13" font-weight="700">医疗</text><text x="774" y="384" text-anchor="middle" fill="#9dabb4" font-size="12">研究 / 诊断</text>
+
+      <!-- main airlock -->
+      <path d="M372 592 h156 l-20 36 h-116z" fill="#303e49" stroke="#91a1ac" stroke-width="4"/>
+      <path d="M410 603 h80" stroke="#e6a650" stroke-width="5"/>
+      <text x="450" y="580" text-anchor="middle" fill="#e3ebef" font-size="15" font-weight="700">主气闸 / 异星出口</text>
+
+      <!-- circulation paths -->
+      <path d="M278 260 C210 350 245 470 355 525" fill="none" stroke="#67c5d4" stroke-width="3" stroke-dasharray="7 10" opacity=".65"/>
+      <path d="M622 260 C690 350 655 470 545 525" fill="none" stroke="#67c5d4" stroke-width="3" stroke-dasharray="7 10" opacity=".65"/>
+      <text x="450" y="548" text-anchor="middle" fill="#77cddd" font-size="12">≥ 2.4 m 连续环形通道 · 四人互不阻塞</text>
+    </svg>
+  </div>
+
+  <div class="notes">
+    <div class="note"><h3><span class="tag">焦点</span>冬眠仓成为开场主视觉</h3><p>五个仓沿后壁形成连续弧面，玩家从入口或构造体停机位都能立即看到，不需要寻找角色选择区。</p></div>
+    <div class="note"><h3><span class="tag">联机</span>同时选择不堵路</h3><p>仓门正面保持开启空间，角色信息与交互端放在仓体侧面。四台构造体可同时停留在不同仓前。</p></div>
+    <div class="note"><h3><span class="tag">扩展</span>左右两端继续接仓</h3><p>首发扩展接口以装甲检修盖封闭。以后新增角色时，沿后部环形舱壁继续增设冬眠仓模块。</p></div>
+    <div class="note"><h3><span class="tag">玩法</span>一个大厅承担全部核心操作</h3><p>中央低矮操作岛负责航行、任务和公共交互；左右舱壁承载维修制造、医疗研究等模块，中央视线保持通透。</p></div>
+    <div class="note"><h3><span class="tag">写实</span>结构先于装饰</h3><p>后续概念图会强调压力壳分段、承重框架、线缆检修、应急照明、磨损与可维护性，维持写实 PBR 和中等细节密度。</p></div>
+  </div>
+</div>
+
+<div class="approval">请重点判断：五个冬眠仓集中在大厅后部弧形舱壁、两端留扩展接口，是否符合你对主大厅的想象？</div>

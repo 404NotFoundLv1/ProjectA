@@ -1,0 +1,15 @@
+Use case: precise-object-edit
+Asset type: ProjectRift UE5 realistic ship-hub environment concept art correction
+Input image: Image 1 is the edit target.
+Primary request: Make exactly two structural design changes while preserving everything else.
+
+CHANGE 1 — LARGER CENTRAL MISSION / NAVIGATION TABLE:
+Increase the diameter of the one circular central mission/navigation island by approximately 30 percent. Keep it low, coherent, and clearly one device. Preserve its four accessible multiplayer interaction faces, central cyan navigation/holographic surface, realistic equipment cabinets, and a broad uninterrupted circulation ring around it. The enlarged table should feel like the important command focal point of a four-player expedition ship, but must not block sightlines to the hibernation pods.
+
+CHANGE 2 — RECLINED HIBERNATION PODS:
+Redesign all EXACTLY five rear-wall hibernation pods so they are no longer vertical. Tilt every capsule backward by a consistent 15–20 degrees from vertical, creating a believable semi-reclined aerospace hibernation posture. The top of each pod leans back into the curved bulkhead and the lower foot end projects slightly forward. Rebuild the supporting frames, recessed wall mounts and lower bases so the inclination is structurally plausible and clearly readable in perspective. Keep the five pods aligned in a shallow arc. Keep exactly one sleeping human silhouette visible inside every pod, with each body following the same semi-reclined angle. Preserve compact side interaction terminals and sealed expansion panels at both ends.
+
+Hard invariants: EXACTLY five clearly countable sealed hibernation pods; exactly one sleeping silhouette in each; exactly one enlarged central mission/navigation table; exactly one prominent floating spherical maintenance construct; exactly four subtle flush floor charging sockets; single floor; one continuous large room; no stairs or upper level.
+Preserve unchanged: camera and 16:9 framing, room dimensions, overhead service ring, pressure-shell ribs, left combined preparation/armory/fabrication wall bay, right medical and role/loadout bays, protected dormant jump-core assembly, structural repair interface, restrained crash damage, cold white/cyan lighting, red emergency accents, floor materials and radial circulation layout.
+Materials/style: grounded human aerospace engineering, physically plausible hard-surface design, realistic PBR, medium detail density, readable midtones.
+Avoid: vertical upright pods, horizontal beds, coffin-horror styling, more or fewer than five pods, merged or duplicated pods, extra central tables, surrounding redundant consoles, added props, clutter, empty hangar, multi-floor atrium, neon cyberpunk, fantasy technology, awake humans, UI overlay, inset plan, logo, watermark.

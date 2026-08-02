@@ -1,0 +1,34 @@
+Use case: precise-object-edit
+Asset type: ProjectRift approved-direction ship hub interior concept, realism refinement v2
+
+Input image: Image 1 is the edit target. It is Option A, the selected Ring Operations Hall.
+
+Primary request: Make this exact scene substantially more realistic and production-credible while preserving its approved spatial design. Change only realism, material treatment, lighting credibility, scale cues and engineering plausibility. Do not redesign the layout.
+
+Hard invariants:
+- preserve the same wide entrance viewpoint, camera height, room proportions and overall composition;
+- preserve one continuous open navigable room;
+- preserve the central low mission/ready operations island;
+- preserve the unobstructed circulation loop around it;
+- preserve the perimeter arrangement of open functional workstations;
+- preserve the shielded circular jump core on the far focal wall;
+- preserve the small top-down plan inset and keep it consistent with the perspective;
+- do not add accessible side rooms, branching hallways, extra floors, partitions or tall sightline blockers.
+
+Realism improvements:
+- render like a grounded high-end Unreal Engine in-game environment capture, not glossy promotional concept art;
+- use physically plausible neutral exposure, practical industrial area lights and believable bounce light; brighten shadow detail enough to read navigation without flattening contrast;
+- reduce black-crush, excessive cinematic vignette, shiny CGI surfaces, tiny random kitbash greebles and decorative pipes with no service purpose;
+- clarify large structural bays and load paths before medium panels and small fixtures;
+- make wall consoles, medical equipment, crafting bench, armory racks, storage cabinets and repair controls visibly different through credible equipment shapes, while keeping all stations open to the same room;
+- use real human-scale construction: standard-height doors/hatches that remain sealed service access only, 1m railings, reachable worktops, floor drains, cable trays, removable maintenance panels, fasteners, emergency braces and safe walking clearances;
+- refine PBR materials: worn painted steel, galvanized structure, brushed and heat-darkened alloy, rubber cable jackets, ceramic insulation, matte safety flooring, restrained oil/grime accumulation, dust in corners, moderate chipped paint and welded repair discoloration;
+- show a few purposeful field-repair patches and mismatched replacement panels, not generalized destruction;
+- replace overly luminous screens with mostly matte monitors and small readable cyan indicators; no readable text;
+- make the central mission table a robust industrial console with believable supports, access panels and restrained projection light;
+- reinforce the jump core with thick mechanical shielding, service rings and armored glass; keep its deep-violet emission dim and physically contained;
+- use restrained amber maintenance accents and neutral-white work lighting, with cyan limited to functional indicators.
+
+Style: grounded realistic PBR hard-surface interior, medium detail density, strong large/medium/small hierarchy, credible modular fabrication, lived-in but maintained, suitable as a 3D environment modeling target.
+
+Avoid: layout drift, fantasy ornament, luxury styling, sterile clean white surfaces, gothic forms, excessive neon, purple anywhere outside the core, excessive scratches, uniform grime, wet reflective floors, smoky atmosphere, fake text, logos, watermark, people, current UE demo-map geometry, or a new camera angle.

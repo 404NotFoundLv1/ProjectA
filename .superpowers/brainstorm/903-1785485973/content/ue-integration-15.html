@@ -1,0 +1,42 @@
+<style>
+  .ueflow{display:grid;grid-template-columns:repeat(7,minmax(118px,1fr));gap:9px;overflow-x:auto;margin-top:22px;padding-bottom:8px}.ustep{position:relative;min-height:155px;padding:14px 12px;border-radius:11px;border:1px solid rgba(148,163,184,.2);background:rgba(255,255,255,.025)}.ustep:not(:last-child):after{content:"›";position:absolute;right:-12px;top:55px;z-index:2;color:#6bd4d7;background:#101a20;width:17px;text-align:center;font-size:24px}.ustep i{font-style:normal;color:#6bd4d7;font-size:.68rem;letter-spacing:.1em}.ustep b{display:block;margin:8px 0 5px;color:#eaf2f3}.ustep span{color:#8fa4ab;font-size:.76rem;line-height:1.4}
+  .policy{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:22px}.policy section{padding:19px}.policy h3{margin-top:0}.row{display:grid;grid-template-columns:120px 1fr;gap:10px;padding:9px 0;border-top:1px solid rgba(148,163,184,.15)}.row b{color:#edb45b}.row span{color:#a6b8bd;font-size:.82rem}
+  .lab{margin-top:20px;padding:18px 20px;border:1px solid rgba(105,211,214,.36);border-radius:12px;background:rgba(105,211,214,.05)}.lab strong{color:#76dde0}.lab code{color:#bed2d7}.lab ul{display:grid;grid-template-columns:repeat(3,1fr);gap:7px 20px;padding-left:18px;margin:12px 0 0;color:#9fb2b8;font-size:.82rem}
+  .boundary{margin-top:18px;color:#91a4ab;font-size:.84rem}.boundary b{color:#eaf2f3}
+  @media(max-width:860px){.policy{grid-template-columns:1fr}.ueflow{grid-template-columns:repeat(7,150px)}.lab ul{grid-template-columns:1fr 1fr}}
+</style>
+
+<div class="label">PROJECTRIFT · WORKFLOW SECTION 06</div>
+<h2>UE 入库：源资产可回溯，运行时资产可重导</h2>
+<p class="subtitle">先通过授权和源文件检查，再导入最终目录；不建立“随便导进来再整理”的 Incoming 垃圾区。</p>
+
+<div class="ueflow">
+  <div class="ustep"><i>U0</i><b>入库预检</b><span>命名、目标路径、源文件、授权记录和尺寸报告齐全。</span></div>
+  <div class="ustep"><i>U1</i><b>FBX 导入</b><span>每个资产独立；只导网格、UV、顶点色、法线与碰撞。</span></div>
+  <div class="ustep"><i>U2</i><b>纹理导入</b><span>Base Color sRGB；Normal 与 ORM 使用正确压缩和色彩空间。</span></div>
+  <div class="ustep"><i>U3</i><b>材质装配</b><span>绑定 ProjectRift 主材质与 MI；禁止自动生成一次性材质。</span></div>
+  <div class="ustep"><i>U4</i><b>状态装配</b><span>需要修复状态或交互的资产进入 Blueprint；纯结构保持静态网格。</span></div>
+  <div class="ustep"><i>U5</i><b>自动校验</b><span>运行 PRProductionValidation，错误为零才能进入样板舱。</span></div>
+  <div class="ustep"><i>U6</i><b>PIE 验收</b><span>单人／四人动线、镜头、碰撞、灯光状态和性能实测。</span></div>
+</div>
+
+<div class="policy">
+  <section class="card">
+    <h3>导入协议</h3>
+    <div class="row"><b>主格式</b><span>成熟 FBX 静态网格流程；Interchange FBX 暂不作为首版依赖。</span></div>
+    <div class="row"><b>材质</b><span>关闭 FBX 自动材质／贴图生成，使用受控主材质实例。</span></div>
+    <div class="row"><b>重导入</b><span>源路径和导入设置固定；更新同名资产，不制造 _New／_Copy。</span></div>
+    <div class="row"><b>Nanite / LOD</b><span>按资产类型决定：英雄和高复杂静态件优先评估 Nanite；简单重复件保留成本更低的 LOD。</span></div>
+  </section>
+  <section class="card">
+    <h3>地图放置协议</h3>
+    <div class="row"><b>纯结构</b><span>墙、地板、顶板可直接作为 Static Mesh 放置并复用。</span></div>
+    <div class="row"><b>状态资产</b><span>灯光、贴花、修复覆盖件由统一 ShipHub Module Blueprint 装配。</span></div>
+    <div class="row"><b>交互站</b><span>共享交互底座，外观模块不重复实现玩法逻辑。</span></div>
+    <div class="row"><b>批量重复</b><span>确认数量与性能后再使用 ISM/HISM 或打包方案，不提前复杂化。</span></div>
+  </section>
+</div>
+
+<div class="lab"><strong>新建独立验收关卡：</strong> <code>/Game/ProjectRift/ShipHub/Maps/L_ShipHub_ArtValidation</code><ul><li>1 m／4 m 尺寸尺</li><li>标准门墙与转角</li><li>8×8 m 样板舱</li><li>四角色通行位</li><li>三阶段材质／灯光</li><li>碰撞与镜头测试</li><li>Nanite／LOD 对照</li><li>Shader Complexity</li><li>固定截图机位</li></ul></div>
+
+<p class="boundary"><b>工具边界：</b>Unreal MCP 只通过 ProjectA 的 127.0.0.1:8001 使用，并只服务编辑器开发；它不进入打包游戏，也不接触其他 UE 项目。</p>

@@ -1,0 +1,37 @@
+Use case: precise-object-edit
+Asset type: ProjectRift UE5 realistic ship-hub environment concept art — visual cleanup pass
+Input image: Image 1 is the approved layout and geometry target. Preserve its architecture, scale, object placement, camera, and gameplay functions.
+Primary request: Make the chamber feel cleaner, calmer, more deliberate and easier to read at first glance. Eliminate the dirty appearance and the excessive field of tiny visual dots. This is a MATERIAL, DETAIL-FREQUENCY and LIGHTING-HIERARCHY cleanup only, not a layout redesign.
+
+SURFACE CLEANUP:
+- Remove roughly 65–70 percent of tiny bolts, rivets, pinholes, tiny orange markings, micro-greebles, miniature panel fasteners, noisy bevel highlights and repeated small surface interruptions.
+- Consolidate walls, ceiling and central table into larger purposeful armor panels with fewer, longer seam lines and broader uninterrupted material fields.
+- Keep important structural ribs and modular boundaries, but simplify secondary subdivisions.
+- Make the deck clean semi-matte dark graphite metal rather than wet, oily or mirror-glossy. Greatly reduce scattered specular sparkles and bright reflection dots.
+- Remove general grime, oily smears, heavy dust, random scratches and excessive edge chipping. Keep only restrained localized use wear at walk paths, interaction edges and the one damaged repair bay.
+- Clean the hibernation-pod glazing: controlled light condensation and soft frost only, without dirty streaks.
+
+LIGHTING CLEANUP:
+- Remove most tiny blue, white, red and orange point lights across the walls, floor, ceiling and consoles.
+- Replace dotted illumination with a small number of broad rectangular task lights, continuous recessed light strips and soft area-light pools.
+- Establish a clear hierarchy: broad neutral-cool white architectural lighting first; the large central cyan navigation surface second; the five softly lit pods third; restrained red emergency light only at one damaged structural bay.
+- Make the overall exposure slightly brighter and more neutral, with readable charcoal and cool-gray surfaces. Lift dark midtones without flattening depth.
+- Reduce cyan saturation and glow bloom. Keep blue light concentrated only on the central navigation table, pod life-support strips, four flush charging sockets and the drone optical sensor.
+- Avoid tiny isolated high-intensity pixels and star-like highlights.
+
+COLOR / MATERIAL LANGUAGE:
+- Use large blocks of charcoal structural metal, medium cool-gray removable panels, small off-white technical inserts, and very restrained cyan/red functional accents.
+- Realistic clean aerospace interior after emergency stabilization, not a filthy industrial dungeon.
+- Physically plausible PBR, medium detail density, clear macro/mid/micro hierarchy: strong architectural forms, readable functional modules, sparse microdetail.
+
+CRASH STORY:
+- The ship remains crash-landed but stabilized. Show damage only through one open repair panel, one subtle coolant vapor leak, a few misaligned plates and limited red emergency illumination. Do not spread damage or dirt across the whole room.
+
+HARD INVARIANTS:
+- EXACTLY five clearly countable backward-reclined sealed hibernation pods, exactly one sleeping silhouette in each.
+- Exactly one enlarged central mission/navigation table with the same diameter and four interaction faces.
+- Exactly one prominent floating spherical maintenance construct.
+- Exactly four subtle flush floor charging sockets.
+- Preserve the left combined preparation/armory/fabrication wall bay, right medical and role/loadout bays, protected dormant jump core, structural repair interface, overhead service ring, single floor, one continuous large room, broad circulation ring, and 16:9 entrance-side camera.
+
+Avoid: dirty or oily surfaces, wet reflective floor, dense rivet fields, dotted light field, excessive small emissive LEDs, star-like specular highlights, excessive panel seams, micro-greeble noise, grunge, soot, rust, neon cyberpunk, sterile white laboratory, flat lighting, new furniture, extra consoles, changed layout, more or fewer than five pods, extra drones, UI overlay, inset plan, logo, watermark.
