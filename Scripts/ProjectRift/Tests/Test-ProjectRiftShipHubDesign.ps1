@@ -69,6 +69,105 @@ function Assert-LessOrEqual {
     }
 }
 
+function ConvertFrom-ProjectRiftBigEndianUInt32 {
+    param(
+        [Parameter(Mandatory)][byte[]]$Bytes,
+        [Parameter(Mandatory)][int]$Offset
+    )
+
+    return [uint32](
+        ([uint64]$Bytes[$Offset] * 16777216) +
+        ([uint64]$Bytes[$Offset + 1] * 65536) +
+        ([uint64]$Bytes[$Offset + 2] * 256) +
+        [uint64]$Bytes[$Offset + 3]
+    )
+}
+
+function Read-ProjectRiftPngMetadata {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    try {
+        if ($stream.Length -lt 33) {
+            throw "PNG is too short to contain a complete IHDR chunk: $Path"
+        }
+        $signatureBytes = New-Object byte[] 8
+        if ($stream.Read($signatureBytes, 0, 8) -ne 8) {
+            throw "PNG signature could not be read completely: $Path"
+        }
+        $signature = @(0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
+        for ($index = 0; $index -lt $signature.Count; $index++) {
+            if ($signatureBytes[$index] -ne $signature[$index]) {
+                throw "PNG signature mismatch at byte $index`: $Path"
+            }
+        }
+
+        $width = $null
+        $height = $null
+        $pixelsPerMeterX = $null
+        $pixelsPerMeterY = $null
+        $physicalUnit = $null
+        while (($stream.Position + 12) -le $stream.Length) {
+            $chunkHeader = New-Object byte[] 8
+            if ($stream.Read($chunkHeader, 0, 8) -ne 8) {
+                throw "PNG chunk header could not be read completely: $Path"
+            }
+            $chunkLength = [uint64](ConvertFrom-ProjectRiftBigEndianUInt32 -Bytes $chunkHeader -Offset 0)
+            $chunkType = [Text.Encoding]::ASCII.GetString($chunkHeader, 4, 4)
+            if ($chunkLength -gt ([uint64]$stream.Length - [uint64]$stream.Position - 4)) {
+                throw "PNG chunk extends beyond the file: $Path"
+            }
+
+            if ($chunkType -ceq 'IHDR' -or $chunkType -ceq 'pHYs') {
+                if ($chunkLength -gt 13) {
+                    throw "PNG metadata chunk is unexpectedly large: $Path"
+                }
+                $chunkData = New-Object byte[] ([int]$chunkLength)
+                if ($stream.Read($chunkData, 0, [int]$chunkLength) -ne [int]$chunkLength) {
+                    throw "PNG metadata chunk could not be read completely: $Path"
+                }
+                if ($chunkType -ceq 'IHDR') {
+                    if ($chunkLength -ne 13) {
+                        throw "PNG IHDR length must be 13: $Path"
+                    }
+                    $width = ConvertFrom-ProjectRiftBigEndianUInt32 -Bytes $chunkData -Offset 0
+                    $height = ConvertFrom-ProjectRiftBigEndianUInt32 -Bytes $chunkData -Offset 4
+                }
+                else {
+                    if ($chunkLength -ne 9) {
+                        throw "PNG pHYs length must be 9: $Path"
+                    }
+                    $pixelsPerMeterX = ConvertFrom-ProjectRiftBigEndianUInt32 -Bytes $chunkData -Offset 0
+                    $pixelsPerMeterY = ConvertFrom-ProjectRiftBigEndianUInt32 -Bytes $chunkData -Offset 4
+                    $physicalUnit = [int]$chunkData[8]
+                }
+            }
+            else {
+                $stream.Seek([long]$chunkLength, [IO.SeekOrigin]::Current) | Out-Null
+            }
+
+            $crcBytes = New-Object byte[] 4
+            if ($stream.Read($crcBytes, 0, 4) -ne 4) {
+                throw "PNG chunk CRC could not be read completely: $Path"
+            }
+            if ($chunkType -ceq 'IEND') {
+                break
+            }
+        }
+    }
+    finally {
+        $stream.Dispose()
+    }
+
+    return [pscustomobject]@{
+        Width = $width
+        Height = $height
+        PixelsPerMeterX = $pixelsPerMeterX
+        PixelsPerMeterY = $pixelsPerMeterY
+        PhysicalUnit = $physicalUnit
+    }
+}
+
 function Invoke-ProjectRiftRunnerForTest {
     param(
         [Parameter(Mandatory)][string]$RunnerPath,
@@ -270,7 +369,32 @@ public static class ProjectRiftFailingPythonProbe {
                 Assert-True ($validBuildLog[1] -like 'blender:--background --factory-startup --python *build_shiphub_design.py -- --project-root * --brief *ShipHubCompleteDesign_v1.json --output-root *CompleteDesign') "BuildWhiteModel should invoke the exact background builder contract. Actual log: $($validBuildLog[1])"
             }
 
-            foreach ($blenderStage in @('RenderDrawings', 'Validate')) {
+            $wrongRenderVersionResult = Invoke-ProjectRiftRunnerForTest -RunnerPath $runnerPath -Stage 'RenderDrawings' -BlenderExe $wrongBlenderProbe -PythonExe $pythonProbe
+            Assert-True ($wrongRenderVersionResult.ExitCode -ne 0) 'RenderDrawings should fail for a non-5.2 Blender executable.'
+            Assert-True ($wrongRenderVersionResult.Text -match 'requires Blender 5\.2\.x LTS') 'RenderDrawings should check Blender 5.2 LTS before invoking its renderer.'
+
+            Remove-Item -LiteralPath $toolLog -Force -ErrorAction SilentlyContinue
+            $failingRenderResult = Invoke-ProjectRiftRunnerForTest -RunnerPath $runnerPath -Stage 'RenderDrawings' -BlenderExe $failingBuildBlenderProbe -PythonExe $pythonProbe
+            Assert-True ($failingRenderResult.ExitCode -ne 0) 'RenderDrawings should propagate a nonzero background Blender exit.'
+            Assert-True ($failingRenderResult.Text -match 'RenderDrawings failed with exit code 9\.') 'RenderDrawings should report the exact nonzero background Blender exit code.'
+            $failingRenderLog = if (Test-Path -LiteralPath $toolLog) { @(Get-Content -LiteralPath $toolLog) } else { @() }
+            Assert-Equal $failingRenderLog.Count 2 'RenderDrawings failure probe should run the version gate and one background render.'
+            if ($failingRenderLog.Count -eq 2) {
+                Assert-Equal $failingRenderLog[0] 'blender:--version' 'RenderDrawings failure probe should run the independent version gate first.'
+                Assert-True ($failingRenderLog[1] -like 'blender:--background --factory-startup --python *render_shiphub_drawings.py -- --project-root * --blend *SM_ShipHub_Complete_White_v1.blend --manifest *layout-manifest.json --output-root *Drawings\PNG') "RenderDrawings should invoke the exact background renderer contract. Actual log: $($failingRenderLog[1])"
+            }
+
+            Remove-Item -LiteralPath $toolLog -Force -ErrorAction SilentlyContinue
+            $validRenderResult = Invoke-ProjectRiftRunnerForTest -RunnerPath $runnerPath -Stage 'RenderDrawings' -BlenderExe $validBlenderProbe -PythonExe $pythonProbe
+            Assert-Equal $validRenderResult.ExitCode 0 'RenderDrawings should invoke Blender successfully when its renderer and inputs exist.'
+            $validRenderLog = if (Test-Path -LiteralPath $toolLog) { @(Get-Content -LiteralPath $toolLog) } else { @() }
+            Assert-Equal $validRenderLog.Count 2 'RenderDrawings should run the independent version gate and one background render.'
+            if ($validRenderLog.Count -eq 2) {
+                Assert-Equal $validRenderLog[0] 'blender:--version' 'RenderDrawings should invoke the supplied Blender version check first.'
+                Assert-True ($validRenderLog[1] -like 'blender:--background --factory-startup --python *render_shiphub_drawings.py -- --project-root * --blend *SM_ShipHub_Complete_White_v1.blend --manifest *layout-manifest.json --output-root *Drawings\PNG') "RenderDrawings should invoke the exact background renderer contract. Actual log: $($validRenderLog[1])"
+            }
+
+            foreach ($blenderStage in @('Validate')) {
                 $wrongVersionResult = Invoke-ProjectRiftRunnerForTest -RunnerPath $runnerPath -Stage $blenderStage -BlenderExe $wrongBlenderProbe -PythonExe $pythonProbe
                 Assert-True ($wrongVersionResult.ExitCode -ne 0) "$blenderStage should fail for a non-5.2 Blender executable."
                 Assert-True ($wrongVersionResult.Text -match 'requires Blender 5\.2\.x LTS') "$blenderStage should check Blender 5.2 LTS before checking its deferred stage script."
@@ -298,16 +422,17 @@ public static class ProjectRiftFailingPythonProbe {
             Remove-Item -LiteralPath $toolLog -Force -ErrorAction SilentlyContinue
             $allResult = Invoke-ProjectRiftRunnerForTest -RunnerPath $runnerPath -Stage 'All' -BlenderExe $validBlenderProbe -PythonExe $pythonProbe
             Assert-True ($allResult.ExitCode -ne 0) 'All should fail closed at the first absent deferred stage.'
-            Assert-True ($allResult.Text -match 'RenderDrawings stage is missing its required script') "All should complete BuildWhiteModel and stop at the absent RenderDrawings stage. Actual output: $($allResult.Text)"
+            Assert-True ($allResult.Text -match 'Publish stage is missing its required script') "All should complete RenderDrawings and stop at the absent Publish stage. Actual output: $($allResult.Text)"
             $allLog = if (Test-Path -LiteralPath $toolLog) { @(Get-Content -LiteralPath $toolLog) } else { @() }
-            Assert-True ($allLog.Count -ge 6) "All should invoke Preflight, ValidateContract, BuildWhiteModel and the RenderDrawings Blender gate in order. Actual log: $($allLog -join ' | ')"
-            if ($allLog.Count -ge 6) {
+            Assert-True ($allLog.Count -ge 7) "All should invoke Preflight, ValidateContract, BuildWhiteModel and RenderDrawings in order before Publish fails closed. Actual log: $($allLog -join ' | ')"
+            if ($allLog.Count -ge 7) {
                 Assert-Equal $allLog[0] 'blender:--version' 'All should invoke Preflight first with the explicit Blender executable.'
                 Assert-True ($allLog[1] -like 'python:-c import PIL, reportlab, pypdf*') 'All should forward the explicit Python executable to Preflight.'
                 Assert-True ($allLog[2] -like 'python:*shiphub_contract.py*') 'All should forward the explicit Python executable to ValidateContract.'
                 Assert-Equal $allLog[3] 'blender:--version' 'All should forward the explicit Blender executable to BuildWhiteModel.'
                 Assert-True ($allLog[4] -like 'blender:--background --factory-startup --python *build_shiphub_design.py*') 'All should run the background white-model build after its version gate.'
                 Assert-Equal $allLog[5] 'blender:--version' 'All should reach the RenderDrawings Blender gate only after BuildWhiteModel.'
+                Assert-True ($allLog[6] -like 'blender:--background --factory-startup --python *render_shiphub_drawings.py*') 'All should run the background drawing renderer before reaching Publish.'
             }
         }
         finally {
@@ -356,13 +481,142 @@ public static class ProjectRiftFailingPythonProbe {
             $fbxPath = Join-Path $outputRoot 'Exports\SM_ShipHub_Complete_White_v1.fbx'
             $glbPath = Join-Path $outputRoot 'Exports\SM_ShipHub_Complete_White_v1.glb'
             $manifestPath = Join-Path $outputRoot 'Reports\layout-manifest.json'
-            $requiredArtifacts = @($blendPath, $fbxPath, $glbPath, $manifestPath)
+            $pngRoot = Join-Path $outputRoot 'Drawings\PNG'
+            $perspectivesRoot = Join-Path $pngRoot 'Perspectives'
+            $expectedBaseNames = @($expectedSheets | ForEach-Object { "${_}_Base.png" })
+            $expectedPerspectiveNames = @(
+                'front.png', 'reverse.png', 'west-oblique.png',
+                'east-oblique.png', 'high-overview.png', 'ceiling-low-angle.png'
+            )
+            $expectedBasePaths = @($expectedBaseNames | ForEach-Object { Join-Path $pngRoot $_ })
+            $expectedPerspectivePaths = @($expectedPerspectiveNames | ForEach-Object { Join-Path $perspectivesRoot $_ })
+            $requiredPngPaths = @($expectedBasePaths + $expectedPerspectivePaths)
+            $requiredArtifacts = @($blendPath, $fbxPath, $glbPath, $manifestPath) + $requiredPngPaths
+
+            $rendererPath = Join-Path $projectRoot 'Scripts\ProjectRift\ArtPipeline\shiphub\render_shiphub_drawings.py'
+            $realBlenderPath = 'D:\Blender5.2\blender.exe'
+            if ((Test-Path -LiteralPath $rendererPath -PathType Leaf) -and
+                (Test-Path -LiteralPath $realBlenderPath -PathType Leaf) -and
+                (Test-Path -LiteralPath $blendPath -PathType Leaf) -and
+                (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+                $previousErrorActionPreference = $ErrorActionPreference
+                try {
+                    $ErrorActionPreference = 'Continue'
+                    $visibilityProbeOutput = @(
+                        & $realBlenderPath --background --factory-startup --python $rendererPath -- `
+                            --project-root $projectRoot --blend $blendPath --manifest $manifestPath `
+                            --output-root $pngRoot --probe-sheet-visibility A01_FloorPlan 2>&1
+                    )
+                    $visibilityProbeExitCode = $LASTEXITCODE
+                }
+                finally {
+                    $ErrorActionPreference = $previousErrorActionPreference
+                }
+                $visibilityProbeText = ($visibilityProbeOutput | ForEach-Object { $_.ToString() }) -join "`n"
+                Assert-Equal $visibilityProbeExitCode 0 "A01 visibility probe should execute the real renderer. Actual output: $visibilityProbeText"
+                $visibilityLine = @($visibilityProbeOutput | ForEach-Object { $_.ToString() } | Where-Object { $_ -like 'SHIPHUB_VISIBILITY_PROBE=*' } | Select-Object -Last 1)
+                Assert-Equal $visibilityLine.Count 1 "A01 visibility probe should emit one JSON snapshot. Actual output: $visibilityProbeText"
+                if ($visibilityLine.Count -eq 1) {
+                    $visibility = $visibilityLine[0].Substring('SHIPHUB_VISIBILITY_PROBE='.Length) | ConvertFrom-Json
+                    Assert-True (@($visibility.hidden) -ccontains 'SM_ShipHub_CeilingPressureShell') 'A01 floor plan must hide the ceiling pressure shell for the render.'
+                    Assert-True (@($visibility.hidden) -ccontains 'SM_ShipHub_CeilingServiceRing') 'A01 floor plan must hide the ceiling service ring for the render.'
+                    Assert-True (@($visibility.visible) -ccontains 'SM_ShipHub_FloorSlab') 'A01 floor plan must retain the floor slab for the render.'
+                    Assert-True (@($visibility.visible) -ccontains 'SM_ShipHub_NavTable_Display') 'A01 floor plan must retain the navigation-table display for the render.'
+                }
+            }
+            else {
+                $script:Failures.Add('A01 visibility probe is missing the real Blender, renderer, authoritative BLEND, or manifest input.')
+            }
+
+            $semanticProbePath = Join-Path $projectRoot 'Scripts\ProjectRift\Tests\probe_shiphub_render_semantics.py'
+            if ((Test-Path -LiteralPath $semanticProbePath -PathType Leaf) -and
+                (Test-Path -LiteralPath $realBlenderPath -PathType Leaf) -and
+                (Test-Path -LiteralPath $blendPath -PathType Leaf) -and
+                (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+                $previousErrorActionPreference = $ErrorActionPreference
+                try {
+                    $ErrorActionPreference = 'Continue'
+                    $semanticProbeOutput = @(
+                        & $realBlenderPath --background --factory-startup --python $semanticProbePath -- `
+                            --project-root $projectRoot --blend $blendPath --manifest $manifestPath `
+                            --output-root $pngRoot 2>&1
+                    )
+                    $semanticProbeExitCode = $LASTEXITCODE
+                }
+                finally {
+                    $ErrorActionPreference = $previousErrorActionPreference
+                }
+                $semanticProbeText = ($semanticProbeOutput | ForEach-Object { $_.ToString() }) -join "`n"
+                Assert-Equal $semanticProbeExitCode 0 "Render semantic and rollback probes should pass. Actual output: $semanticProbeText"
+                $semanticLine = @($semanticProbeOutput | ForEach-Object { $_.ToString() } | Where-Object { $_ -like 'SHIPHUB_RENDER_SEMANTIC_PROBE=*' } | Select-Object -Last 1)
+                Assert-Equal $semanticLine.Count 1 "Render semantic probe should emit one JSON snapshot. Actual output: $semanticProbeText"
+                if ($semanticLine.Count -eq 1) {
+                    $semantics = $semanticLine[0].Substring('SHIPHUB_RENDER_SEMANTIC_PROBE='.Length) | ConvertFrom-Json
+                    Assert-Equal ([bool]$semantics.scene.a09.SM_ShipHub_CeilingPressureShell.visible_duplicate) $false 'A09 must not render a pressure-shell duplicate.'
+                    Assert-Equal ([double]$semantics.scene.a09.SM_ShipHub_CeilingServiceRing.offset_z_m) 10.5 'A09 ceiling-ring offset mismatch.'
+                    $lowAngle = $semantics.scene.perspectives | Where-Object { $_.name -ceq 'ceiling-low-angle.png' } | Select-Object -First 1
+                    Assert-True ([Math]::Abs([double]$lowAngle.location[0]) -lt 14.0 -and [Math]::Abs([double]$lowAngle.location[1]) -lt 12.0 -and [double]$lowAngle.location[2] -gt 0.0 -and [double]$lowAngle.location[2] -lt 8.0) 'Ceiling low-angle camera must be inside the room.'
+                    Assert-True (@($lowAngle.hidden) -ccontains 'SM_ShipHub_CeilingPressureShell') 'Ceiling low-angle must hide the pressure shell.'
+                    Assert-True ([double]$semantics.scene.details.d03.door_height_axis_camera_alignment -ge 0.95) 'D03 door envelope must use a plan projection.'
+                    Assert-True ([double]$semantics.scene.details.d03.projected_door_axis_angle_degrees -ge 25.0) 'D03 door swing must be distinguishable in screen projection.'
+                    Assert-SequenceEqual @($semantics.scene.details.d05.front_widths_m) @(1.0, 2.0, 4.0) 'D05 exact temporary front widths'
+                    Assert-Equal ([bool]$semantics.rollback.backup_preserved) $true 'Rollback-incomplete must preserve its backup directory.'
+                    Assert-Equal ([bool]$semantics.rollback.error_reports_backup_path) $true 'Rollback-incomplete error must report its preserved backup path.'
+                }
+            }
+            else {
+                $script:Failures.Add('Render semantic probe is missing its Blender script or authoritative inputs.')
+            }
 
             foreach ($artifactPath in $requiredArtifacts) {
                 $artifactExists = Test-Path -LiteralPath $artifactPath -PathType Leaf
                 Assert-True $artifactExists "Required generated artifact is missing: $artifactPath"
                 if ($artifactExists) {
                     Assert-True ((Get-Item -LiteralPath $artifactPath).Length -gt 0) "Required generated artifact is empty: $artifactPath"
+                }
+            }
+
+            $pngRootExists = Test-Path -LiteralPath $pngRoot -PathType Container
+            Assert-True $pngRootExists "Drawing PNG root is missing: $pngRoot"
+            if ($pngRootExists) {
+                $actualBaseFiles = @(Get-ChildItem -LiteralPath $pngRoot -File -Force)
+                Assert-Equal $actualBaseFiles.Count 15 "Drawing PNG root must contain exactly fifteen base files: $($actualBaseFiles.Name -join ', ')"
+                $actualBasePrefixes = @(
+                    $actualBaseFiles |
+                        Where-Object { $_.Name -clike '*_Base.png' } |
+                        ForEach-Object { $_.Name.Substring(0, $_.Name.Length - '_Base.png'.Length) } |
+                        Sort-Object
+                )
+                Assert-SequenceEqual $actualBasePrefixes @($expectedSheets | Sort-Object) 'Drawing base filename prefixes'
+
+                $actualPngDirectories = @(Get-ChildItem -LiteralPath $pngRoot -Directory -Recurse -Force)
+                Assert-Equal $actualPngDirectories.Count 1 "Drawing PNG root must contain only the Perspectives subdirectory: $($actualPngDirectories.FullName -join ', ')"
+                if ($actualPngDirectories.Count -eq 1) {
+                    Assert-Equal $actualPngDirectories[0].FullName $perspectivesRoot 'Drawing PNG subdirectory mismatch.'
+                }
+            }
+
+            $perspectivesRootExists = Test-Path -LiteralPath $perspectivesRoot -PathType Container
+            Assert-True $perspectivesRootExists "Perspective PNG directory is missing: $perspectivesRoot"
+            if ($perspectivesRootExists) {
+                $actualPerspectiveFiles = @(Get-ChildItem -LiteralPath $perspectivesRoot -File -Force)
+                Assert-Equal $actualPerspectiveFiles.Count 6 "Perspective PNG directory must contain exactly six source files: $($actualPerspectiveFiles.Name -join ', ')"
+                Assert-SequenceEqual @($actualPerspectiveFiles.Name | Sort-Object) @($expectedPerspectiveNames | Sort-Object) 'Perspective source filenames'
+            }
+
+            foreach ($pngPath in $requiredPngPaths) {
+                if ((Test-Path -LiteralPath $pngPath -PathType Leaf) -and (Get-Item -LiteralPath $pngPath).Length -gt 0) {
+                    try {
+                        $metadata = Read-ProjectRiftPngMetadata -Path $pngPath
+                        Assert-Equal $metadata.Width 4961 "PNG width mismatch for $pngPath"
+                        Assert-Equal $metadata.Height 3508 "PNG height mismatch for $pngPath"
+                        Assert-Equal $metadata.PixelsPerMeterX 11811 "PNG horizontal 300 dpi pHYs mismatch for $pngPath"
+                        Assert-Equal $metadata.PixelsPerMeterY 11811 "PNG vertical 300 dpi pHYs mismatch for $pngPath"
+                        Assert-Equal $metadata.PhysicalUnit 1 "PNG pHYs unit must be meter for $pngPath"
+                    }
+                    catch {
+                        $script:Failures.Add("PNG metadata validation failed for $pngPath`: $($_.Exception.Message)")
+                    }
                 }
             }
             $unexpectedFiles = @(

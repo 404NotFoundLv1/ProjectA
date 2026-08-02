@@ -104,6 +104,31 @@ function Invoke-ProjectRiftBuildWhiteModel {
     }
 }
 
+function Invoke-ProjectRiftRenderDrawings {
+    $blender = Resolve-ProjectRiftValidatedBlender -StageName 'RenderDrawings'
+    $renderScript = Join-Path $projectRoot 'Scripts\ProjectRift\ArtPipeline\shiphub\render_shiphub_drawings.py'
+    $blendPath = Join-Path $generatedOutputRoot 'Blender\SM_ShipHub_Complete_White_v1.blend'
+    $manifestPath = Join-Path $generatedOutputRoot 'Reports\layout-manifest.json'
+    $outputRoot = Join-Path $generatedOutputRoot 'Drawings\PNG'
+
+    foreach ($requiredPath in @($renderScript, $blendPath, $manifestPath)) {
+        if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
+            throw "RenderDrawings is missing its required input: $requiredPath"
+        }
+    }
+    foreach ($validatedPath in @($blendPath, $manifestPath, $outputRoot)) {
+        if (-not (Test-ProjectRiftContainedArtPath -Candidate $validatedPath -AllowedRoot $generatedOutputRoot)) {
+            throw "RenderDrawings path is outside the approved root: $validatedPath"
+        }
+    }
+
+    & $blender --background --factory-startup --python $renderScript -- --project-root $projectRoot --blend $blendPath --manifest $manifestPath --output-root $outputRoot
+    $renderExitCode = $LASTEXITCODE
+    if ($renderExitCode -ne 0) {
+        throw "RenderDrawings failed with exit code $renderExitCode."
+    }
+}
+
 function Invoke-ProjectRiftDeferredStage {
     param(
         [Parameter(Mandatory)][string]$DeferredStage,
@@ -153,7 +178,7 @@ switch ($Stage) {
     'Preflight' { Invoke-ProjectRiftPreflight }
     'ValidateContract' { Invoke-ProjectRiftContractValidation }
     'BuildWhiteModel' { Invoke-ProjectRiftBuildWhiteModel }
-    'RenderDrawings' { Invoke-ProjectRiftDeferredStage -DeferredStage 'RenderDrawings' -RequireBlender }
+    'RenderDrawings' { Invoke-ProjectRiftRenderDrawings }
     'Publish' { Invoke-ProjectRiftDeferredStage -DeferredStage 'Publish' -RequirePython }
     'Validate' { Invoke-ProjectRiftDeferredStage -DeferredStage 'Validate' -RequireBlender -RequirePython }
     'All' {
