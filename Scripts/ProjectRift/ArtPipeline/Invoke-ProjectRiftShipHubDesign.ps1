@@ -129,6 +129,43 @@ function Invoke-ProjectRiftRenderDrawings {
     }
 }
 
+function Invoke-ProjectRiftPublish {
+    $python = Resolve-ProjectRiftPythonExecutable -ExplicitPath $PythonExe
+    $publishScript = Join-Path $projectRoot 'Scripts\ProjectRift\ArtPipeline\shiphub\publish_shiphub_drawings.py'
+    $briefPath = Join-Path $projectRoot 'SourceArt\ProjectRift\ShipHub\Briefs\ShipHubCompleteDesign_v1.json'
+    $manifestPath = Join-Path $generatedOutputRoot 'Reports\layout-manifest.json'
+    $drawingsRoot = Join-Path $generatedOutputRoot 'Drawings'
+    $pngRoot = Join-Path $drawingsRoot 'PNG'
+
+    foreach ($requiredPath in @($publishScript, $briefPath, $manifestPath, $pngRoot)) {
+        if (-not (Test-Path -LiteralPath $requiredPath)) {
+            throw "Publish is missing its required input: $requiredPath"
+        }
+    }
+    foreach ($validatedPath in @($manifestPath, $drawingsRoot, $pngRoot)) {
+        if (-not (Test-ProjectRiftContainedArtPath -Candidate $validatedPath -AllowedRoot $generatedOutputRoot)) {
+            throw "Publish path is outside the approved root: $validatedPath"
+        }
+    }
+
+    $publishOutput = @(& $python $publishScript --brief $briefPath --manifest $manifestPath --drawings-root $drawingsRoot 2>&1)
+    $publishExitCode = $LASTEXITCODE
+    $publishOutput | ForEach-Object { Write-Output $_ }
+    if ($publishExitCode -ne 0) {
+        throw "Publish stage failed with exit code $publishExitCode."
+    }
+    $publishSuccess = @(
+        $publishOutput |
+            ForEach-Object { $_.ToString() } |
+            Where-Object { $_ -match '^ShipHub published .+ Committed Handoff files: [^;]+; .+\.$' }
+    )
+    if ($publishSuccess.Count -ne 1) {
+        throw 'Publish stage did not report its two committed Handoff filenames.'
+    }
+    $publishSuccess[0] -match '^ShipHub published .+ Committed Handoff files: (?<Pdf>[^;]+); (?<Png>.+)\.$' | Out-Null
+    Write-Output "Publish stage committed Handoff filenames: $($Matches.Pdf); $($Matches.Png)"
+}
+
 function Invoke-ProjectRiftDeferredStage {
     param(
         [Parameter(Mandatory)][string]$DeferredStage,
@@ -179,7 +216,7 @@ switch ($Stage) {
     'ValidateContract' { Invoke-ProjectRiftContractValidation }
     'BuildWhiteModel' { Invoke-ProjectRiftBuildWhiteModel }
     'RenderDrawings' { Invoke-ProjectRiftRenderDrawings }
-    'Publish' { Invoke-ProjectRiftDeferredStage -DeferredStage 'Publish' -RequirePython }
+    'Publish' { Invoke-ProjectRiftPublish }
     'Validate' { Invoke-ProjectRiftDeferredStage -DeferredStage 'Validate' -RequireBlender -RequirePython }
     'All' {
         Invoke-ProjectRiftRecursiveStage -RecursiveStage 'Preflight'

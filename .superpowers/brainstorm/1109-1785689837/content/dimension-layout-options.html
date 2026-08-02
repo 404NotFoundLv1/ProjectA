@@ -1,0 +1,126 @@
+<style>
+  #dimension-layout-options .drawing {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 420 / 297;
+    overflow: hidden;
+    background: var(--bg-tertiary);
+    color: var(--accent);
+  }
+  #dimension-layout-options .drawing img {
+    position: absolute;
+    object-fit: contain;
+    opacity: 0.86;
+  }
+  #dimension-layout-options .drawing svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  #dimension-layout-options .dim {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.2;
+  }
+  #dimension-layout-options .ext {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 0.65;
+  }
+  #dimension-layout-options .leader {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 0.8;
+  }
+  #dimension-layout-options .note-box {
+    fill: var(--bg-secondary);
+    stroke: var(--border);
+    stroke-width: 0.8;
+  }
+  #dimension-layout-options text {
+    fill: var(--text-primary);
+    font: 500 8px Arial, sans-serif;
+  }
+  #dimension-layout-options .dim-text {
+    fill: currentColor;
+  }
+  #dimension-layout-options .card-image {
+    aspect-ratio: 420 / 297;
+  }
+</style>
+
+<div id="dimension-layout-options">
+  <h2>选择 SVG 尺寸标注布局</h2>
+  <p class="subtitle">目标：尺寸必须对应真实方向、避开模型主体，并保持 A3 图纸一眼可读。</p>
+
+  <div class="cards">
+    <div class="card" data-choice="a" onclick="toggleSelect(this)">
+      <div class="card-image">
+        <div class="drawing" aria-label="方案 A：外围主尺寸和局部就近尺寸">
+          <img src="/files/a01-base-preview.png" style="left:12%;top:9%;width:76%;height:69%" alt="A01 舰船大厅平面图">
+          <svg viewBox="0 0 420 297" role="img" aria-label="外围主尺寸和局部就近尺寸示意">
+            <defs><marker id="arrow-a" markerWidth="5" markerHeight="5" refX="2.5" refY="2.5" orient="auto-start-reverse"><path d="M0 0L5 2.5L0 5Z" fill="currentColor"/></marker></defs>
+            <line class="ext" x1="62" y1="218" x2="62" y2="238"/><line class="ext" x1="358" y1="218" x2="358" y2="238"/>
+            <line class="dim" x1="62" y1="234" x2="358" y2="234" marker-start="url(#arrow-a)" marker-end="url(#arrow-a)"/>
+            <text class="dim-text" x="181" y="230">28 m OVERALL WIDTH</text>
+            <line class="ext" x1="62" y1="48" x2="42" y2="48"/><line class="ext" x1="62" y1="213" x2="42" y2="213"/>
+            <line class="dim" x1="46" y1="48" x2="46" y2="213" marker-start="url(#arrow-a)" marker-end="url(#arrow-a)"/>
+            <text class="dim-text" x="39" y="158" transform="rotate(-90 39 158)">24 m OVERALL DEPTH</text>
+            <line class="dim" x1="174" y1="145" x2="246" y2="145" marker-start="url(#arrow-a)" marker-end="url(#arrow-a)"/>
+            <text class="dim-text" x="188" y="140">Ø 8 m TABLE</text>
+            <circle cx="180" cy="72" r="5" fill="var(--bg-secondary)" stroke="currentColor"/><text class="dim-text" x="177.5" y="75">P</text>
+            <circle cx="328" cy="200" r="5" fill="var(--bg-secondary)" stroke="currentColor"/><text class="dim-text" x="325.5" y="203">D</text>
+            <rect class="note-box" x="260" y="246" width="142" height="35"/>
+            <text x="266" y="257">P: POD CENTER CHAIN</text><text x="266" y="269">D: DOCK COORDINATE SCHEDULE</text>
+          </svg>
+        </div>
+      </div>
+      <div class="card-body">
+        <h3>A · 外围主尺寸 + 就近局部尺寸（推荐）</h3>
+        <p>宽、深放到建筑轮廓外；桌面直径贴近对象；坐标类数据改用编号与表格。保持平面图最大。</p>
+      </div>
+    </div>
+
+    <div class="card" data-choice="b" onclick="toggleSelect(this)">
+      <div class="card-image">
+        <div class="drawing" aria-label="方案 B：统一尺寸带">
+          <img src="/files/a01-base-preview.png" style="left:14%;top:22%;width:72%;height:58%" alt="A01 舰船大厅平面图">
+          <svg viewBox="0 0 420 297" role="img" aria-label="顶部和左侧统一尺寸带示意">
+            <defs><marker id="arrow-b" markerWidth="5" markerHeight="5" refX="2.5" refY="2.5" orient="auto-start-reverse"><path d="M0 0L5 2.5L0 5Z" fill="currentColor"/></marker></defs>
+            <line class="dim" x1="72" y1="34" x2="348" y2="34" marker-start="url(#arrow-b)" marker-end="url(#arrow-b)"/><text class="dim-text" x="180" y="29">28 m OVERALL WIDTH</text>
+            <line class="dim" x1="72" y1="50" x2="348" y2="50" marker-start="url(#arrow-b)" marker-end="url(#arrow-b)"/><text class="dim-text" x="188" y="46">POD CENTER CHAIN</text>
+            <line class="dim" x1="45" y1="70" x2="45" y2="222" marker-start="url(#arrow-b)" marker-end="url(#arrow-b)"/><text class="dim-text" x="38" y="165" transform="rotate(-90 38 165)">24 m OVERALL DEPTH</text>
+            <line class="dim" x1="60" y1="70" x2="60" y2="222" marker-start="url(#arrow-b)" marker-end="url(#arrow-b)"/><text class="dim-text" x="53" y="160" transform="rotate(-90 53 160)">5 m MAIN PATH</text>
+            <rect class="note-box" x="246" y="242" width="158" height="38"/>
+            <text x="252" y="254">OBJECT DIMENSIONS / COORDINATES</text><text x="252" y="267">TABLE Ø8 · DOCK D1-D4</text>
+          </svg>
+        </div>
+      </div>
+      <div class="card-body">
+        <h3>B · 统一顶部/左侧尺寸带</h3>
+        <p>所有尺寸集中在两条外部尺寸带，主体最干净；但平面图需要缩小，局部尺寸与对象的对应关系较弱。</p>
+      </div>
+    </div>
+
+    <div class="card" data-choice="c" onclick="toggleSelect(this)">
+      <div class="card-image">
+        <div class="drawing" aria-label="方案 C：平面图和尺寸表分栏">
+          <img src="/files/a01-base-preview.png" style="left:7%;top:13%;width:64%;height:65%" alt="A01 舰船大厅平面图">
+          <svg viewBox="0 0 420 297" role="img" aria-label="平面图和尺寸表分栏示意">
+            <defs><marker id="arrow-c" markerWidth="5" markerHeight="5" refX="2.5" refY="2.5" orient="auto-start-reverse"><path d="M0 0L5 2.5L0 5Z" fill="currentColor"/></marker></defs>
+            <line class="dim" x1="42" y1="230" x2="292" y2="230" marker-start="url(#arrow-c)" marker-end="url(#arrow-c)"/><text class="dim-text" x="135" y="226">28 m OVERALL</text>
+            <line class="dim" x1="29" y1="58" x2="29" y2="213" marker-start="url(#arrow-c)" marker-end="url(#arrow-c)"/><text class="dim-text" x="22" y="164" transform="rotate(-90 22 164)">24 m OVERALL</text>
+            <line class="leader" x1="168" y1="137" x2="322" y2="80"/><circle cx="168" cy="137" r="5" fill="var(--bg-secondary)" stroke="currentColor"/><text class="dim-text" x="165.5" y="140">1</text>
+            <rect class="note-box" x="306" y="34" width="104" height="190"/>
+            <text x="314" y="49">DIMENSION SCHEDULE</text><text x="314" y="68">1 · TABLE Ø8 m</text><text x="314" y="84">2 · MAIN PATH 5 m</text><text x="314" y="100">3 · POD CENTERS</text><text x="314" y="116">4 · DOCK D1-D4</text>
+          </svg>
+        </div>
+      </div>
+      <div class="card-body">
+        <h3>C · 平面图 + 独立尺寸表</h3>
+        <p>数字信息最整齐，适合复杂施工图；代价是平面图缩小最多，视觉上更像工程交付而非概念建模图。</p>
+      </div>
+    </div>
+  </div>
+</div>

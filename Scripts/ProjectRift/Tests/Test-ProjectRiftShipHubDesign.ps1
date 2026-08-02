@@ -168,6 +168,159 @@ function Read-ProjectRiftPngMetadata {
     }
 }
 
+function New-ProjectRiftStrictHandoffFixture {
+    param([Parameter(Mandatory)][string]$Root)
+
+    $drawingsRoot = Join-Path $Root 'Drawings'
+    $handoffRoot = Join-Path $drawingsRoot 'Handoff'
+    New-Item -ItemType Directory -Path $handoffRoot -Force | Out-Null
+    $pdfPath = Join-Path $drawingsRoot 'ProjectRift_ShipHub_CompleteDesign_v1.pdf'
+    $pngPath = Join-Path $drawingsRoot 'ProjectRift_ShipHub_ContactSheet_v1.png'
+    [IO.File]::WriteAllBytes($pdfPath, [Text.Encoding]::ASCII.GetBytes('%PDF-1.4 fixture'))
+    [IO.File]::WriteAllBytes($pngPath, [byte[]]@(
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x13, 0x61, 0x00, 0x00, 0x0D, 0xB4,
+        0x08, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44,
+        0x00, 0x00, 0x00, 0x00
+    ))
+    $pdfHash = (Get-FileHash -LiteralPath $pdfPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $pngHash = (Get-FileHash -LiteralPath $pngPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $handoffPdfPath = Join-Path $handoffRoot ("ProjectRift_ShipHub_CompleteDesign_v1r2_{0}.pdf" -f $pdfHash.Substring(0, 8))
+    $handoffPngPath = Join-Path $handoffRoot ("ProjectRift_ShipHub_ContactSheet_v1r2_{0}.png" -f $pngHash.Substring(0, 8))
+    Copy-Item -LiteralPath $pdfPath -Destination $handoffPdfPath
+    Copy-Item -LiteralPath $pngPath -Destination $handoffPngPath
+    return [pscustomobject]@{
+        DrawingsRoot = $drawingsRoot
+        HandoffRoot = $handoffRoot
+        PdfPath = $pdfPath
+        PngPath = $pngPath
+        HandoffPdfPath = $handoffPdfPath
+        HandoffPngPath = $handoffPngPath
+    }
+}
+
+function Test-ProjectRiftStrictHandoff {
+    param([Parameter(Mandatory)][string]$DrawingsRoot)
+
+    $failures = [System.Collections.Generic.List[string]]::new()
+    $pdfPath = Join-Path $DrawingsRoot 'ProjectRift_ShipHub_CompleteDesign_v1.pdf'
+    $pngPath = Join-Path $DrawingsRoot 'ProjectRift_ShipHub_ContactSheet_v1.png'
+    $handoffRoot = Join-Path $DrawingsRoot 'Handoff'
+    $pdfHash = $null
+    $pngHash = $null
+    if (Test-Path -LiteralPath $pdfPath -PathType Leaf) {
+        $pdfHash = (Get-FileHash -LiteralPath $pdfPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        $pdfLength = (Get-Item -LiteralPath $pdfPath).Length
+        if ($pdfLength -lt 4) { $failures.Add('Canonical PDF must contain at least 4 bytes for signature validation.') }
+        if ($pdfLength -ge 32MB) { $failures.Add('Canonical PDF must remain below the 32 MiB WPS compatibility limit.') }
+        if ($pdfLength -ge 4) {
+            $stream = [IO.File]::Open($pdfPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+            try {
+                $signature = New-Object byte[] 4
+                [void]$stream.Read($signature, 0, 4)
+                if ([Text.Encoding]::ASCII.GetString($signature) -cne '%PDF') { $failures.Add('Canonical PDF signature mismatch.') }
+            }
+            finally { $stream.Dispose() }
+        }
+    }
+    else { $failures.Add("Canonical PDF is missing: $pdfPath") }
+    if (Test-Path -LiteralPath $pngPath -PathType Leaf) {
+        $pngHash = (Get-FileHash -LiteralPath $pngPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        try {
+            $metadata = Read-ProjectRiftPngMetadata -Path $pngPath
+            if ($metadata.Width -ne 4961) { $failures.Add('Canonical PNG width mismatch.') }
+            if ($metadata.Height -ne 3508) { $failures.Add('Canonical PNG height mismatch.') }
+        }
+        catch { $failures.Add("Canonical PNG validation failed: $($_.Exception.Message)") }
+    }
+    else { $failures.Add("Canonical PNG is missing: $pngPath") }
+
+    $expectedNames = @()
+    if ($null -ne $pdfHash -and $null -ne $pngHash) {
+        $expectedNames = @(
+            "ProjectRift_ShipHub_CompleteDesign_v1r2_$($pdfHash.Substring(0, 8)).pdf",
+            "ProjectRift_ShipHub_ContactSheet_v1r2_$($pngHash.Substring(0, 8)).png"
+        )
+    }
+    $expectedPaths = @($expectedNames | ForEach-Object { Join-Path $handoffRoot $_ })
+    $entries = @()
+    if (-not (Test-Path -LiteralPath $handoffRoot -PathType Container)) {
+        $failures.Add("Published Handoff root is missing: $handoffRoot")
+    }
+    else {
+        $entries = @(Get-ChildItem -LiteralPath $handoffRoot -Force)
+        $recursiveEntries = @(Get-ChildItem -LiteralPath $handoffRoot -Recurse -Force)
+        if ($entries.Count -ne 2) { $failures.Add("Handoff root must contain exactly two entries: $($entries.Name -join ', ')") }
+        if ($recursiveEntries.Count -ne 2) { $failures.Add('Handoff root must not contain nested entries.') }
+        foreach ($entry in $entries) {
+            if ($entry.PSIsContainer) { $failures.Add("Handoff root must not contain directories: $($entry.FullName)") }
+            if ($entry -isnot [IO.FileInfo]) { $failures.Add("Handoff entry must be a normal file: $($entry.FullName)") }
+            $linkProperty = $entry.PSObject.Properties['LinkType']
+            if ($null -ne $linkProperty -and -not [string]::IsNullOrEmpty([string]$linkProperty.Value)) {
+                $failures.Add("Handoff entry must not be a link: $($entry.FullName)")
+            }
+        }
+    }
+    $actualNames = @($entries | ForEach-Object { [string]$_.Name })
+    $ordinaryEntries = [System.Collections.Generic.List[IO.FileInfo]]::new()
+    foreach ($entry in $entries) {
+        $linkProperty = $entry.PSObject.Properties['LinkType']
+        $isLink = $null -ne $linkProperty -and -not [string]::IsNullOrEmpty([string]$linkProperty.Value)
+        if (($entry -is [IO.FileInfo]) -and -not $entry.PSIsContainer -and -not $isLink) {
+            $ordinaryEntries.Add($entry)
+        }
+    }
+    foreach ($expectedName in $expectedNames) {
+        $exactEntries = @($entries | Where-Object { [string]::Equals($_.Name, $expectedName, [StringComparison]::Ordinal) })
+        $exactOrdinaryEntries = @($ordinaryEntries | Where-Object { [string]::Equals($_.Name, $expectedName, [StringComparison]::Ordinal) })
+        if ($exactEntries.Count -ne 1) {
+            $failures.Add("Handoff filename must match the canonical lowercase SHA-256 name case-sensitively: $expectedName")
+        }
+        if ($exactOrdinaryEntries.Count -ne 1) {
+            $failures.Add("Handoff expected ordinary file is missing: $expectedName")
+        }
+    }
+    foreach ($actualName in $actualNames) {
+        $exactExpected = @($expectedNames | Where-Object { [string]::Equals($_, $actualName, [StringComparison]::Ordinal) })
+        if ($exactExpected.Count -ne 1) {
+            $failures.Add("Handoff contains an unexpected or case-mismatched filename: $actualName")
+        }
+    }
+    if ($expectedNames.Count -eq 2) {
+        $handoffPdf = @($ordinaryEntries | Where-Object { [string]::Equals($_.Name, $expectedNames[0], [StringComparison]::Ordinal) } | Select-Object -First 1)
+        $handoffPng = @($ordinaryEntries | Where-Object { [string]::Equals($_.Name, $expectedNames[1], [StringComparison]::Ordinal) } | Select-Object -First 1)
+        if ($handoffPdf.Count -eq 1) {
+            $handoffHash = (Get-FileHash -LiteralPath $handoffPdf[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($handoffHash -cne $pdfHash) { $failures.Add('Handoff PDF bytes must match the canonical PDF.') }
+            $handoffLength = $handoffPdf[0].Length
+            if ($handoffLength -lt 4) { $failures.Add('Handoff PDF must contain at least 4 bytes for signature validation.') }
+            if ($handoffLength -ge 32MB) { $failures.Add('Handoff PDF must remain below the 32 MiB WPS compatibility limit.') }
+            if ($handoffLength -ge 4) {
+                $stream = [IO.File]::Open($handoffPdf[0].FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+                try {
+                    $signature = New-Object byte[] 4
+                    [void]$stream.Read($signature, 0, 4)
+                    if ([Text.Encoding]::ASCII.GetString($signature) -cne '%PDF') { $failures.Add('Handoff PDF signature mismatch.') }
+                }
+                finally { $stream.Dispose() }
+            }
+        }
+        if ($handoffPng.Count -eq 1) {
+            $handoffHash = (Get-FileHash -LiteralPath $handoffPng[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($handoffHash -cne $pngHash) { $failures.Add('Handoff PNG bytes must match the canonical contact sheet.') }
+            try {
+                $metadata = Read-ProjectRiftPngMetadata -Path $handoffPng[0].FullName
+                if ($metadata.Width -ne 4961) { $failures.Add('Handoff PNG width mismatch.') }
+                if ($metadata.Height -ne 3508) { $failures.Add('Handoff PNG height mismatch.') }
+            }
+            catch { $failures.Add("Handoff PNG validation failed: $($_.Exception.Message)") }
+        }
+    }
+    return [pscustomobject]@{ Failures = @($failures); ExpectedPaths = $expectedPaths }
+}
+
 function Invoke-ProjectRiftRunnerForTest {
     param(
         [Parameter(Mandatory)][string]$RunnerPath,
@@ -208,6 +361,65 @@ try {
     }
     else {
         Import-Module -Name $modulePath -Force -ErrorAction Stop
+
+        $strictHandoffTestRoot = Join-Path $projectRoot ("Saved\Automation\ProjectRiftShipHubDesign\strict-handoff-test-{0}" -f [Guid]::NewGuid().ToString('N'))
+        try {
+            $validFixture = New-ProjectRiftStrictHandoffFixture -Root (Join-Path $strictHandoffTestRoot 'valid')
+            $validStrictResult = Test-ProjectRiftStrictHandoff -DrawingsRoot $validFixture.DrawingsRoot
+            Assert-Equal @($validStrictResult.Failures).Count 0 'Strict Handoff fixture should accept the valid canonical pair.'
+
+            $extraFixture = New-ProjectRiftStrictHandoffFixture -Root (Join-Path $strictHandoffTestRoot 'extra')
+            [IO.File]::WriteAllText((Join-Path $extraFixture.HandoffRoot 'stale.txt'), 'stale')
+            $extraStrictResult = Test-ProjectRiftStrictHandoff -DrawingsRoot $extraFixture.DrawingsRoot
+            Assert-True ((@($extraStrictResult.Failures) -match 'exactly two').Count -gt 0) 'Strict Handoff fixture should reject an extra or stale entry.'
+
+            $nestedFixture = New-ProjectRiftStrictHandoffFixture -Root (Join-Path $strictHandoffTestRoot 'nested')
+            New-Item -ItemType Directory -Path (Join-Path $nestedFixture.HandoffRoot 'nested') | Out-Null
+            $nestedStrictResult = Test-ProjectRiftStrictHandoff -DrawingsRoot $nestedFixture.DrawingsRoot
+            Assert-True ((@($nestedStrictResult.Failures) -match 'directories|nested').Count -gt 0) 'Strict Handoff fixture should reject nested directories.'
+
+            $caseFixture = New-ProjectRiftStrictHandoffFixture -Root (Join-Path $strictHandoffTestRoot 'case')
+            $caseTempPath = Join-Path $caseFixture.HandoffRoot 'rename-temp.pdf'
+            Move-Item -LiteralPath $caseFixture.HandoffPdfPath -Destination $caseTempPath
+            Move-Item -LiteralPath $caseTempPath -Destination ($caseFixture.HandoffPdfPath.ToUpperInvariant())
+            $caseStrictResult = Test-ProjectRiftStrictHandoff -DrawingsRoot $caseFixture.DrawingsRoot
+            Assert-True ((@($caseStrictResult.Failures) -match 'case-sensitive').Count -gt 0) 'Strict Handoff fixture should reject a mixed-case filename from the actual directory entry.'
+
+            $missingCanonicalFixture = New-ProjectRiftStrictHandoffFixture -Root (Join-Path $strictHandoffTestRoot 'missing-canonical')
+            Remove-Item -LiteralPath $missingCanonicalFixture.PdfPath -Force
+            $missingCanonicalResult = Test-ProjectRiftStrictHandoff -DrawingsRoot $missingCanonicalFixture.DrawingsRoot
+            Assert-True ((@($missingCanonicalResult.Failures) -match 'Canonical PDF is missing').Count -gt 0) 'Strict Handoff fixture should accumulate a clear missing-canonical-PDF failure.'
+
+            $mismatchFixture = New-ProjectRiftStrictHandoffFixture -Root (Join-Path $strictHandoffTestRoot 'mismatch')
+            [IO.File]::WriteAllBytes($mismatchFixture.HandoffPdfPath, [Text.Encoding]::ASCII.GetBytes('%PDF-1.4 mismatched'))
+            $mismatchStrictResult = Test-ProjectRiftStrictHandoff -DrawingsRoot $mismatchFixture.DrawingsRoot
+            Assert-True ((@($mismatchStrictResult.Failures) -match 'bytes must match').Count -gt 0) 'Strict Handoff fixture should reject a byte-mismatched copy.'
+
+            $directoryFixture = New-ProjectRiftStrictHandoffFixture -Root (Join-Path $strictHandoffTestRoot 'exact-name-directory')
+            Remove-Item -LiteralPath $directoryFixture.HandoffPdfPath -Force
+            New-Item -ItemType Directory -Path $directoryFixture.HandoffPdfPath | Out-Null
+            $directoryStrictResult = Test-ProjectRiftStrictHandoff -DrawingsRoot $directoryFixture.DrawingsRoot
+            Assert-True ((@($directoryStrictResult.Failures) -match 'normal file|case-sensitively').Count -gt 0) 'Strict Handoff fixture should reject an exact-name directory without throwing.'
+
+            $hardLinkFixture = New-ProjectRiftStrictHandoffFixture -Root (Join-Path $strictHandoffTestRoot 'hardlink')
+            Remove-Item -LiteralPath $hardLinkFixture.HandoffPdfPath -Force
+            $hardLinkCreated = $false
+            try {
+                New-Item -ItemType HardLink -Path $hardLinkFixture.HandoffPdfPath -Target $hardLinkFixture.PdfPath | Out-Null
+                $hardLinkCreated = $true
+                Write-Output 'Strict Handoff hardlink fixture: created.'
+            }
+            catch {
+                Write-Output "Strict Handoff hardlink fixture: unavailable ($($_.Exception.Message))."
+            }
+            if ($hardLinkCreated) {
+                $hardLinkStrictResult = Test-ProjectRiftStrictHandoff -DrawingsRoot $hardLinkFixture.DrawingsRoot
+                Assert-True ((@($hardLinkStrictResult.Failures) -match 'link|normal file').Count -gt 0) 'Strict Handoff fixture should reject an exact-name hardlink as nonordinary.'
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $strictHandoffTestRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
 
         $allowedArtRoot = Join-Path $projectRoot 'SourceArt\ProjectRift\ShipHub'
         $artChild = Join-Path $allowedArtRoot 'CompleteDesign\test-output.txt'
@@ -276,6 +488,7 @@ try {
         $wrongBlenderProbe = Join-Path $runnerTestRoot 'wrong\blender.exe'
         $failingBuildBlenderProbe = Join-Path $runnerTestRoot 'failing-build\blender.exe'
         $pythonProbe = Join-Path $runnerTestRoot 'python.exe'
+        $malformedPublishPythonProbe = Join-Path $runnerTestRoot 'malformed-publish-python.exe'
         $failingPythonProbe = Join-Path $runnerTestRoot 'failing-python.exe'
         $toolLog = Join-Path $runnerTestRoot 'tool-invocations.log'
         New-Item -ItemType Directory -Path (Split-Path -Parent $wrongBlenderProbe) -Force | Out-Null
@@ -324,6 +537,21 @@ public static class ProjectRiftPythonProbe {
     public static int Main(string[] args) {
         string log = Environment.GetEnvironmentVariable("PROJECTRIFT_TEST_TOOL_LOG");
         if (!String.IsNullOrEmpty(log)) File.AppendAllText(log, "python:" + String.Join(" ", args) + Environment.NewLine);
+        foreach (string arg in args) {
+            if (arg.EndsWith("publish_shiphub_drawings.py", StringComparison.OrdinalIgnoreCase)) {
+                Console.WriteLine("ShipHub published 15 SVGs, 15 PNGs, and ProjectRift_ShipHub_CompleteDesign_v1.pdf. Committed Handoff files: ProjectRift_ShipHub_CompleteDesign_v1r2_12345678.pdf; ProjectRift_ShipHub_ContactSheet_v1r2_87654321.png.");
+                break;
+            }
+        }
+        return 0;
+    }
+}
+'@
+        $malformedPublishPythonSource = @'
+using System;
+public static class ProjectRiftMalformedPublishPythonProbe {
+    public static int Main(string[] args) {
+        Console.WriteLine("ShipHub published 15 SVGs, 15 PNGs, and ProjectRift_ShipHub_CompleteDesign_v1.pdf. Committed Handoff files: only-one.pdf.");
         return 0;
     }
 }
@@ -341,6 +569,7 @@ public static class ProjectRiftFailingPythonProbe {
             Add-Type -TypeDefinition $wrongBlenderSource -OutputAssembly $wrongBlenderProbe -OutputType ConsoleApplication
             Add-Type -TypeDefinition $failingBuildBlenderSource -OutputAssembly $failingBuildBlenderProbe -OutputType ConsoleApplication
             Add-Type -TypeDefinition $pythonSource -OutputAssembly $pythonProbe -OutputType ConsoleApplication
+            Add-Type -TypeDefinition $malformedPublishPythonSource -OutputAssembly $malformedPublishPythonProbe -OutputType ConsoleApplication
             Add-Type -TypeDefinition $failingPythonSource -OutputAssembly $failingPythonProbe -OutputType ConsoleApplication
             $env:PROJECTRIFT_TEST_TOOL_LOG = $toolLog
 
@@ -415,6 +644,10 @@ public static class ProjectRiftFailingPythonProbe {
             Assert-True ($publishResult.Text -match 'Explicit Python path') 'Publish should resolve its supplied Python before checking its deferred script.'
             Assert-True ($publishResult.Text -notmatch 'missing its required script') 'Publish should not inspect its deferred script before Python resolution.'
 
+            $malformedPublishResult = Invoke-ProjectRiftRunnerForTest -RunnerPath $runnerPath -Stage 'Publish' -PythonExe $malformedPublishPythonProbe
+            Assert-True ($malformedPublishResult.ExitCode -ne 0) 'Publish should reject a malformed committed-Handoff success line.'
+            Assert-True ($malformedPublishResult.Text -match 'did not report its two committed Handoff filenames') 'Publish should clearly report a malformed committed-Handoff success line.'
+
             $pythonFailureResult = Invoke-ProjectRiftRunnerForTest -RunnerPath $runnerPath -Stage 'ValidateContract' -PythonExe $failingPythonProbe
             Assert-True ($pythonFailureResult.ExitCode -ne 0) 'ValidateContract should propagate a nonzero Python exit.'
             Assert-True ($pythonFailureResult.Text -match 'exited with code 7') 'ValidateContract should report the supplied Python exit code.'
@@ -422,10 +655,11 @@ public static class ProjectRiftFailingPythonProbe {
             Remove-Item -LiteralPath $toolLog -Force -ErrorAction SilentlyContinue
             $allResult = Invoke-ProjectRiftRunnerForTest -RunnerPath $runnerPath -Stage 'All' -BlenderExe $validBlenderProbe -PythonExe $pythonProbe
             Assert-True ($allResult.ExitCode -ne 0) 'All should fail closed at the first absent deferred stage.'
-            Assert-True ($allResult.Text -match 'Publish stage is missing its required script') "All should complete RenderDrawings and stop at the absent Publish stage. Actual output: $($allResult.Text)"
+            Assert-True ($allResult.Text -match 'Validate stage is missing its required script') "All should complete Publish and stop at the absent Validate stage. Actual output: $($allResult.Text)"
+            Assert-True ($allResult.Text -match 'Publish stage committed Handoff filenames: ProjectRift_ShipHub_CompleteDesign_v1r2_12345678\.pdf; ProjectRift_ShipHub_ContactSheet_v1r2_87654321\.png') 'All should report both committed Handoff filenames after Publish.'
             $allLog = if (Test-Path -LiteralPath $toolLog) { @(Get-Content -LiteralPath $toolLog) } else { @() }
-            Assert-True ($allLog.Count -ge 7) "All should invoke Preflight, ValidateContract, BuildWhiteModel and RenderDrawings in order before Publish fails closed. Actual log: $($allLog -join ' | ')"
-            if ($allLog.Count -ge 7) {
+            Assert-Equal $allLog.Count 9 "All should invoke Preflight, ValidateContract, BuildWhiteModel, RenderDrawings, Publish, then the Validate version gate in exact order. Actual log: $($allLog -join ' | ')"
+            if ($allLog.Count -eq 9) {
                 Assert-Equal $allLog[0] 'blender:--version' 'All should invoke Preflight first with the explicit Blender executable.'
                 Assert-True ($allLog[1] -like 'python:-c import PIL, reportlab, pypdf*') 'All should forward the explicit Python executable to Preflight.'
                 Assert-True ($allLog[2] -like 'python:*shiphub_contract.py*') 'All should forward the explicit Python executable to ValidateContract.'
@@ -433,6 +667,8 @@ public static class ProjectRiftFailingPythonProbe {
                 Assert-True ($allLog[4] -like 'blender:--background --factory-startup --python *build_shiphub_design.py*') 'All should run the background white-model build after its version gate.'
                 Assert-Equal $allLog[5] 'blender:--version' 'All should reach the RenderDrawings Blender gate only after BuildWhiteModel.'
                 Assert-True ($allLog[6] -like 'blender:--background --factory-startup --python *render_shiphub_drawings.py*') 'All should run the background drawing renderer before reaching Publish.'
+                Assert-True ($allLog[7] -like 'python:*publish_shiphub_drawings.py --brief *ShipHubCompleteDesign_v1.json --manifest *layout-manifest.json --drawings-root *CompleteDesign\Drawings') 'All should forward the explicit Python executable to Publish after RenderDrawings.'
+                Assert-Equal $allLog[8] 'blender:--version' 'All should invoke the Validate Blender version gate after Publish before reporting its absent script.'
             }
         }
         finally {
@@ -481,17 +717,32 @@ public static class ProjectRiftFailingPythonProbe {
             $fbxPath = Join-Path $outputRoot 'Exports\SM_ShipHub_Complete_White_v1.fbx'
             $glbPath = Join-Path $outputRoot 'Exports\SM_ShipHub_Complete_White_v1.glb'
             $manifestPath = Join-Path $outputRoot 'Reports\layout-manifest.json'
+            $drawingsRoot = Join-Path $outputRoot 'Drawings'
             $pngRoot = Join-Path $outputRoot 'Drawings\PNG'
             $perspectivesRoot = Join-Path $pngRoot 'Perspectives'
+            $svgRoot = Join-Path $drawingsRoot 'SVG'
+            $finalPngRoot = Join-Path $drawingsRoot 'FinalPNG'
+            $pdfPath = Join-Path $drawingsRoot 'ProjectRift_ShipHub_CompleteDesign_v1.pdf'
+            $contactSheetPath = Join-Path $drawingsRoot 'ProjectRift_ShipHub_ContactSheet_v1.png'
+            $handoffRoot = Join-Path $drawingsRoot 'Handoff'
             $expectedBaseNames = @($expectedSheets | ForEach-Object { "${_}_Base.png" })
+            $expectedSvgNames = @($expectedSheets | ForEach-Object { "${_}.svg" })
+            $expectedFinalPngNames = @($expectedSheets | ForEach-Object { "${_}.png" })
             $expectedPerspectiveNames = @(
                 'front.png', 'reverse.png', 'west-oblique.png',
                 'east-oblique.png', 'high-overview.png', 'ceiling-low-angle.png'
             )
             $expectedBasePaths = @($expectedBaseNames | ForEach-Object { Join-Path $pngRoot $_ })
             $expectedPerspectivePaths = @($expectedPerspectiveNames | ForEach-Object { Join-Path $perspectivesRoot $_ })
+            $expectedSvgPaths = @($expectedSvgNames | ForEach-Object { Join-Path $svgRoot $_ })
+            $expectedFinalPngPaths = @($expectedFinalPngNames | ForEach-Object { Join-Path $finalPngRoot $_ })
             $requiredPngPaths = @($expectedBasePaths + $expectedPerspectivePaths)
-            $requiredArtifacts = @($blendPath, $fbxPath, $glbPath, $manifestPath) + $requiredPngPaths
+            $strictHandoffResult = Test-ProjectRiftStrictHandoff -DrawingsRoot $drawingsRoot
+            $expectedHandoffPaths = @($strictHandoffResult.ExpectedPaths)
+            foreach ($handoffFailure in @($strictHandoffResult.Failures)) {
+                $script:Failures.Add($handoffFailure)
+            }
+            $requiredArtifacts = @($blendPath, $fbxPath, $glbPath, $manifestPath, $pdfPath, $contactSheetPath) + $requiredPngPaths + $expectedSvgPaths + $expectedFinalPngPaths + $expectedHandoffPaths
 
             $rendererPath = Join-Path $projectRoot 'Scripts\ProjectRift\ArtPipeline\shiphub\render_shiphub_drawings.py'
             $realBlenderPath = 'D:\Blender5.2\blender.exe'
@@ -596,6 +847,34 @@ public static class ProjectRiftFailingPythonProbe {
                 }
             }
 
+            $svgRootExists = Test-Path -LiteralPath $svgRoot -PathType Container
+            Assert-True $svgRootExists "Published SVG root is missing: $svgRoot"
+            if ($svgRootExists) {
+                $actualSvgFiles = @(Get-ChildItem -LiteralPath $svgRoot -File -Force)
+                Assert-Equal $actualSvgFiles.Count 15 "Published SVG root must contain exactly fifteen files: $($actualSvgFiles.Name -join ', ')"
+                Assert-SequenceEqual @($actualSvgFiles.Name | Sort-Object) @($expectedSvgNames | Sort-Object) 'Published SVG filenames'
+                foreach ($svgPath in $expectedSvgPaths) {
+                    if (Test-Path -LiteralPath $svgPath -PathType Leaf) {
+                        try {
+                            [xml]$svgDocument = Get-Content -LiteralPath $svgPath -Raw -Encoding UTF8
+                            Assert-Equal $svgDocument.DocumentElement.LocalName 'svg' "SVG root element mismatch for $svgPath"
+                            Assert-Equal $svgDocument.DocumentElement.GetAttribute('viewBox') '0 0 420 297' "SVG A3 landscape viewBox mismatch for $svgPath"
+                        }
+                        catch {
+                            $script:Failures.Add("SVG validation failed for $svgPath`: $($_.Exception.Message)")
+                        }
+                    }
+                }
+            }
+
+            $finalPngRootExists = Test-Path -LiteralPath $finalPngRoot -PathType Container
+            Assert-True $finalPngRootExists "Published FinalPNG root is missing: $finalPngRoot"
+            if ($finalPngRootExists) {
+                $actualFinalPngFiles = @(Get-ChildItem -LiteralPath $finalPngRoot -File -Force)
+                Assert-Equal $actualFinalPngFiles.Count 15 "Published FinalPNG root must contain exactly fifteen files: $($actualFinalPngFiles.Name -join ', ')"
+                Assert-SequenceEqual @($actualFinalPngFiles.Name | Sort-Object) @($expectedFinalPngNames | Sort-Object) 'Published FinalPNG filenames'
+            }
+
             $perspectivesRootExists = Test-Path -LiteralPath $perspectivesRoot -PathType Container
             Assert-True $perspectivesRootExists "Perspective PNG directory is missing: $perspectivesRoot"
             if ($perspectivesRootExists) {
@@ -619,13 +898,44 @@ public static class ProjectRiftFailingPythonProbe {
                     }
                 }
             }
+            foreach ($pngPath in @($expectedFinalPngPaths + $contactSheetPath)) {
+                if ((Test-Path -LiteralPath $pngPath -PathType Leaf) -and (Get-Item -LiteralPath $pngPath).Length -gt 0) {
+                    try {
+                        $metadata = Read-ProjectRiftPngMetadata -Path $pngPath
+                        Assert-Equal $metadata.Width 4961 "Published PNG width mismatch for $pngPath"
+                        Assert-Equal $metadata.Height 3508 "Published PNG height mismatch for $pngPath"
+                        Assert-Equal $metadata.PixelsPerMeterX 11811 "Published PNG horizontal 300 dpi pHYs mismatch for $pngPath"
+                        Assert-Equal $metadata.PixelsPerMeterY 11811 "Published PNG vertical 300 dpi pHYs mismatch for $pngPath"
+                        Assert-Equal $metadata.PhysicalUnit 1 "Published PNG pHYs unit must be meter for $pngPath"
+                    }
+                    catch {
+                        $script:Failures.Add("Published PNG metadata validation failed for $pngPath`: $($_.Exception.Message)")
+                    }
+                }
+            }
+            if (Test-Path -LiteralPath $pdfPath -PathType Leaf) {
+                $pdfLength = (Get-Item -LiteralPath $pdfPath).Length
+                Assert-True ($pdfLength -ge 4) 'Published PDF must contain at least 4 bytes for signature validation.'
+                Assert-True ($pdfLength -lt 32MB) 'Published PDF must remain below the 32 MiB WPS compatibility limit.'
+                if ($pdfLength -ge 4) {
+                    $pdfStream = [IO.File]::Open($pdfPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+                    try {
+                        $pdfSignature = New-Object byte[] 4
+                        [void]$pdfStream.Read($pdfSignature, 0, 4)
+                        Assert-Equal ([Text.Encoding]::ASCII.GetString($pdfSignature)) '%PDF' 'Published PDF signature mismatch.'
+                    }
+                    finally {
+                        $pdfStream.Dispose()
+                    }
+                }
+            }
             $unexpectedFiles = @(
                 Get-ChildItem -LiteralPath $outputRoot -File -Recurse -Force |
                     Where-Object { $_.FullName -notin $requiredArtifacts }
             )
             Assert-Equal $unexpectedFiles.Count 0 "CompleteDesign must not retain non-contract files: $($unexpectedFiles.FullName -join ', ')"
             $unexpectedWorkDirectories = @(
-                Get-ChildItem -LiteralPath $outputRoot -Directory -Force |
+                Get-ChildItem -LiteralPath $outputRoot -Directory -Recurse -Force |
                     Where-Object { $_.Name -like '.shiphub-*' }
             )
             Assert-Equal $unexpectedWorkDirectories.Count 0 "CompleteDesign must not retain staging or backup directories: $($unexpectedWorkDirectories.FullName -join ', ')"

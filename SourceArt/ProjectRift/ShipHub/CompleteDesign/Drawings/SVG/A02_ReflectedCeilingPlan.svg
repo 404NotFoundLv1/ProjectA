@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 297" width="420mm" height="297mm">
+ <style>.t{font-family:Arial,sans-serif;fill:#e8eef5}.dimension{font-family:Arial,sans-serif;fill:#efb05a;font-size:4px}.extension-line{stroke:#efb05a;stroke-width:0.45}.dimension-line{stroke:#efb05a;stroke-width:0.65}</style>
+ <defs><marker id="dimension-arrow" markerWidth="5" markerHeight="5" refX="2.5" refY="2.5" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M0,0 L5,2.5 L0,5 Z" fill="#efb05a"/></marker></defs>
+ <rect width="420" height="297" fill="#0b1017"/><image href="../PNG/A02_ReflectedCeilingPlan_Base.png" x="12" y="14" width="396" height="226" preserveAspectRatio="xMidYMid meet"/>
+ <g class="dimension-chain" data-dimension-id="ring-outer" data-kind="object" data-orientation="diameter" data-label="Ø 16 m SERVICE RING OUTER"><line class="dimension-line" x1="150" y1="135" x2="270" y2="135" marker-start="url(#dimension-arrow)" marker-end="url(#dimension-arrow)"/><text x="174" y="130" class="dimension">Ø 16 m SERVICE RING OUTER</text></g><g class="dimension-chain" data-dimension-id="ring-inner" data-kind="object" data-orientation="diameter" data-label="Ø 10 m SERVICE RING INNER"><line class="dimension-line" x1="172" y1="145" x2="248" y2="145" marker-start="url(#dimension-arrow)" marker-end="url(#dimension-arrow)"/><text x="182" y="158" class="dimension">Ø 10 m SERVICE RING INNER</text></g>
+ 
+ <rect x="7" y="7" width="406" height="283" fill="none" stroke="#e8eef5" stroke-width="1"/><rect id="title-block" x="7" y="258" width="406" height="32" fill="#0b1017" stroke="#e8eef5" stroke-width="0.7"/>
+ <path d="M22 19 L18 29 L26 29 Z" fill="#e8eef5"/><text x="20" y="35" class="t" font-size="5">N</text><path d="M340 20h40m-40 0v4m40-4v4" stroke="#e8eef5" stroke-width="1"/><text x="340" y="31" class="t" font-size="4">5 m SCALE BAR</text>
+ <text x="15" y="263" class="t" font-size="6">A02_ReflectedCeilingPlan  反射天花平面图</text><text x="15" y="276" class="t" font-size="4">SCALE 1:100   UNITS: m / mm</text><text x="150" y="276" class="t" font-size="4">CEILING SECTION C-C</text>
+ <text x="15" y="286" class="t" font-size="3">BRIEF SHA256: fd21285d447e3410d0f0f19ec966b86d93d947d898a815d6a0c3c895e9b6303d</text>
+</svg>
