@@ -1,0 +1,4257 @@
+{
+  "assemblies": {
+    "airlock": {
+      "center_m": [
+        0.0,
+        -12.0,
+        0.0
+      ],
+      "count": 1,
+      "measured_frame_clear_opening_m": [
+        4.0,
+        3.5
+      ],
+      "measured_structural_clear_opening_m": [
+        4.0,
+        3.5
+      ],
+      "members": [
+        {
+          "location_m": [
+            0.0,
+            -12.0,
+            1.7
+          ],
+          "measured_dimensions_m": [
+            3.8,
+            0.2,
+            3.4
+          ],
+          "measured_world_bounds_m": {
+            "max": [
+              1.9,
+              -11.9,
+              3.4
+            ],
+            "min": [
+              -1.9,
+              -12.1,
+              0.0
+            ]
+          },
+          "name": "SM_ShipHub_Airlock_DoorPanel"
+        },
+        {
+          "location_m": [
+            2.3,
+            -12.0,
+            2.15
+          ],
+          "measured_dimensions_m": [
+            0.6,
+            1.2,
+            4.3
+          ],
+          "measured_world_bounds_m": {
+            "max": [
+              2.6,
+              -11.4,
+              4.3
+            ],
+            "min": [
+              2.0,
+              -12.6,
+              0.0
+            ]
+          },
+          "name": "SM_ShipHub_Airlock_FrameEast"
+        },
+        {
+          "location_m": [
+            -2.3,
+            -12.0,
+            2.15
+          ],
+          "measured_dimensions_m": [
+            0.6,
+            1.2,
+            4.3
+          ],
+          "measured_world_bounds_m": {
+            "max": [
+              -2.0,
+              -11.4,
+              4.3
+            ],
+            "min": [
+              -2.6,
+              -12.6,
+              0.0
+            ]
+          },
+          "name": "SM_ShipHub_Airlock_FrameWest"
+        },
+        {
+          "location_m": [
+            0.0,
+            -12.0,
+            3.9
+          ],
+          "measured_dimensions_m": [
+            5.2,
+            1.2,
+            0.8
+          ],
+          "measured_world_bounds_m": {
+            "max": [
+              2.6,
+              -11.4,
+              4.3
+            ],
+            "min": [
+              -2.6,
+              -12.6,
+              3.5
+            ]
+          },
+          "name": "SM_ShipHub_Airlock_Header"
+        }
+      ],
+      "names": [
+        "SM_ShipHub_Airlock_DoorPanel",
+        "SM_ShipHub_Airlock_FrameEast",
+        "SM_ShipHub_Airlock_FrameWest",
+        "SM_ShipHub_Airlock_Header"
+      ]
+    },
+    "ceiling_ring": {
+      "count": 1,
+      "members": [
+        {
+          "location_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "measured_dimensions_m": [
+            16.0,
+            16.0,
+            1.8
+          ],
+          "measured_inner_radius_m": 5.0,
+          "measured_outer_radius_m": 8.0,
+          "measured_world_bounds_m": {
+            "max": [
+              8.0,
+              8.0,
+              8.0
+            ],
+            "min": [
+              -8.0,
+              -8.0,
+              6.2
+            ]
+          },
+          "measured_z_range_m": [
+            6.2,
+            8.0
+          ],
+          "name": "SM_ShipHub_CeilingServiceRing"
+        }
+      ],
+      "names": [
+        "SM_ShipHub_CeilingServiceRing"
+      ]
+    },
+    "construct_docks": {
+      "centers_m": [
+        [
+          -5.3,
+          -5.3,
+          0.0
+        ],
+        [
+          5.3,
+          -5.3,
+          0.0
+        ],
+        [
+          -5.3,
+          5.3,
+          0.0
+        ],
+        [
+          5.3,
+          5.3,
+          0.0
+        ]
+      ],
+      "count": 4,
+      "members": [
+        {
+          "location_m": [
+            -5.3,
+            -5.3,
+            0.0
+          ],
+          "measured_diameter_m": 1.0,
+          "measured_dimensions_m": [
+            1.0,
+            1.0,
+            0.08
+          ],
+          "measured_recess_m": 0.08,
+          "measured_top_z_m": 0.0,
+          "measured_world_bounds_m": {
+            "max": [
+              -4.8,
+              -4.8,
+              0.0
+            ],
+            "min": [
+              -5.8,
+              -5.8,
+              -0.08
+            ]
+          },
+          "name": "SM_ShipHub_ConstructDock_01"
+        },
+        {
+          "location_m": [
+            5.3,
+            -5.3,
+            0.0
+          ],
+          "measured_diameter_m": 1.0,
+          "measured_dimensions_m": [
+            1.0,
+            1.0,
+            0.08
+          ],
+          "measured_recess_m": 0.08,
+          "measured_top_z_m": 0.0,
+          "measured_world_bounds_m": {
+            "max": [
+              5.8,
+              -4.8,
+              0.0
+            ],
+            "min": [
+              4.8,
+              -5.8,
+              -0.08
+            ]
+          },
+          "name": "SM_ShipHub_ConstructDock_02"
+        },
+        {
+          "location_m": [
+            -5.3,
+            5.3,
+            0.0
+          ],
+          "measured_diameter_m": 1.0,
+          "measured_dimensions_m": [
+            1.0,
+            1.0,
+            0.08
+          ],
+          "measured_recess_m": 0.08,
+          "measured_top_z_m": 0.0,
+          "measured_world_bounds_m": {
+            "max": [
+              -4.8,
+              5.8,
+              0.0
+            ],
+            "min": [
+              -5.8,
+              4.8,
+              -0.08
+            ]
+          },
+          "name": "SM_ShipHub_ConstructDock_03"
+        },
+        {
+          "location_m": [
+            5.3,
+            5.3,
+            0.0
+          ],
+          "measured_diameter_m": 1.0,
+          "measured_dimensions_m": [
+            1.0,
+            1.0,
+            0.08
+          ],
+          "measured_recess_m": 0.08,
+          "measured_top_z_m": 0.0,
+          "measured_world_bounds_m": {
+            "max": [
+              5.8,
+              5.8,
+              0.0
+            ],
+            "min": [
+              4.8,
+              4.8,
+              -0.08
+            ]
+          },
+          "name": "SM_ShipHub_ConstructDock_04"
+        }
+      ],
+      "names": [
+        "SM_ShipHub_ConstructDock_01",
+        "SM_ShipHub_ConstructDock_02",
+        "SM_ShipHub_ConstructDock_03",
+        "SM_ShipHub_ConstructDock_04"
+      ]
+    },
+    "cryopods": {
+      "centers_m": [
+        [
+          -4.0,
+          9.8,
+          0.0
+        ],
+        [
+          -2.0,
+          9.8,
+          0.0
+        ],
+        [
+          0.0,
+          9.8,
+          0.0
+        ],
+        [
+          2.0,
+          9.8,
+          0.0
+        ],
+        [
+          4.0,
+          9.8,
+          0.0
+        ]
+      ],
+      "count": 5,
+      "members": [
+        {
+          "base_axis_center_m": [
+            -4.0,
+            9.8,
+            0.0
+          ],
+          "leans_toward": "+Y",
+          "location_m": [
+            -4.0,
+            9.8,
+            0.0
+          ],
+          "measured_dimensions_m": [
+            1.6,
+            1.599999,
+            3.0
+          ],
+          "measured_recline_degrees": 17.999991,
+          "measured_world_bounds_m": {
+            "max": [
+              -3.2,
+              10.700959,
+              3.0
+            ],
+            "min": [
+              -4.8,
+              9.10096,
+              0.0
+            ]
+          },
+          "name": "SM_ShipHub_Cryopod_01",
+          "top_axis_center_m": [
+            -4.0,
+            10.700959,
+            2.772868
+          ]
+        },
+        {
+          "base_axis_center_m": [
+            -2.0,
+            9.8,
+            0.0
+          ],
+          "leans_toward": "+Y",
+          "location_m": [
+            -2.0,
+            9.8,
+            0.0
+          ],
+          "measured_dimensions_m": [
+            1.6,
+            1.599999,
+            3.0
+          ],
+          "measured_recline_degrees": 17.999991,
+          "measured_world_bounds_m": {
+            "max": [
+              -1.2,
+              10.700959,
+              3.0
+            ],
+            "min": [
+              -2.8,
+              9.10096,
+              0.0
+            ]
+          },
+          "name": "SM_ShipHub_Cryopod_02",
+          "top_axis_center_m": [
+            -2.0,
+            10.700959,
+            2.772868
+          ]
+        },
+        {
+          "base_axis_center_m": [
+            0.0,
+            9.8,
+            0.0
+          ],
+          "leans_toward": "+Y",
+          "location_m": [
+            0.0,
+            9.8,
+            0.0
+          ],
+          "measured_dimensions_m": [
+            1.6,
+            1.599999,
+            3.0
+          ],
+          "measured_recline_degrees": 17.999991,
+          "measured_world_bounds_m": {
+            "max": [
+              0.8,
+              10.700959,
+              3.0
+            ],
+            "min": [
+              -0.8,
+              9.10096,
+              0.0
+            ]
+          },
+          "name": "SM_ShipHub_Cryopod_03",
+          "top_axis_center_m": [
+            0.0,
+            10.700959,
+            2.772868
+          ]
+        },
+        {
+          "base_axis_center_m": [
+            2.0,
+            9.8,
+            0.0
+          ],
+          "leans_toward": "+Y",
+          "location_m": [
+            2.0,
+            9.8,
+            0.0
+          ],
+          "measured_dimensions_m": [
+            1.6,
+            1.599999,
+            3.0
+          ],
+          "measured_recline_degrees": 17.999991,
+          "measured_world_bounds_m": {
+            "max": [
+              2.8,
+              10.700959,
+              3.0
+            ],
+            "min": [
+              1.2,
+              9.10096,
+              0.0
+            ]
+          },
+          "name": "SM_ShipHub_Cryopod_04",
+          "top_axis_center_m": [
+            2.0,
+            10.700959,
+            2.772868
+          ]
+        },
+        {
+          "base_axis_center_m": [
+            4.0,
+            9.8,
+            0.0
+          ],
+          "leans_toward": "+Y",
+          "location_m": [
+            4.0,
+            9.8,
+            0.0
+          ],
+          "measured_dimensions_m": [
+            1.6,
+            1.599999,
+            3.0
+          ],
+          "measured_recline_degrees": 17.999991,
+          "measured_world_bounds_m": {
+            "max": [
+              4.8,
+              10.700959,
+              3.0
+            ],
+            "min": [
+              3.2,
+              9.10096,
+              0.0
+            ]
+          },
+          "name": "SM_ShipHub_Cryopod_05",
+          "top_axis_center_m": [
+            4.0,
+            10.700959,
+            2.772868
+          ]
+        }
+      ],
+      "names": [
+        "SM_ShipHub_Cryopod_01",
+        "SM_ShipHub_Cryopod_02",
+        "SM_ShipHub_Cryopod_03",
+        "SM_ShipHub_Cryopod_04",
+        "SM_ShipHub_Cryopod_05"
+      ],
+      "recline_degrees": 18.0
+    },
+    "navigation_table": {
+      "center_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "count": 1,
+      "display_name": "SM_ShipHub_NavTable_Display",
+      "members": [
+        {
+          "location_m": [
+            0.0,
+            0.0,
+            1.05
+          ],
+          "measured_dimensions_m": [
+            6.0,
+            6.0,
+            0.1
+          ],
+          "measured_world_bounds_m": {
+            "max": [
+              3.0,
+              3.0,
+              1.1
+            ],
+            "min": [
+              -3.0,
+              -3.0,
+              1.0
+            ]
+          },
+          "name": "SM_ShipHub_NavTable_Display"
+        },
+        {
+          "location_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "measured_dimensions_m": [
+            4.0,
+            4.0,
+            1.0
+          ],
+          "measured_world_bounds_m": {
+            "max": [
+              4.0,
+              4.0,
+              1.0
+            ],
+            "min": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "name": "SM_ShipHub_NavTable_Sector_01"
+        },
+        {
+          "location_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "measured_dimensions_m": [
+            4.0,
+            4.0,
+            1.0
+          ],
+          "measured_world_bounds_m": {
+            "max": [
+              0.0,
+              4.0,
+              1.0
+            ],
+            "min": [
+              -4.0,
+              0.0,
+              0.0
+            ]
+          },
+          "name": "SM_ShipHub_NavTable_Sector_02"
+        },
+        {
+          "location_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "measured_dimensions_m": [
+            4.0,
+            4.0,
+            1.0
+          ],
+          "measured_world_bounds_m": {
+            "max": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "min": [
+              -4.0,
+              -4.0,
+              0.0
+            ]
+          },
+          "name": "SM_ShipHub_NavTable_Sector_03"
+        },
+        {
+          "location_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "measured_dimensions_m": [
+            4.0,
+            4.0,
+            1.0
+          ],
+          "measured_world_bounds_m": {
+            "max": [
+              4.0,
+              0.0,
+              1.0
+            ],
+            "min": [
+              0.0,
+              -4.0,
+              0.0
+            ]
+          },
+          "name": "SM_ShipHub_NavTable_Sector_04"
+        }
+      ],
+      "sector_names": [
+        "SM_ShipHub_NavTable_Sector_01",
+        "SM_ShipHub_NavTable_Sector_02",
+        "SM_ShipHub_NavTable_Sector_03",
+        "SM_ShipHub_NavTable_Sector_04"
+      ]
+    }
+  },
+  "blender": {
+    "lts": true,
+    "version": "5.2.0 LTS",
+    "version_tuple": [
+      5,
+      2,
+      0
+    ]
+  },
+  "collections": [
+    "00_REFERENCE",
+    "10_STRUCTURE",
+    "20_NAV_TABLE",
+    "30_CRYOPODS",
+    "40_AIRLOCK",
+    "50_WEST_BAYS",
+    "60_EAST_BAYS",
+    "70_CONSTRUCT_DOCKS",
+    "80_CEILING",
+    "90_CAMERAS"
+  ],
+  "exports": {
+    "expected_object_names": [
+      "SM_ShipHub_Airlock_DoorPanel",
+      "SM_ShipHub_Airlock_FrameEast",
+      "SM_ShipHub_Airlock_FrameWest",
+      "SM_ShipHub_Airlock_Header",
+      "SM_ShipHub_CeilingPressureShell",
+      "SM_ShipHub_CeilingServiceRing",
+      "SM_ShipHub_ConstructDock_01",
+      "SM_ShipHub_ConstructDock_02",
+      "SM_ShipHub_ConstructDock_03",
+      "SM_ShipHub_ConstructDock_04",
+      "SM_ShipHub_Cryopod_01",
+      "SM_ShipHub_Cryopod_02",
+      "SM_ShipHub_Cryopod_03",
+      "SM_ShipHub_Cryopod_04",
+      "SM_ShipHub_Cryopod_05",
+      "SM_ShipHub_East_JumpCoreBay",
+      "SM_ShipHub_East_MedicalBay",
+      "SM_ShipHub_East_RoleBay",
+      "SM_ShipHub_ExpansionInterface_East",
+      "SM_ShipHub_ExpansionInterface_West",
+      "SM_ShipHub_FloorSlab",
+      "SM_ShipHub_NavTable_Display",
+      "SM_ShipHub_NavTable_Sector_01",
+      "SM_ShipHub_NavTable_Sector_02",
+      "SM_ShipHub_NavTable_Sector_03",
+      "SM_ShipHub_NavTable_Sector_04",
+      "SM_ShipHub_Rib_East_+2",
+      "SM_ShipHub_Rib_East_+6",
+      "SM_ShipHub_Rib_East_-2",
+      "SM_ShipHub_Rib_East_-6",
+      "SM_ShipHub_Rib_North_+0",
+      "SM_ShipHub_Rib_North_+4",
+      "SM_ShipHub_Rib_North_+8",
+      "SM_ShipHub_Rib_North_-4",
+      "SM_ShipHub_Rib_North_-8",
+      "SM_ShipHub_Rib_South_+4",
+      "SM_ShipHub_Rib_South_+8",
+      "SM_ShipHub_Rib_South_-4",
+      "SM_ShipHub_Rib_South_-8",
+      "SM_ShipHub_Rib_West_+2",
+      "SM_ShipHub_Rib_West_+6",
+      "SM_ShipHub_Rib_West_-2",
+      "SM_ShipHub_Rib_West_-6",
+      "SM_ShipHub_Wall_02",
+      "SM_ShipHub_Wall_03",
+      "SM_ShipHub_Wall_04",
+      "SM_ShipHub_Wall_05",
+      "SM_ShipHub_Wall_06",
+      "SM_ShipHub_Wall_07",
+      "SM_ShipHub_Wall_08",
+      "SM_ShipHub_Wall_SouthEast",
+      "SM_ShipHub_Wall_SouthWest",
+      "SM_ShipHub_West_PreparationBay",
+      "SM_ShipHub_West_RepairBay"
+    ],
+    "fbx": {
+      "actual_object_names": [
+        "SM_ShipHub_Airlock_DoorPanel",
+        "SM_ShipHub_Airlock_FrameEast",
+        "SM_ShipHub_Airlock_FrameWest",
+        "SM_ShipHub_Airlock_Header",
+        "SM_ShipHub_CeilingPressureShell",
+        "SM_ShipHub_CeilingServiceRing",
+        "SM_ShipHub_ConstructDock_01",
+        "SM_ShipHub_ConstructDock_02",
+        "SM_ShipHub_ConstructDock_03",
+        "SM_ShipHub_ConstructDock_04",
+        "SM_ShipHub_Cryopod_01",
+        "SM_ShipHub_Cryopod_02",
+        "SM_ShipHub_Cryopod_03",
+        "SM_ShipHub_Cryopod_04",
+        "SM_ShipHub_Cryopod_05",
+        "SM_ShipHub_East_JumpCoreBay",
+        "SM_ShipHub_East_MedicalBay",
+        "SM_ShipHub_East_RoleBay",
+        "SM_ShipHub_ExpansionInterface_East",
+        "SM_ShipHub_ExpansionInterface_West",
+        "SM_ShipHub_FloorSlab",
+        "SM_ShipHub_NavTable_Display",
+        "SM_ShipHub_NavTable_Sector_01",
+        "SM_ShipHub_NavTable_Sector_02",
+        "SM_ShipHub_NavTable_Sector_03",
+        "SM_ShipHub_NavTable_Sector_04",
+        "SM_ShipHub_Rib_East_+2",
+        "SM_ShipHub_Rib_East_+6",
+        "SM_ShipHub_Rib_East_-2",
+        "SM_ShipHub_Rib_East_-6",
+        "SM_ShipHub_Rib_North_+0",
+        "SM_ShipHub_Rib_North_+4",
+        "SM_ShipHub_Rib_North_+8",
+        "SM_ShipHub_Rib_North_-4",
+        "SM_ShipHub_Rib_North_-8",
+        "SM_ShipHub_Rib_South_+4",
+        "SM_ShipHub_Rib_South_+8",
+        "SM_ShipHub_Rib_South_-4",
+        "SM_ShipHub_Rib_South_-8",
+        "SM_ShipHub_Rib_West_+2",
+        "SM_ShipHub_Rib_West_+6",
+        "SM_ShipHub_Rib_West_-2",
+        "SM_ShipHub_Rib_West_-6",
+        "SM_ShipHub_Wall_02",
+        "SM_ShipHub_Wall_03",
+        "SM_ShipHub_Wall_04",
+        "SM_ShipHub_Wall_05",
+        "SM_ShipHub_Wall_06",
+        "SM_ShipHub_Wall_07",
+        "SM_ShipHub_Wall_08",
+        "SM_ShipHub_Wall_SouthEast",
+        "SM_ShipHub_Wall_SouthWest",
+        "SM_ShipHub_West_PreparationBay",
+        "SM_ShipHub_West_RepairBay"
+      ],
+      "actual_scales": [
+        {
+          "name": "SM_ShipHub_Airlock_DoorPanel",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Airlock_FrameEast",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Airlock_FrameWest",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Airlock_Header",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_CeilingPressureShell",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_CeilingServiceRing",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_ConstructDock_01",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_ConstructDock_02",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_ConstructDock_03",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_ConstructDock_04",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Cryopod_01",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Cryopod_02",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Cryopod_03",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Cryopod_04",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Cryopod_05",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_East_JumpCoreBay",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_East_MedicalBay",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_East_RoleBay",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_ExpansionInterface_East",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_ExpansionInterface_West",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_FloorSlab",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_NavTable_Display",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_NavTable_Sector_01",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_NavTable_Sector_02",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_NavTable_Sector_03",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_NavTable_Sector_04",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_East_+2",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_East_+6",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_East_-2",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_East_-6",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_North_+0",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_North_+4",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_North_+8",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_North_-4",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_North_-8",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_South_+4",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_South_+8",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_South_-4",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_South_-8",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_West_+2",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_West_+6",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_West_-2",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_West_-6",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Wall_02",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Wall_03",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Wall_04",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Wall_05",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Wall_06",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Wall_07",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Wall_08",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Wall_SouthEast",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Wall_SouthWest",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_West_PreparationBay",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_West_RepairBay",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        }
+      ],
+      "object_count": 54,
+      "objects": [
+        "SM_ShipHub_Airlock_DoorPanel",
+        "SM_ShipHub_Airlock_FrameEast",
+        "SM_ShipHub_Airlock_FrameWest",
+        "SM_ShipHub_Airlock_Header",
+        "SM_ShipHub_CeilingPressureShell",
+        "SM_ShipHub_CeilingServiceRing",
+        "SM_ShipHub_ConstructDock_01",
+        "SM_ShipHub_ConstructDock_02",
+        "SM_ShipHub_ConstructDock_03",
+        "SM_ShipHub_ConstructDock_04",
+        "SM_ShipHub_Cryopod_01",
+        "SM_ShipHub_Cryopod_02",
+        "SM_ShipHub_Cryopod_03",
+        "SM_ShipHub_Cryopod_04",
+        "SM_ShipHub_Cryopod_05",
+        "SM_ShipHub_East_JumpCoreBay",
+        "SM_ShipHub_East_MedicalBay",
+        "SM_ShipHub_East_RoleBay",
+        "SM_ShipHub_ExpansionInterface_East",
+        "SM_ShipHub_ExpansionInterface_West",
+        "SM_ShipHub_FloorSlab",
+        "SM_ShipHub_NavTable_Display",
+        "SM_ShipHub_NavTable_Sector_01",
+        "SM_ShipHub_NavTable_Sector_02",
+        "SM_ShipHub_NavTable_Sector_03",
+        "SM_ShipHub_NavTable_Sector_04",
+        "SM_ShipHub_Rib_East_+2",
+        "SM_ShipHub_Rib_East_+6",
+        "SM_ShipHub_Rib_East_-2",
+        "SM_ShipHub_Rib_East_-6",
+        "SM_ShipHub_Rib_North_+0",
+        "SM_ShipHub_Rib_North_+4",
+        "SM_ShipHub_Rib_North_+8",
+        "SM_ShipHub_Rib_North_-4",
+        "SM_ShipHub_Rib_North_-8",
+        "SM_ShipHub_Rib_South_+4",
+        "SM_ShipHub_Rib_South_+8",
+        "SM_ShipHub_Rib_South_-4",
+        "SM_ShipHub_Rib_South_-8",
+        "SM_ShipHub_Rib_West_+2",
+        "SM_ShipHub_Rib_West_+6",
+        "SM_ShipHub_Rib_West_-2",
+        "SM_ShipHub_Rib_West_-6",
+        "SM_ShipHub_Wall_02",
+        "SM_ShipHub_Wall_03",
+        "SM_ShipHub_Wall_04",
+        "SM_ShipHub_Wall_05",
+        "SM_ShipHub_Wall_06",
+        "SM_ShipHub_Wall_07",
+        "SM_ShipHub_Wall_08",
+        "SM_ShipHub_Wall_SouthEast",
+        "SM_ShipHub_Wall_SouthWest",
+        "SM_ShipHub_West_PreparationBay",
+        "SM_ShipHub_West_RepairBay"
+      ]
+    },
+    "glb": {
+      "actual_object_names": [
+        "SM_ShipHub_Airlock_DoorPanel",
+        "SM_ShipHub_Airlock_FrameEast",
+        "SM_ShipHub_Airlock_FrameWest",
+        "SM_ShipHub_Airlock_Header",
+        "SM_ShipHub_CeilingPressureShell",
+        "SM_ShipHub_CeilingServiceRing",
+        "SM_ShipHub_ConstructDock_01",
+        "SM_ShipHub_ConstructDock_02",
+        "SM_ShipHub_ConstructDock_03",
+        "SM_ShipHub_ConstructDock_04",
+        "SM_ShipHub_Cryopod_01",
+        "SM_ShipHub_Cryopod_02",
+        "SM_ShipHub_Cryopod_03",
+        "SM_ShipHub_Cryopod_04",
+        "SM_ShipHub_Cryopod_05",
+        "SM_ShipHub_East_JumpCoreBay",
+        "SM_ShipHub_East_MedicalBay",
+        "SM_ShipHub_East_RoleBay",
+        "SM_ShipHub_ExpansionInterface_East",
+        "SM_ShipHub_ExpansionInterface_West",
+        "SM_ShipHub_FloorSlab",
+        "SM_ShipHub_NavTable_Display",
+        "SM_ShipHub_NavTable_Sector_01",
+        "SM_ShipHub_NavTable_Sector_02",
+        "SM_ShipHub_NavTable_Sector_03",
+        "SM_ShipHub_NavTable_Sector_04",
+        "SM_ShipHub_Rib_East_+2",
+        "SM_ShipHub_Rib_East_+6",
+        "SM_ShipHub_Rib_East_-2",
+        "SM_ShipHub_Rib_East_-6",
+        "SM_ShipHub_Rib_North_+0",
+        "SM_ShipHub_Rib_North_+4",
+        "SM_ShipHub_Rib_North_+8",
+        "SM_ShipHub_Rib_North_-4",
+        "SM_ShipHub_Rib_North_-8",
+        "SM_ShipHub_Rib_South_+4",
+        "SM_ShipHub_Rib_South_+8",
+        "SM_ShipHub_Rib_South_-4",
+        "SM_ShipHub_Rib_South_-8",
+        "SM_ShipHub_Rib_West_+2",
+        "SM_ShipHub_Rib_West_+6",
+        "SM_ShipHub_Rib_West_-2",
+        "SM_ShipHub_Rib_West_-6",
+        "SM_ShipHub_Wall_02",
+        "SM_ShipHub_Wall_03",
+        "SM_ShipHub_Wall_04",
+        "SM_ShipHub_Wall_05",
+        "SM_ShipHub_Wall_06",
+        "SM_ShipHub_Wall_07",
+        "SM_ShipHub_Wall_08",
+        "SM_ShipHub_Wall_SouthEast",
+        "SM_ShipHub_Wall_SouthWest",
+        "SM_ShipHub_West_PreparationBay",
+        "SM_ShipHub_West_RepairBay"
+      ],
+      "actual_scales": [
+        {
+          "name": "SM_ShipHub_Airlock_DoorPanel",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Airlock_FrameEast",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Airlock_FrameWest",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Airlock_Header",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_CeilingPressureShell",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_CeilingServiceRing",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_ConstructDock_01",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_ConstructDock_02",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_ConstructDock_03",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_ConstructDock_04",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Cryopod_01",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Cryopod_02",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Cryopod_03",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Cryopod_04",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Cryopod_05",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_East_JumpCoreBay",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_East_MedicalBay",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_East_RoleBay",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_ExpansionInterface_East",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_ExpansionInterface_West",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_FloorSlab",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_NavTable_Display",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_NavTable_Sector_01",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_NavTable_Sector_02",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_NavTable_Sector_03",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_NavTable_Sector_04",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_East_+2",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_East_+6",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_East_-2",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_East_-6",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_North_+0",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_North_+4",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_North_+8",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_North_-4",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_North_-8",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_South_+4",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_South_+8",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_South_-4",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_South_-8",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_West_+2",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_West_+6",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_West_-2",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Rib_West_-6",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Wall_02",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Wall_03",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Wall_04",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Wall_05",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Wall_06",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Wall_07",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Wall_08",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Wall_SouthEast",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_Wall_SouthWest",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_West_PreparationBay",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "name": "SM_ShipHub_West_RepairBay",
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        }
+      ],
+      "object_count": 54,
+      "objects": [
+        "SM_ShipHub_Airlock_DoorPanel",
+        "SM_ShipHub_Airlock_FrameEast",
+        "SM_ShipHub_Airlock_FrameWest",
+        "SM_ShipHub_Airlock_Header",
+        "SM_ShipHub_CeilingPressureShell",
+        "SM_ShipHub_CeilingServiceRing",
+        "SM_ShipHub_ConstructDock_01",
+        "SM_ShipHub_ConstructDock_02",
+        "SM_ShipHub_ConstructDock_03",
+        "SM_ShipHub_ConstructDock_04",
+        "SM_ShipHub_Cryopod_01",
+        "SM_ShipHub_Cryopod_02",
+        "SM_ShipHub_Cryopod_03",
+        "SM_ShipHub_Cryopod_04",
+        "SM_ShipHub_Cryopod_05",
+        "SM_ShipHub_East_JumpCoreBay",
+        "SM_ShipHub_East_MedicalBay",
+        "SM_ShipHub_East_RoleBay",
+        "SM_ShipHub_ExpansionInterface_East",
+        "SM_ShipHub_ExpansionInterface_West",
+        "SM_ShipHub_FloorSlab",
+        "SM_ShipHub_NavTable_Display",
+        "SM_ShipHub_NavTable_Sector_01",
+        "SM_ShipHub_NavTable_Sector_02",
+        "SM_ShipHub_NavTable_Sector_03",
+        "SM_ShipHub_NavTable_Sector_04",
+        "SM_ShipHub_Rib_East_+2",
+        "SM_ShipHub_Rib_East_+6",
+        "SM_ShipHub_Rib_East_-2",
+        "SM_ShipHub_Rib_East_-6",
+        "SM_ShipHub_Rib_North_+0",
+        "SM_ShipHub_Rib_North_+4",
+        "SM_ShipHub_Rib_North_+8",
+        "SM_ShipHub_Rib_North_-4",
+        "SM_ShipHub_Rib_North_-8",
+        "SM_ShipHub_Rib_South_+4",
+        "SM_ShipHub_Rib_South_+8",
+        "SM_ShipHub_Rib_South_-4",
+        "SM_ShipHub_Rib_South_-8",
+        "SM_ShipHub_Rib_West_+2",
+        "SM_ShipHub_Rib_West_+6",
+        "SM_ShipHub_Rib_West_-2",
+        "SM_ShipHub_Rib_West_-6",
+        "SM_ShipHub_Wall_02",
+        "SM_ShipHub_Wall_03",
+        "SM_ShipHub_Wall_04",
+        "SM_ShipHub_Wall_05",
+        "SM_ShipHub_Wall_06",
+        "SM_ShipHub_Wall_07",
+        "SM_ShipHub_Wall_08",
+        "SM_ShipHub_Wall_SouthEast",
+        "SM_ShipHub_Wall_SouthWest",
+        "SM_ShipHub_West_PreparationBay",
+        "SM_ShipHub_West_RepairBay"
+      ]
+    }
+  },
+  "materials": [
+    "MAT_Structure",
+    "MAT_Interactable",
+    "MAT_Glass",
+    "MAT_Door",
+    "MAT_NonWalkable"
+  ],
+  "objects": [
+    {
+      "collection": "00_REFERENCE",
+      "exported": false,
+      "location_m": [
+        0.0,
+        -9.5,
+        0.01
+      ],
+      "material": "MAT_Door",
+      "measured_world_bounds_m": {
+        "max": [
+          4.0,
+          -7.0,
+          0.02
+        ],
+        "min": [
+          -4.0,
+          -12.0,
+          0.0
+        ]
+      },
+      "name": "REF_Airlock_MusterArea_8x5",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "airlock_muster_reference"
+    },
+    {
+      "collection": "00_REFERENCE",
+      "exported": false,
+      "location_m": [
+        0.0,
+        -6.0,
+        0.96
+      ],
+      "material": "MAT_Interactable",
+      "measured_world_bounds_m": {
+        "max": [
+          0.42,
+          -5.58,
+          1.92
+        ],
+        "min": [
+          -0.42,
+          -6.42,
+          0.0
+        ]
+      },
+      "name": "REF_CharacterCapsule",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "character_reference"
+    },
+    {
+      "collection": "00_REFERENCE",
+      "exported": false,
+      "location_m": [
+        0.0,
+        0.0,
+        0.025
+      ],
+      "material": "MAT_NonWalkable",
+      "measured_world_bounds_m": {
+        "max": [
+          0.0125,
+          12.0,
+          0.0375
+        ],
+        "min": [
+          -0.0125,
+          -12.0,
+          0.0125
+        ]
+      },
+      "name": "REF_Grid_X_+00",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "dimensional_grid_reference"
+    },
+    {
+      "collection": "00_REFERENCE",
+      "exported": false,
+      "location_m": [
+        4.0,
+        0.0,
+        0.025
+      ],
+      "material": "MAT_NonWalkable",
+      "measured_world_bounds_m": {
+        "max": [
+          4.0125,
+          12.0,
+          0.0375
+        ],
+        "min": [
+          3.9875,
+          -12.0,
+          0.0125
+        ]
+      },
+      "name": "REF_Grid_X_+04",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "dimensional_grid_reference"
+    },
+    {
+      "collection": "00_REFERENCE",
+      "exported": false,
+      "location_m": [
+        8.0,
+        0.0,
+        0.025
+      ],
+      "material": "MAT_NonWalkable",
+      "measured_world_bounds_m": {
+        "max": [
+          8.0125,
+          12.0,
+          0.0375
+        ],
+        "min": [
+          7.9875,
+          -12.0,
+          0.0125
+        ]
+      },
+      "name": "REF_Grid_X_+08",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "dimensional_grid_reference"
+    },
+    {
+      "collection": "00_REFERENCE",
+      "exported": false,
+      "location_m": [
+        12.0,
+        0.0,
+        0.025
+      ],
+      "material": "MAT_NonWalkable",
+      "measured_world_bounds_m": {
+        "max": [
+          12.0125,
+          12.0,
+          0.0375
+        ],
+        "min": [
+          11.9875,
+          -12.0,
+          0.0125
+        ]
+      },
+      "name": "REF_Grid_X_+12",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "dimensional_grid_reference"
+    },
+    {
+      "collection": "00_REFERENCE",
+      "exported": false,
+      "location_m": [
+        -4.0,
+        0.0,
+        0.025
+      ],
+      "material": "MAT_NonWalkable",
+      "measured_world_bounds_m": {
+        "max": [
+          -3.9875,
+          12.0,
+          0.0375
+        ],
+        "min": [
+          -4.0125,
+          -12.0,
+          0.0125
+        ]
+      },
+      "name": "REF_Grid_X_-04",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "dimensional_grid_reference"
+    },
+    {
+      "collection": "00_REFERENCE",
+      "exported": false,
+      "location_m": [
+        -8.0,
+        0.0,
+        0.025
+      ],
+      "material": "MAT_NonWalkable",
+      "measured_world_bounds_m": {
+        "max": [
+          -7.9875,
+          12.0,
+          0.0375
+        ],
+        "min": [
+          -8.0125,
+          -12.0,
+          0.0125
+        ]
+      },
+      "name": "REF_Grid_X_-08",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "dimensional_grid_reference"
+    },
+    {
+      "collection": "00_REFERENCE",
+      "exported": false,
+      "location_m": [
+        -12.0,
+        0.0,
+        0.025
+      ],
+      "material": "MAT_NonWalkable",
+      "measured_world_bounds_m": {
+        "max": [
+          -11.9875,
+          12.0,
+          0.0375
+        ],
+        "min": [
+          -12.0125,
+          -12.0,
+          0.0125
+        ]
+      },
+      "name": "REF_Grid_X_-12",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "dimensional_grid_reference"
+    },
+    {
+      "collection": "00_REFERENCE",
+      "exported": false,
+      "location_m": [
+        0.0,
+        0.0,
+        0.025
+      ],
+      "material": "MAT_NonWalkable",
+      "measured_world_bounds_m": {
+        "max": [
+          14.0,
+          0.0125,
+          0.0375
+        ],
+        "min": [
+          -14.0,
+          -0.0125,
+          0.0125
+        ]
+      },
+      "name": "REF_Grid_Y_+00",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "dimensional_grid_reference"
+    },
+    {
+      "collection": "00_REFERENCE",
+      "exported": false,
+      "location_m": [
+        0.0,
+        4.0,
+        0.025
+      ],
+      "material": "MAT_NonWalkable",
+      "measured_world_bounds_m": {
+        "max": [
+          14.0,
+          4.0125,
+          0.0375
+        ],
+        "min": [
+          -14.0,
+          3.9875,
+          0.0125
+        ]
+      },
+      "name": "REF_Grid_Y_+04",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "dimensional_grid_reference"
+    },
+    {
+      "collection": "00_REFERENCE",
+      "exported": false,
+      "location_m": [
+        0.0,
+        8.0,
+        0.025
+      ],
+      "material": "MAT_NonWalkable",
+      "measured_world_bounds_m": {
+        "max": [
+          14.0,
+          8.0125,
+          0.0375
+        ],
+        "min": [
+          -14.0,
+          7.9875,
+          0.0125
+        ]
+      },
+      "name": "REF_Grid_Y_+08",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "dimensional_grid_reference"
+    },
+    {
+      "collection": "00_REFERENCE",
+      "exported": false,
+      "location_m": [
+        0.0,
+        -4.0,
+        0.025
+      ],
+      "material": "MAT_NonWalkable",
+      "measured_world_bounds_m": {
+        "max": [
+          14.0,
+          -3.9875,
+          0.0375
+        ],
+        "min": [
+          -14.0,
+          -4.0125,
+          0.0125
+        ]
+      },
+      "name": "REF_Grid_Y_-04",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "dimensional_grid_reference"
+    },
+    {
+      "collection": "00_REFERENCE",
+      "exported": false,
+      "location_m": [
+        0.0,
+        -8.0,
+        0.025
+      ],
+      "material": "MAT_NonWalkable",
+      "measured_world_bounds_m": {
+        "max": [
+          14.0,
+          -7.9875,
+          0.0375
+        ],
+        "min": [
+          -14.0,
+          -8.0125,
+          0.0125
+        ]
+      },
+      "name": "REF_Grid_Y_-08",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "dimensional_grid_reference"
+    },
+    {
+      "collection": "00_REFERENCE",
+      "exported": false,
+      "location_m": [
+        0.0,
+        0.0,
+        3.5
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          14.0,
+          12.0,
+          7.0
+        ],
+        "min": [
+          -14.0,
+          -12.0,
+          0.0
+        ]
+      },
+      "name": "REF_ShipHub_ClearEnvelope_28x24x7",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "clear_envelope_reference"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          14.0,
+          12.0,
+          7.4
+        ],
+        "min": [
+          -14.0,
+          -12.0,
+          7.0
+        ]
+      },
+      "name": "SM_ShipHub_CeilingPressureShell",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "ceiling_pressure_shell"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          14.0,
+          12.0,
+          0.0
+        ],
+        "min": [
+          -14.0,
+          -12.0,
+          -0.4
+        ]
+      },
+      "name": "SM_ShipHub_FloorSlab",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "floor_slab"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        14.5,
+        2.0,
+        3.8
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          14.8,
+          2.11,
+          7.6
+        ],
+        "min": [
+          14.2,
+          1.89,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Rib_East_+2",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_rib"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        14.5,
+        6.0,
+        3.8
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          14.8,
+          6.11,
+          7.6
+        ],
+        "min": [
+          14.2,
+          5.89,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Rib_East_+6",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_rib"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        14.5,
+        -2.0,
+        3.8
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          14.8,
+          -1.89,
+          7.6
+        ],
+        "min": [
+          14.2,
+          -2.11,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Rib_East_-2",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_rib"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        14.5,
+        -6.0,
+        3.8
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          14.8,
+          -5.89,
+          7.6
+        ],
+        "min": [
+          14.2,
+          -6.11,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Rib_East_-6",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_rib"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        0.0,
+        12.5,
+        3.8
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          0.11,
+          12.8,
+          7.6
+        ],
+        "min": [
+          -0.11,
+          12.2,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Rib_North_+0",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_rib"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        4.0,
+        12.5,
+        3.8
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          4.11,
+          12.8,
+          7.6
+        ],
+        "min": [
+          3.89,
+          12.2,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Rib_North_+4",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_rib"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        8.0,
+        12.5,
+        3.8
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          8.11,
+          12.8,
+          7.6
+        ],
+        "min": [
+          7.89,
+          12.2,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Rib_North_+8",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_rib"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        -4.0,
+        12.5,
+        3.8
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          -3.89,
+          12.8,
+          7.6
+        ],
+        "min": [
+          -4.11,
+          12.2,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Rib_North_-4",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_rib"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        -8.0,
+        12.5,
+        3.8
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          -7.89,
+          12.8,
+          7.6
+        ],
+        "min": [
+          -8.11,
+          12.2,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Rib_North_-8",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_rib"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        4.0,
+        -12.5,
+        3.8
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          4.11,
+          -12.2,
+          7.6
+        ],
+        "min": [
+          3.89,
+          -12.8,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Rib_South_+4",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_rib"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        8.0,
+        -12.5,
+        3.8
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          8.11,
+          -12.2,
+          7.6
+        ],
+        "min": [
+          7.89,
+          -12.8,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Rib_South_+8",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_rib"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        -4.0,
+        -12.5,
+        3.8
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          -3.89,
+          -12.2,
+          7.6
+        ],
+        "min": [
+          -4.11,
+          -12.8,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Rib_South_-4",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_rib"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        -8.0,
+        -12.5,
+        3.8
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          -7.89,
+          -12.2,
+          7.6
+        ],
+        "min": [
+          -8.11,
+          -12.8,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Rib_South_-8",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_rib"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        -14.5,
+        2.0,
+        3.8
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          -14.2,
+          2.11,
+          7.6
+        ],
+        "min": [
+          -14.8,
+          1.89,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Rib_West_+2",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_rib"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        -14.5,
+        6.0,
+        3.8
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          -14.2,
+          6.11,
+          7.6
+        ],
+        "min": [
+          -14.8,
+          5.89,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Rib_West_+6",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_rib"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        -14.5,
+        -2.0,
+        3.8
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          -14.2,
+          -1.89,
+          7.6
+        ],
+        "min": [
+          -14.8,
+          -2.11,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Rib_West_-2",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_rib"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        -14.5,
+        -6.0,
+        3.8
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          -14.2,
+          -5.89,
+          7.6
+        ],
+        "min": [
+          -14.8,
+          -6.11,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Rib_West_-6",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_rib"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          14.282843,
+          -8.0,
+          7.0
+        ],
+        "min": [
+          10.0,
+          -12.282843,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Wall_02",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_wall"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          14.4,
+          8.0,
+          7.0
+        ],
+        "min": [
+          14.0,
+          -8.0,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Wall_03",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_wall"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          14.282843,
+          12.282843,
+          7.0
+        ],
+        "min": [
+          10.0,
+          8.0,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Wall_04",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_wall"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          10.0,
+          12.4,
+          7.0
+        ],
+        "min": [
+          -10.0,
+          12.0,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Wall_05",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_wall"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          -10.0,
+          12.282843,
+          7.0
+        ],
+        "min": [
+          -14.282843,
+          8.0,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Wall_06",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_wall"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          -14.0,
+          8.0,
+          7.0
+        ],
+        "min": [
+          -14.4,
+          -8.0,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Wall_07",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_wall"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          -10.0,
+          -8.0,
+          7.0
+        ],
+        "min": [
+          -14.282843,
+          -12.282843,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Wall_08",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_wall"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          10.0,
+          -12.0,
+          7.0
+        ],
+        "min": [
+          2.0,
+          -12.4,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Wall_SouthEast",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_wall"
+    },
+    {
+      "collection": "10_STRUCTURE",
+      "exported": true,
+      "location_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          -2.0,
+          -12.0,
+          7.0
+        ],
+        "min": [
+          -10.0,
+          -12.4,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Wall_SouthWest",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "structural_wall"
+    },
+    {
+      "collection": "20_NAV_TABLE",
+      "exported": true,
+      "location_m": [
+        0.0,
+        0.0,
+        1.05
+      ],
+      "material": "MAT_Glass",
+      "measured_world_bounds_m": {
+        "max": [
+          3.0,
+          3.0,
+          1.1
+        ],
+        "min": [
+          -3.0,
+          -3.0,
+          1.0
+        ]
+      },
+      "name": "SM_ShipHub_NavTable_Display",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "navigation_table_display"
+    },
+    {
+      "collection": "20_NAV_TABLE",
+      "exported": true,
+      "location_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "material": "MAT_Interactable",
+      "measured_world_bounds_m": {
+        "max": [
+          4.0,
+          4.0,
+          1.0
+        ],
+        "min": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_NavTable_Sector_01",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "navigation_table_sector"
+    },
+    {
+      "collection": "20_NAV_TABLE",
+      "exported": true,
+      "location_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "material": "MAT_Interactable",
+      "measured_world_bounds_m": {
+        "max": [
+          0.0,
+          4.0,
+          1.0
+        ],
+        "min": [
+          -4.0,
+          0.0,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_NavTable_Sector_02",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "navigation_table_sector"
+    },
+    {
+      "collection": "20_NAV_TABLE",
+      "exported": true,
+      "location_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "material": "MAT_Interactable",
+      "measured_world_bounds_m": {
+        "max": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "min": [
+          -4.0,
+          -4.0,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_NavTable_Sector_03",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "navigation_table_sector"
+    },
+    {
+      "collection": "20_NAV_TABLE",
+      "exported": true,
+      "location_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "material": "MAT_Interactable",
+      "measured_world_bounds_m": {
+        "max": [
+          4.0,
+          0.0,
+          1.0
+        ],
+        "min": [
+          0.0,
+          -4.0,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_NavTable_Sector_04",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "navigation_table_sector"
+    },
+    {
+      "collection": "30_CRYOPODS",
+      "exported": true,
+      "location_m": [
+        -4.0,
+        9.8,
+        0.0
+      ],
+      "material": "MAT_Interactable",
+      "measured_world_bounds_m": {
+        "max": [
+          -3.2,
+          10.700959,
+          3.0
+        ],
+        "min": [
+          -4.8,
+          9.10096,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Cryopod_01",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "cryopod"
+    },
+    {
+      "collection": "30_CRYOPODS",
+      "exported": true,
+      "location_m": [
+        -2.0,
+        9.8,
+        0.0
+      ],
+      "material": "MAT_Interactable",
+      "measured_world_bounds_m": {
+        "max": [
+          -1.2,
+          10.700959,
+          3.0
+        ],
+        "min": [
+          -2.8,
+          9.10096,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Cryopod_02",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "cryopod"
+    },
+    {
+      "collection": "30_CRYOPODS",
+      "exported": true,
+      "location_m": [
+        0.0,
+        9.8,
+        0.0
+      ],
+      "material": "MAT_Interactable",
+      "measured_world_bounds_m": {
+        "max": [
+          0.8,
+          10.700959,
+          3.0
+        ],
+        "min": [
+          -0.8,
+          9.10096,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Cryopod_03",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "cryopod"
+    },
+    {
+      "collection": "30_CRYOPODS",
+      "exported": true,
+      "location_m": [
+        2.0,
+        9.8,
+        0.0
+      ],
+      "material": "MAT_Interactable",
+      "measured_world_bounds_m": {
+        "max": [
+          2.8,
+          10.700959,
+          3.0
+        ],
+        "min": [
+          1.2,
+          9.10096,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Cryopod_04",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "cryopod"
+    },
+    {
+      "collection": "30_CRYOPODS",
+      "exported": true,
+      "location_m": [
+        4.0,
+        9.8,
+        0.0
+      ],
+      "material": "MAT_Interactable",
+      "measured_world_bounds_m": {
+        "max": [
+          4.8,
+          10.700959,
+          3.0
+        ],
+        "min": [
+          3.2,
+          9.10096,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Cryopod_05",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "cryopod"
+    },
+    {
+      "collection": "30_CRYOPODS",
+      "exported": true,
+      "location_m": [
+        5.8,
+        10.6,
+        1.75
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          6.8,
+          11.200001,
+          3.5
+        ],
+        "min": [
+          4.8,
+          10.0,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_ExpansionInterface_East",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "expansion_interface"
+    },
+    {
+      "collection": "30_CRYOPODS",
+      "exported": true,
+      "location_m": [
+        -5.8,
+        10.6,
+        1.75
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          -4.8,
+          11.200001,
+          3.5
+        ],
+        "min": [
+          -6.8,
+          10.0,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_ExpansionInterface_West",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "expansion_interface"
+    },
+    {
+      "collection": "40_AIRLOCK",
+      "exported": true,
+      "location_m": [
+        0.0,
+        -12.0,
+        1.7
+      ],
+      "material": "MAT_Door",
+      "measured_world_bounds_m": {
+        "max": [
+          1.9,
+          -11.9,
+          3.4
+        ],
+        "min": [
+          -1.9,
+          -12.1,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Airlock_DoorPanel",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "airlock_door"
+    },
+    {
+      "collection": "40_AIRLOCK",
+      "exported": true,
+      "location_m": [
+        2.3,
+        -12.0,
+        2.15
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          2.6,
+          -11.4,
+          4.3
+        ],
+        "min": [
+          2.0,
+          -12.6,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Airlock_FrameEast",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "airlock_frame"
+    },
+    {
+      "collection": "40_AIRLOCK",
+      "exported": true,
+      "location_m": [
+        -2.3,
+        -12.0,
+        2.15
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          -2.0,
+          -11.4,
+          4.3
+        ],
+        "min": [
+          -2.6,
+          -12.6,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_Airlock_FrameWest",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "airlock_frame"
+    },
+    {
+      "collection": "40_AIRLOCK",
+      "exported": true,
+      "location_m": [
+        0.0,
+        -12.0,
+        3.9
+      ],
+      "material": "MAT_Structure",
+      "measured_world_bounds_m": {
+        "max": [
+          2.6,
+          -11.4,
+          4.3
+        ],
+        "min": [
+          -2.6,
+          -12.6,
+          3.5
+        ]
+      },
+      "name": "SM_ShipHub_Airlock_Header",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "airlock_frame"
+    },
+    {
+      "collection": "50_WEST_BAYS",
+      "exported": true,
+      "location_m": [
+        -13.2,
+        -4.0,
+        1.2
+      ],
+      "material": "MAT_Interactable",
+      "measured_world_bounds_m": {
+        "max": [
+          -12.599999,
+          0.0,
+          2.4
+        ],
+        "min": [
+          -13.8,
+          -8.0,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_West_PreparationBay",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "west_preparation_bay"
+    },
+    {
+      "collection": "50_WEST_BAYS",
+      "exported": true,
+      "location_m": [
+        -14.0,
+        6.0,
+        1.4
+      ],
+      "material": "MAT_Interactable",
+      "measured_world_bounds_m": {
+        "max": [
+          -13.2,
+          7.5,
+          2.8
+        ],
+        "min": [
+          -14.8,
+          4.5,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_West_RepairBay",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "west_repair_bay"
+    },
+    {
+      "collection": "60_EAST_BAYS",
+      "exported": true,
+      "location_m": [
+        14.0,
+        6.0,
+        3.0
+      ],
+      "material": "MAT_NonWalkable",
+      "measured_world_bounds_m": {
+        "max": [
+          15.0,
+          7.0,
+          5.0
+        ],
+        "min": [
+          13.0,
+          5.0,
+          1.0
+        ]
+      },
+      "name": "SM_ShipHub_East_JumpCoreBay",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "east_jump_core_bay"
+    },
+    {
+      "collection": "60_EAST_BAYS",
+      "exported": true,
+      "location_m": [
+        13.2,
+        -6.0,
+        1.2
+      ],
+      "material": "MAT_Interactable",
+      "measured_world_bounds_m": {
+        "max": [
+          13.8,
+          -4.0,
+          2.4
+        ],
+        "min": [
+          12.599999,
+          -8.0,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_East_MedicalBay",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "east_medical_bay"
+    },
+    {
+      "collection": "60_EAST_BAYS",
+      "exported": true,
+      "location_m": [
+        13.2,
+        -3.0,
+        1.2
+      ],
+      "material": "MAT_Interactable",
+      "measured_world_bounds_m": {
+        "max": [
+          13.8,
+          -2.0,
+          2.4
+        ],
+        "min": [
+          12.599999,
+          -4.0,
+          0.0
+        ]
+      },
+      "name": "SM_ShipHub_East_RoleBay",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "east_role_bay"
+    },
+    {
+      "collection": "70_CONSTRUCT_DOCKS",
+      "exported": true,
+      "location_m": [
+        -5.3,
+        -5.3,
+        0.0
+      ],
+      "material": "MAT_Interactable",
+      "measured_world_bounds_m": {
+        "max": [
+          -4.8,
+          -4.8,
+          0.0
+        ],
+        "min": [
+          -5.8,
+          -5.8,
+          -0.08
+        ]
+      },
+      "name": "SM_ShipHub_ConstructDock_01",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "construct_dock"
+    },
+    {
+      "collection": "70_CONSTRUCT_DOCKS",
+      "exported": true,
+      "location_m": [
+        5.3,
+        -5.3,
+        0.0
+      ],
+      "material": "MAT_Interactable",
+      "measured_world_bounds_m": {
+        "max": [
+          5.8,
+          -4.8,
+          0.0
+        ],
+        "min": [
+          4.8,
+          -5.8,
+          -0.08
+        ]
+      },
+      "name": "SM_ShipHub_ConstructDock_02",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "construct_dock"
+    },
+    {
+      "collection": "70_CONSTRUCT_DOCKS",
+      "exported": true,
+      "location_m": [
+        -5.3,
+        5.3,
+        0.0
+      ],
+      "material": "MAT_Interactable",
+      "measured_world_bounds_m": {
+        "max": [
+          -4.8,
+          5.8,
+          0.0
+        ],
+        "min": [
+          -5.8,
+          4.8,
+          -0.08
+        ]
+      },
+      "name": "SM_ShipHub_ConstructDock_03",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "construct_dock"
+    },
+    {
+      "collection": "70_CONSTRUCT_DOCKS",
+      "exported": true,
+      "location_m": [
+        5.3,
+        5.3,
+        0.0
+      ],
+      "material": "MAT_Interactable",
+      "measured_world_bounds_m": {
+        "max": [
+          5.8,
+          5.8,
+          0.0
+        ],
+        "min": [
+          4.8,
+          4.8,
+          -0.08
+        ]
+      },
+      "name": "SM_ShipHub_ConstructDock_04",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "construct_dock"
+    },
+    {
+      "collection": "80_CEILING",
+      "exported": true,
+      "location_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "material": "MAT_NonWalkable",
+      "measured_world_bounds_m": {
+        "max": [
+          8.0,
+          8.0,
+          8.0
+        ],
+        "min": [
+          -8.0,
+          -8.0,
+          6.2
+        ]
+      },
+      "name": "SM_ShipHub_CeilingServiceRing",
+      "rotation_degrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "semantic_type": "ceiling_service_ring"
+    }
+  ],
+  "room": {
+    "clear_bounds_m": {
+      "max": [
+        14.0,
+        12.0,
+        7.0
+      ],
+      "min": [
+        -14.0,
+        -12.0,
+        0.0
+      ]
+    },
+    "clear_dimensions_m": [
+      28.0,
+      24.0,
+      7.0
+    ],
+    "nominal_height_m": 8.0
+  },
+  "schema": "projectrift.shiphub.white-model-manifest.v1",
+  "sheet_ids": [
+    "A01_FloorPlan",
+    "A02_ReflectedCeilingPlan",
+    "A03_NorthElevation",
+    "A04_SouthElevation",
+    "A05_WestElevation",
+    "A06_EastElevation",
+    "A07_LongitudinalSection",
+    "A08_TransverseSection",
+    "A09_ExplodedModulePlan",
+    "A10_PerspectiveSheet",
+    "D01_Cryopod",
+    "D02_NavigationTable",
+    "D03_MainAirlock",
+    "D04_ConstructDock",
+    "D05_WallBayInterface"
+  ],
+  "source_brief": {
+    "relative_path": "SourceArt/ProjectRift/ShipHub/Briefs/ShipHubCompleteDesign_v1.json",
+    "sha256": "fd21285d447e3410d0f0f19ec966b86d93d947d898a815d6a0c3c895e9b6303d"
+  },
+  "units": {
+    "blender": "m",
+    "unreal_centimeters_per_meter": 100
+  }
+}

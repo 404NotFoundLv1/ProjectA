@@ -69,6 +69,41 @@ function Invoke-ProjectRiftContractValidation {
     }
 }
 
+function Invoke-ProjectRiftBuildWhiteModel {
+    $blender = Resolve-ProjectRiftValidatedBlender -StageName 'BuildWhiteModel'
+    $helperScript = Join-Path $projectRoot 'Scripts\ProjectRift\ArtPipeline\shiphub\shiphub_blender.py'
+    $buildScript = Join-Path $projectRoot 'Scripts\ProjectRift\ArtPipeline\shiphub\build_shiphub_design.py'
+    $briefPath = Join-Path $projectRoot 'SourceArt\ProjectRift\ShipHub\Briefs\ShipHubCompleteDesign_v1.json'
+    $outputRoot = $generatedOutputRoot
+
+    foreach ($requiredScript in @($helperScript, $buildScript)) {
+        if (-not (Test-Path -LiteralPath $requiredScript -PathType Leaf)) {
+            throw "BuildWhiteModel is missing its required script: $requiredScript"
+        }
+    }
+    if (-not (Test-Path -LiteralPath $briefPath -PathType Leaf)) {
+        throw "BuildWhiteModel is missing its design brief: $briefPath"
+    }
+
+    $outputPaths = @(
+        (Join-Path $outputRoot 'Blender\SM_ShipHub_Complete_White_v1.blend'),
+        (Join-Path $outputRoot 'Exports\SM_ShipHub_Complete_White_v1.fbx'),
+        (Join-Path $outputRoot 'Exports\SM_ShipHub_Complete_White_v1.glb'),
+        (Join-Path $outputRoot 'Reports\layout-manifest.json')
+    )
+    foreach ($outputPath in $outputPaths) {
+        if (-not (Test-ProjectRiftContainedArtPath -Candidate $outputPath -AllowedRoot $outputRoot)) {
+            throw "BuildWhiteModel output path is outside the approved root: $outputPath"
+        }
+    }
+
+    & $blender --background --factory-startup --python $buildScript -- --project-root $projectRoot --brief $briefPath --output-root $outputRoot
+    $buildExitCode = $LASTEXITCODE
+    if ($buildExitCode -ne 0) {
+        throw "BuildWhiteModel failed with exit code $buildExitCode."
+    }
+}
+
 function Invoke-ProjectRiftDeferredStage {
     param(
         [Parameter(Mandatory)][string]$DeferredStage,
@@ -117,7 +152,7 @@ function Invoke-ProjectRiftRecursiveStage {
 switch ($Stage) {
     'Preflight' { Invoke-ProjectRiftPreflight }
     'ValidateContract' { Invoke-ProjectRiftContractValidation }
-    'BuildWhiteModel' { Invoke-ProjectRiftDeferredStage -DeferredStage 'BuildWhiteModel' -RequireBlender }
+    'BuildWhiteModel' { Invoke-ProjectRiftBuildWhiteModel }
     'RenderDrawings' { Invoke-ProjectRiftDeferredStage -DeferredStage 'RenderDrawings' -RequireBlender }
     'Publish' { Invoke-ProjectRiftDeferredStage -DeferredStage 'Publish' -RequirePython }
     'Validate' { Invoke-ProjectRiftDeferredStage -DeferredStage 'Validate' -RequireBlender -RequirePython }
