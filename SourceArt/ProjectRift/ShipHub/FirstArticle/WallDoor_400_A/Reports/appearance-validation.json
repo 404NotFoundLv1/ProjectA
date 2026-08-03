@@ -1,0 +1,164 @@
+{
+  "Schema": "projectrift.shiphub.wall-door-appearance-validation.v1",
+  "AssetId": "SM_ShipHub_WallDoor_400_A",
+  "Passed": true,
+  "BlenderVersion": "5.2.0 LTS",
+  "MeasuredBoundsM": {
+    "min": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "max": [
+      4.0,
+      0.3,
+      4.0
+    ]
+  },
+  "BoundsCm": {
+    "Width": 400,
+    "Depth": 30,
+    "Height": 400
+  },
+  "DoorOpeningCm": {
+    "Width": 240,
+    "Height": 280,
+    "MinX": 80,
+    "MaxX": 320
+  },
+  "PivotAtBottomLeftBack": true,
+  "ApprovalStatus": "Approved",
+  "ApprovalDate": "2026-08-03",
+  "ApprovalEvidence": [
+    "Concept/SM_ShipHub_WallDoor_400_A_AppearanceLock.png",
+    "Reports/appearance-validation.json"
+  ],
+  "Method": "BlenderAuthoritativeStyleReconstruction",
+  "ImageGenRole": "StyleReferenceOnly",
+  "ImageGenStyleReference": "Concept/References/BaseStyleReference.png",
+  "CandidateCamera": "CAM_Perspective",
+  "CandidateCameraDriftPixels": 0,
+  "Collections": [
+    "00_REFERENCE",
+    "10_STRUCTURE",
+    "20_DETAIL",
+    "30_STATE_OVERLAY",
+    "40_COLLISION",
+    "90_EXPORT"
+  ],
+  "AuthorityViews": [
+    "Concept/Orthographic/Front.png",
+    "Concept/Orthographic/Back.png",
+    "Concept/Orthographic/Left.png",
+    "Concept/Orthographic/Right.png",
+    "Concept/Orthographic/Perspective.png"
+  ],
+  "Candidates": [
+    "Concept/Candidates/Base.png",
+    "Concept/Candidates/Damaged.png",
+    "Concept/Candidates/Patched.png",
+    "Concept/Candidates/Online.png"
+  ],
+  "GenerationLedgerSha256": "f50b872f0e1b14ece85697865012fc749d8a1a047d7928002c285f4a5b970e59",
+  "CandidateMetadata": [
+    {
+      "State": "Base",
+      "Path": "Concept/Candidates/Base.png",
+      "Width": 2048,
+      "Height": 2048,
+      "Sha256": "142fa79afe6c7266a29c30265430d1a7e2374d0059335055df5096c2af7dfb14",
+      "Camera": "CAM_Perspective",
+      "CameraTransformLensSha256": "da499a7c667ba5bf3493ebd8017cbb7759bdc894ce6f4139f7446bf10c82135f",
+      "CameraDriftPixels": 0,
+      "Provenance": "BlenderProceduralMaterialAndAppearanceOnlyOverlay",
+      "Mode": "RGBA"
+    },
+    {
+      "State": "Damaged",
+      "Path": "Concept/Candidates/Damaged.png",
+      "Width": 2048,
+      "Height": 2048,
+      "Sha256": "947c6c098b38633ccddd44a3b759412e253822c8da5aa75baf463e8e65495cff",
+      "Camera": "CAM_Perspective",
+      "CameraTransformLensSha256": "da499a7c667ba5bf3493ebd8017cbb7759bdc894ce6f4139f7446bf10c82135f",
+      "CameraDriftPixels": 0,
+      "Provenance": "BlenderProceduralMaterialAndAppearanceOnlyOverlay",
+      "Mode": "RGBA"
+    },
+    {
+      "State": "Patched",
+      "Path": "Concept/Candidates/Patched.png",
+      "Width": 2048,
+      "Height": 2048,
+      "Sha256": "d4d2b5aefe32da9962a524fba2c61235e7a922972092ec82ec899687eb36ada4",
+      "Camera": "CAM_Perspective",
+      "CameraTransformLensSha256": "da499a7c667ba5bf3493ebd8017cbb7759bdc894ce6f4139f7446bf10c82135f",
+      "CameraDriftPixels": 0,
+      "Provenance": "BlenderProceduralMaterialAndAppearanceOnlyOverlay",
+      "Mode": "RGBA"
+    },
+    {
+      "State": "Online",
+      "Path": "Concept/Candidates/Online.png",
+      "Width": 2048,
+      "Height": 2048,
+      "Sha256": "71c5ec978363159716f3d6259569d743cf06a5f4b1d31b7a44bed3f90e0c2f2c",
+      "Camera": "CAM_Perspective",
+      "CameraTransformLensSha256": "da499a7c667ba5bf3493ebd8017cbb7759bdc894ce6f4139f7446bf10c82135f",
+      "CameraDriftPixels": 0,
+      "Provenance": "BlenderProceduralMaterialAndAppearanceOnlyOverlay",
+      "Mode": "RGBA"
+    }
+  ],
+  "RenderProvenance": {
+    "Tool": "Blender 5.2 LTS",
+    "Engine": "Eevee Next",
+    "GeometryAuthority": "SM_ShipHub_WallDoor_400_A",
+    "StateOverlayCollection": "30_STATE_OVERLAY",
+    "AppearanceOnly": true
+  },
+  "ValidatedAt": "2026-08-03T16:03:13.130406+08:00",
+  "AuthorityMetadata": [
+    {
+      "Path": "E:/MyWork/ProjectA/SourceArt/ProjectRift/ShipHub/FirstArticle/WallDoor_400_A/Concept/Orthographic/Front.png",
+      "Width": 2048,
+      "Height": 2048,
+      "Mode": "RGBA",
+      "Sha256": "0fa3bd046a4372242d889a38c6656c43ee05a1dd520e9bac6f9eb5bc391cf868"
+    },
+    {
+      "Path": "E:/MyWork/ProjectA/SourceArt/ProjectRift/ShipHub/FirstArticle/WallDoor_400_A/Concept/Orthographic/Back.png",
+      "Width": 2048,
+      "Height": 2048,
+      "Mode": "RGBA",
+      "Sha256": "122ffb87e1cd49fd0c630ac279517c6d455287583cd1e852a12189b11d06cf98"
+    },
+    {
+      "Path": "E:/MyWork/ProjectA/SourceArt/ProjectRift/ShipHub/FirstArticle/WallDoor_400_A/Concept/Orthographic/Left.png",
+      "Width": 2048,
+      "Height": 2048,
+      "Mode": "RGBA",
+      "Sha256": "dd6b908e3640cc9d1bda8293009709b4f16facadbcace1ea65e5d80993c8ca46"
+    },
+    {
+      "Path": "E:/MyWork/ProjectA/SourceArt/ProjectRift/ShipHub/FirstArticle/WallDoor_400_A/Concept/Orthographic/Right.png",
+      "Width": 2048,
+      "Height": 2048,
+      "Mode": "RGBA",
+      "Sha256": "b0096f115ffa2252ec059b1bf68a5063b95d88145f2ec5f073b4cbe56d1dfe49"
+    },
+    {
+      "Path": "E:/MyWork/ProjectA/SourceArt/ProjectRift/ShipHub/FirstArticle/WallDoor_400_A/Concept/Orthographic/Perspective.png",
+      "Width": 2048,
+      "Height": 2048,
+      "Mode": "RGBA",
+      "Sha256": "3eea88318ce7635db8d1af6061f7699de37ecc2ea595b2389a9d07873ca5d0cd"
+    }
+  ],
+  "AppearanceSheet": {
+    "Path": "Concept/SM_ShipHub_WallDoor_400_A_AppearanceLock.png",
+    "Width": 4940,
+    "Height": 2246,
+    "Sha256": "938f6bcf053221fa7a1bae2904bcd5254aff3cb9f58dda1c8f79193bb7b2e4dc"
+  }
+}

@@ -1,7 +1,14 @@
 {
   "Schema": "projectrift.shiphub.wall-door-approval.v1",
   "AssetId": "SM_ShipHub_WallDoor_400_A",
-  "Appearance": {"Status": "Pending", "Evidence": []},
+  "Appearance": {
+    "Status": "Approved",
+    "Date": "2026-08-03",
+    "Evidence": [
+      "Concept/SM_ShipHub_WallDoor_400_A_AppearanceLock.png",
+      "Reports/appearance-validation.json"
+    ]
+  },
   "DCC": {"Status": "Pending", "Evidence": []},
   "UE": {"Status": "Pending", "Evidence": []}
 }

@@ -1,0 +1,540 @@
+{
+  "Schema": "projectrift.shiphub.wall-door-geometry-validation.v1",
+  "AssetId": "SM_ShipHub_WallDoor_400_A",
+  "Passed": true,
+  "ValidationMethod": "IndependentSavedBlendReopen",
+  "SavedBlendReopened": true,
+  "ValidatorScriptSha256": "012c7f0c9b1ffd51a7bd7c5b5a7ca46c2fb7f6baf625ceae8c60e76d89d5025b",
+  "InspectedBlendSha256": "bf54264e3e74b4100bb5f2b71ccffd7f254b1fe246a6c83f7ba78aa9f69eec30",
+  "BlenderVersion": "5.2.0 LTS",
+  "BoundsCm": [
+    400.0,
+    30.0,
+    400.0
+  ],
+  "MeasuredBoundsM": {
+    "min": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "max": [
+      4.0,
+      0.3,
+      4.0
+    ]
+  },
+  "DoorOpeningCm": [
+    240.0,
+    280.0
+  ],
+  "DoorOpeningRangeCm": {
+    "X": [
+      80.0,
+      320.0
+    ],
+    "Z": [
+      0.0,
+      280.0
+    ]
+  },
+  "PivotCm": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "AppliedScale": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "MaterialSlotCount": 2,
+  "UnexpectedNonManifoldEdgeCount": 0,
+  "DuplicateFaceCount": 0,
+  "OverlayObjects": [
+    "SM_ShipHub_WallDoor_400_A_Overlay_Damaged",
+    "SM_ShipHub_WallDoor_400_A_Overlay_Patched"
+  ],
+  "OnlineSilhouetteOverlayCount": 0,
+  "CollisionPieces": [
+    {
+      "Name": "UCX_SM_ShipHub_WallDoor_400_A_LeftJamb",
+      "Intent": "LeftJamb",
+      "BoundsCm": [
+        0.0,
+        0.0,
+        0.0,
+        80.0,
+        30.0,
+        400.0
+      ],
+      "BlocksDoorOpening": false
+    },
+    {
+      "Name": "UCX_SM_ShipHub_WallDoor_400_A_RightJamb",
+      "Intent": "RightJamb",
+      "BoundsCm": [
+        320.0,
+        0.0,
+        0.0,
+        400.0,
+        30.0,
+        400.0
+      ],
+      "BlocksDoorOpening": false
+    },
+    {
+      "Name": "UCX_SM_ShipHub_WallDoor_400_A_Lintel",
+      "Intent": "Lintel",
+      "BoundsCm": [
+        80.0,
+        0.0,
+        280.0,
+        320.0,
+        30.0,
+        400.0
+      ],
+      "BlocksDoorOpening": false
+    }
+  ],
+  "ExportObjects": [
+    {
+      "Name": "SM_ShipHub_WallDoor_400_A",
+      "Location": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "RotationDegrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "Scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "UVLayers": [
+        "UV0",
+        "UV1"
+      ],
+      "ModifiersApplied": true,
+      "Triangulated": true,
+      "PolygonCount": 3216,
+      "TriangleCount": 3216,
+      "BoundsCm": [
+        0.0,
+        0.0,
+        0.0,
+        400.0,
+        30.0,
+        400.0
+      ],
+      "Topology": {
+        "UnexpectedNonManifoldEdgeCount": 0,
+        "DuplicateFaceCount": 0,
+        "DuplicateVertexCount": 0,
+        "SignedVolumeM3": 2.527864337
+      }
+    },
+    {
+      "Name": "SM_ShipHub_WallDoor_400_A_RemovableCover",
+      "Location": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "RotationDegrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "Scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "UVLayers": [
+        "UV0",
+        "UV1"
+      ],
+      "ModifiersApplied": true,
+      "Triangulated": true,
+      "PolygonCount": 188,
+      "TriangleCount": 188,
+      "BoundsCm": [
+        47.0,
+        0.3,
+        218.0,
+        69.0,
+        3.5,
+        262.0
+      ],
+      "Topology": {
+        "UnexpectedNonManifoldEdgeCount": 0,
+        "DuplicateFaceCount": 0,
+        "DuplicateVertexCount": 0,
+        "SignedVolumeM3": 0.003000894
+      }
+    },
+    {
+      "Name": "SM_ShipHub_WallDoor_400_A_Overlay_Damaged",
+      "Location": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "RotationDegrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "Scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "UVLayers": [
+        "UV0",
+        "UV1"
+      ],
+      "ModifiersApplied": true,
+      "Triangulated": true,
+      "PolygonCount": 476,
+      "TriangleCount": 476,
+      "BoundsCm": [
+        45.0,
+        0.0,
+        216.0,
+        390.0,
+        2.0,
+        296.0
+      ],
+      "Topology": {
+        "UnexpectedNonManifoldEdgeCount": 0,
+        "DuplicateFaceCount": 0,
+        "DuplicateVertexCount": 0,
+        "SignedVolumeM3": 0.001044168
+      }
+    },
+    {
+      "Name": "SM_ShipHub_WallDoor_400_A_Overlay_Patched",
+      "Location": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "RotationDegrees": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "Scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "UVLayers": [
+        "UV0",
+        "UV1"
+      ],
+      "ModifiersApplied": true,
+      "Triangulated": true,
+      "PolygonCount": 468,
+      "TriangleCount": 468,
+      "BoundsCm": [
+        10.0,
+        0.2,
+        112.0,
+        390.0,
+        2.0,
+        245.0
+      ],
+      "Topology": {
+        "UnexpectedNonManifoldEdgeCount": 0,
+        "DuplicateFaceCount": 0,
+        "DuplicateVertexCount": 0,
+        "SignedVolumeM3": 0.002380303
+      }
+    }
+  ],
+  "PrimarySilhouetteBevelCm": 5.0,
+  "SecondaryPanelBevelCm": 1.2,
+  "FunctionalRecessDepthCm": 4.0,
+  "FunctionalRecessEvidence": {
+    "Method": "SavedMeshCavityBackplane",
+    "RegionCm": {
+      "X": [
+        110,
+        290
+      ],
+      "Z": [
+        329,
+        341
+      ]
+    },
+    "FrontSurfaceYCm": 4.0,
+    "BackSurfaceYCm": 8.0,
+    "MeasuredDepthCm": 4.0,
+    "SampleVertexCount": 64,
+    "FrontReferenceVertexCount": 4,
+    "CavityVertexCount": 60,
+    "BackplanePolygonCount": 2
+  },
+  "OuterSnapFacesPlanar": true,
+  "OuterSnapFaceEvidence": {
+    "Planes": {
+      "LeftX": {
+        "PlaneM": 0.0,
+        "VertexCount": 4,
+        "MaximumDeviationM": 0.0,
+        "Planar": true
+      },
+      "RightX": {
+        "PlaneM": 4.0,
+        "VertexCount": 4,
+        "MaximumDeviationM": 0.0,
+        "Planar": true
+      },
+      "TopZ": {
+        "PlaneM": 4.0,
+        "VertexCount": 4,
+        "MaximumDeviationM": 0.0,
+        "Planar": true
+      }
+    },
+    "AllPlanar": true
+  },
+  "OverlayClearance": {
+    "Damaged": {
+      "ComponentBoundsCm": [
+        [
+          45.0,
+          0.0,
+          216.0,
+          71.0,
+          1.8,
+          264.0
+        ],
+        [
+          373.0,
+          0.1,
+          289.0,
+          390.0,
+          2.0,
+          296.0
+        ]
+      ],
+      "CrossesDoorOpening": false,
+      "CrossesOuterSnapPlanes": false
+    },
+    "Patched": {
+      "ComponentBoundsCm": [
+        [
+          10.0,
+          0.2,
+          112.0,
+          27.0,
+          2.0,
+          145.0
+        ],
+        [
+          348.0,
+          0.2,
+          186.0,
+          355.0,
+          2.0,
+          224.0
+        ],
+        [
+          373.0,
+          0.2,
+          212.0,
+          390.0,
+          2.0,
+          245.0
+        ]
+      ],
+      "CrossesDoorOpening": false,
+      "CrossesOuterSnapPlanes": false
+    }
+  },
+  "StateCompositions": [
+    {
+      "State": "Base",
+      "VisibleObjects": [
+        "SM_ShipHub_WallDoor_400_A",
+        "SM_ShipHub_WallDoor_400_A_RemovableCover"
+      ],
+      "VisibleBaseBodyCount": 1,
+      "VisibleCoverObjectCount": 1,
+      "CoverVisible": true,
+      "UsesClonedBase": false
+    },
+    {
+      "State": "Damaged",
+      "VisibleObjects": [
+        "SM_ShipHub_WallDoor_400_A",
+        "SM_ShipHub_WallDoor_400_A_Overlay_Damaged"
+      ],
+      "VisibleBaseBodyCount": 1,
+      "VisibleCoverObjectCount": 0,
+      "CoverVisible": false,
+      "UsesClonedBase": false
+    },
+    {
+      "State": "Patched",
+      "VisibleObjects": [
+        "SM_ShipHub_WallDoor_400_A",
+        "SM_ShipHub_WallDoor_400_A_RemovableCover",
+        "SM_ShipHub_WallDoor_400_A_Overlay_Patched"
+      ],
+      "VisibleBaseBodyCount": 1,
+      "VisibleCoverObjectCount": 1,
+      "CoverVisible": true,
+      "UsesClonedBase": false
+    },
+    {
+      "State": "Online",
+      "VisibleObjects": [
+        "SM_ShipHub_WallDoor_400_A",
+        "SM_ShipHub_WallDoor_400_A_RemovableCover"
+      ],
+      "VisibleBaseBodyCount": 1,
+      "VisibleCoverObjectCount": 1,
+      "CoverVisible": true,
+      "UsesClonedBase": false
+    }
+  ],
+  "HasDoorLeaf": false,
+  "PatchedRepairPlateCount": 2,
+  "PatchedCableGuideCount": 1,
+  "DamagedOverlayHasAbsentCoverRim": true,
+  "Collections": [
+    "00_REFERENCE",
+    "10_STRUCTURE",
+    "20_DETAIL",
+    "30_STATE_OVERLAY",
+    "40_COLLISION",
+    "90_EXPORT"
+  ],
+  "SourceModifierStacks": {
+    "SRC_Armor_LeftLower": [
+      "MIRROR",
+      "BOOLEAN",
+      "BOOLEAN",
+      "BEVEL",
+      "WEIGHTED_NORMAL"
+    ],
+    "SRC_Armor_LeftUpper": [
+      "MIRROR",
+      "BOOLEAN",
+      "BOOLEAN",
+      "BEVEL",
+      "WEIGHTED_NORMAL"
+    ],
+    "SRC_Armor_LintelLeft": [
+      "BOOLEAN",
+      "BEVEL",
+      "WEIGHTED_NORMAL"
+    ],
+    "SRC_Armor_LintelRight": [
+      "BOOLEAN",
+      "BEVEL",
+      "WEIGHTED_NORMAL"
+    ],
+    "SRC_AsymmetricRemovableCover": [
+      "BEVEL",
+      "WEIGHTED_NORMAL"
+    ],
+    "SRC_Damaged_AbsentCoverRim": [
+      "BOOLEAN",
+      "BEVEL",
+      "WEIGHTED_NORMAL"
+    ],
+    "SRC_Damaged_LocalizedEdgeInsert": [
+      "BEVEL",
+      "WEIGHTED_NORMAL"
+    ],
+    "SRC_Patched_ProtectedCableGuide": [
+      "BEVEL",
+      "WEIGHTED_NORMAL"
+    ],
+    "SRC_Patched_RepairPlate_Array": [
+      "ARRAY",
+      "BEVEL",
+      "WEIGHTED_NORMAL"
+    ],
+    "SRC_Primary_UFrame": [
+      "BOOLEAN",
+      "BOOLEAN",
+      "BOOLEAN",
+      "BEVEL",
+      "WEIGHTED_NORMAL"
+    ]
+  },
+  "AppliedTopologyEvidence": {
+    "EditableModifierTypes": [
+      "ARRAY",
+      "BEVEL",
+      "BOOLEAN",
+      "MIRROR",
+      "WEIGHTED_NORMAL"
+    ],
+    "ExportModifiersApplied": true,
+    "FinalExportDuplicatesOnlyTriangulated": true,
+    "NormalsRecalculatedOutward": true,
+    "AccidentalDoublesRemoved": true
+  },
+  "ReviewRenders": [
+    {
+      "State": "Base",
+      "Path": "Reports/ProductionReview/Base.png",
+      "Width": 1024,
+      "Height": 1024,
+      "Camera": "CAM_Production_Perspective",
+      "CoverVisible": true,
+      "Sha256": "95a214ce21acd7d84961cc24baaaf9b1a370d7269039db7e7a58ae8935c205a9"
+    },
+    {
+      "State": "Damaged",
+      "Path": "Reports/ProductionReview/Damaged.png",
+      "Width": 1024,
+      "Height": 1024,
+      "Camera": "CAM_Production_Perspective",
+      "CoverVisible": false,
+      "Sha256": "e04ac21488ffdf4d23a1b1fb664c7de9c770736b6eac106bdfb2e8b987d187a1"
+    },
+    {
+      "State": "Patched",
+      "Path": "Reports/ProductionReview/Patched.png",
+      "Width": 1024,
+      "Height": 1024,
+      "Camera": "CAM_Production_Perspective",
+      "CoverVisible": true,
+      "Sha256": "fd6d4daeb8907fa50fd863c7073ce6409ae48c29fe95d9d0124f6b77423dacb1"
+    }
+  ],
+  "ApprovalDependency": {
+    "Status": "Approved",
+    "Date": "2026-08-03",
+    "Evidence": [
+      "Concept/SM_ShipHub_WallDoor_400_A_AppearanceLock.png",
+      "Reports/appearance-validation.json"
+    ]
+  },
+  "SourceSha256": {
+    "AppearanceBlend": "fda6c2eb0b993e7a76b6a55f845a87a7a56ac2aa173cc8000b89324003bd0b06",
+    "AppearanceReport": "51f6579260749a511805a0b188afdd79b9ed85bebf817c5c72102c767a8dbc13",
+    "AppearanceSheet": "938f6bcf053221fa7a1bae2904bcd5254aff3cb9f58dda1c8f79193bb7b2e4dc",
+    "Contract": "52e4ce986f12827716a43bd56bce9e573539f990cdce03dab9a862173a6135da",
+    "BuilderScript": "54b9c02ccb3f40906748c1518b773f8d5f8303d0f5e07cf96f2aabf3af8b9b5c",
+    "ValidatorScript": "012c7f0c9b1ffd51a7bd7c5b5a7ca46c2fb7f6baf625ceae8c60e76d89d5025b"
+  },
+  "OutputSha256": {
+    "ProductionBlend": "bf54264e3e74b4100bb5f2b71ccffd7f254b1fe246a6c83f7ba78aa9f69eec30"
+  },
+  "ValidationIssues": [],
+  "ValidatedAt": "2026-08-03T16:03:30.322802+08:00"
+}

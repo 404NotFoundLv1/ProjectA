@@ -19,6 +19,10 @@ $contractPath = Join-Path $briefsRoot 'SM_ShipHub_WallDoor_400_A.asset.json'
 $approvalPath = Join-Path $briefsRoot 'SM_ShipHub_WallDoor_400_A.approval.json'
 $ledgerPath = Join-Path $briefsRoot 'SM_ShipHub_WallDoor_400_A.generation-ledger.json'
 $contractScript = Join-Path $PSScriptRoot 'shiphub\wall_door_contract.py'
+$appearanceBuilder = Join-Path $PSScriptRoot 'shiphub\build_wall_door_first_article.py'
+$productionValidator = Join-Path $PSScriptRoot 'shiphub\validate_wall_door_production.py'
+$productionBlend = Join-Path $firstArticleRoot 'Blender\SM_ShipHub_WallDoor_400_A.blend'
+$geometryReport = Join-Path $firstArticleRoot 'Reports\geometry-validation.json'
 $referencePaths = @(
     (Join-Path $projectRoot 'SourceArt\ProjectRift\ShipHub\CompleteDesign\Blender\SM_ShipHub_Complete_White_v1.blend'),
     (Join-Path $projectRoot 'SourceArt\ProjectRift\ShipHub\CompleteDesign\Drawings\FinalPNG\D05_WallBayInterface.png')
@@ -65,7 +69,7 @@ function Resolve-ProjectRiftWallDoorPython {
 }
 
 function Test-ProjectRiftWallDoorInputs {
-    foreach ($sourcePath in @($contractPath, $approvalPath, $ledgerPath, $contractScript) + $referencePaths) {
+    foreach ($sourcePath in @($contractPath, $approvalPath, $ledgerPath, $contractScript, $appearanceBuilder, $productionValidator) + $referencePaths) {
         Assert-ProjectRiftContainedPath -Path $sourcePath -AllowedRoot $projectRoot -Label 'Wall-door source path'
         if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
             throw "Required wall-door source is missing: $sourcePath"
@@ -73,6 +77,33 @@ function Test-ProjectRiftWallDoorInputs {
     }
     Assert-ProjectRiftContainedPath -Path $automationRoot -AllowedRoot $projectRoot -Label 'Wall-door automation output root'
     Assert-ProjectRiftContainedPath -Path $previewPath -AllowedRoot $automationRoot -Label 'Wall-door contract preview'
+}
+
+function Invoke-ProjectRiftWallDoorAppearanceBuild {
+    Test-ProjectRiftWallDoorInputs
+    $blender = Resolve-ProjectRiftWallDoorBlender
+    & $blender --background --factory-startup --python $appearanceBuilder -- --contract $contractPath --project-root $projectRoot --output-root $firstArticleRoot
+    if ($LASTEXITCODE -ne 0) {
+        throw "BuildAppearance stage failed with Blender exit code $LASTEXITCODE."
+    }
+    $python = Resolve-ProjectRiftWallDoorPython
+    & $python $appearanceBuilder --finalize --contract $contractPath --project-root $projectRoot --output-root $firstArticleRoot
+    if ($LASTEXITCODE -ne 0) {
+        throw "BuildAppearance finalization failed with Python exit code $LASTEXITCODE."
+    }
+}
+
+function Invoke-ProjectRiftWallDoorProductionBuild {
+    Test-ProjectRiftWallDoorInputs
+    $blender = Resolve-ProjectRiftWallDoorBlender
+    & $blender --background --factory-startup --python $appearanceBuilder -- --production --contract $contractPath --project-root $projectRoot --output-root $firstArticleRoot
+    if ($LASTEXITCODE -ne 0) {
+        throw "BuildProduction stage failed with Blender exit code $LASTEXITCODE."
+    }
+    & $blender --background --factory-startup --python $productionValidator -- --project-root $projectRoot --output-root $firstArticleRoot --blend $productionBlend --report $geometryReport
+    if ($LASTEXITCODE -ne 0) {
+        throw "BuildProduction independent saved-blend validation failed with Blender exit code $LASTEXITCODE."
+    }
 }
 
 function Invoke-ProjectRiftWallDoorPreflight {
@@ -113,14 +144,16 @@ function Invoke-ProjectRiftUnavailableWallDoorStage {
 switch ($Stage) {
     'Preflight' { Invoke-ProjectRiftWallDoorPreflight }
     'ValidateContract' { Invoke-ProjectRiftWallDoorContractValidation }
-    'BuildAppearance' { Invoke-ProjectRiftUnavailableWallDoorStage 'BuildAppearance is unavailable: Task 10 (Appearance) has not run.' }
-    'BuildProduction' { Invoke-ProjectRiftUnavailableWallDoorStage 'BuildProduction is unavailable: Task 11 (Production) has not run.' }
+    'BuildAppearance' { Invoke-ProjectRiftWallDoorAppearanceBuild }
+    'BuildProduction' { Invoke-ProjectRiftWallDoorProductionBuild }
     'BakeTextures' { Invoke-ProjectRiftUnavailableWallDoorStage 'BakeTextures is unavailable: Task 12 (Texture Bake) has not run.' }
     'Export' { Invoke-ProjectRiftUnavailableWallDoorStage 'Export is unavailable: Task 13 (Export) has not run.' }
     'ValidatePackage' { Invoke-ProjectRiftUnavailableWallDoorStage 'ValidatePackage is unavailable: Task 14 (Package Validation) has not run.' }
     'AllDCC' {
         Invoke-ProjectRiftWallDoorPreflight
         Invoke-ProjectRiftWallDoorContractValidation
-        Invoke-ProjectRiftUnavailableWallDoorStage 'BuildAppearance is unavailable: Task 10 (Appearance) has not run.'
+        Invoke-ProjectRiftWallDoorAppearanceBuild
+        Invoke-ProjectRiftWallDoorProductionBuild
+        Invoke-ProjectRiftUnavailableWallDoorStage 'BakeTextures is unavailable: Task 12 (Texture Bake) has not run.'
     }
 }

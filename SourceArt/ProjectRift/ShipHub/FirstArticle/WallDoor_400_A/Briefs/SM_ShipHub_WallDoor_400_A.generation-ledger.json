@@ -1,5 +1,37 @@
 {
   "Schema": "projectrift.shiphub.wall-door-generation-ledger.v1",
   "AssetId": "SM_ShipHub_WallDoor_400_A",
-  "Entries": []
+  "Entries": [
+    {
+      "Id": "base-v1",
+      "Tool": "OpenAI built-in ImageGen",
+      "Mode": "edit",
+      "Input": "Concept/Orthographic/Perspective.png",
+      "Output": "Saved/Automation/ProjectRiftShipHubWallDoor/ImageGen/Base-rejected-camera-drift.png",
+      "Prompt": "Use case: sketch-to-render\nAsset type: ProjectRift UE5.8 modular ship-hub wall-door appearance study\nInput image: the ProjectA-owned Blender perspective render is the edit target and the sole geometry authority\nPrimary request: render the exact input wall-door as a grounded realistic PBR hard-surface game asset for a human-built expedition vessel that survived an alien-world crash\nSubject: a 400 cm wide, 400 cm tall, 30 cm deep modular structural wall with a fully open 240×280 cm doorway, exposed load-bearing frame, restrained chamfered armor panels, service channels, and credible maintenance access\nStyle/medium: realistic UE5-quality 3D asset render, medium detail density, clean and readable rather than dirty or greeble-heavy\nComposition/framing: preserve the exact input camera, perspective, silhouette, doorway, jamb widths, lintel height, module boundaries, and every structural recess\nLighting/mood: neutral studio asset-review lighting, no environment scene\nColor palette: dark blue-gray load-bearing steel, cool-gray armor panels, black seals, tiny neutral identifiers; no purple\nMaterials/textures: painted metal, limited exposed steel at believable chips, black rubber seals, restrained roughness variation, broad surfaces remain calm\nConstraints: change surface treatment only; keep the doorway fully open; no room, floor, ceiling, character, door leaf, text, logo, watermark, hanging cable, organic growth, purple energy, excessive greebles, random dots, or geometry outside the existing envelope",
+      "PromptSha256": "18c587e2681ee29cffad669b5f59fe9003008914db005815062abf21336e4400",
+      "OutputSha256": "67c6d5794793f77524ad9c75f8cd3e1d2221a0b7ee8bea487017b6487011e09a",
+      "CreatedAt": "2026-08-03T13:18:28.6350341+08:00",
+      "DurationSeconds": 45,
+      "Status": "RejectedCameraDrift",
+      "Outcome": "Rejected because the normalized frame width changed from approximately 46.2% to approximately 64%, exceeding the 2% drift gate.",
+      "CommercialReview": "RequiredBeforeUEImport"
+    },
+    {
+      "Id": "base-v2",
+      "Tool": "OpenAI built-in ImageGen",
+      "Mode": "edit",
+      "Input": "Concept/Orthographic/Perspective.png",
+      "Output": "Concept/References/BaseStyleReference.png",
+      "Prompt": "Use case: sketch-to-render\nAsset type: ProjectRift UE5.8 modular ship-hub wall-door appearance study\nInput image: the ProjectA-owned Blender perspective render is the edit target and the sole geometry authority\nPrimary request: render the exact input wall-door as a grounded realistic PBR hard-surface game asset for a human-built expedition vessel that survived an alien-world crash\nSubject: a 400 cm wide, 400 cm tall, 30 cm deep modular structural wall with a fully open 240×280 cm doorway, exposed load-bearing frame, restrained chamfered armor panels, service channels, and credible maintenance access\nStyle/medium: realistic UE5-quality 3D asset render, medium detail density, clean and readable rather than dirty or greeble-heavy\nComposition/framing: preserve the exact input camera, perspective, silhouette, doorway, jamb widths, lintel height, module boundaries, and every structural recess\nLighting/mood: neutral studio asset-review lighting, no environment scene\nColor palette: dark blue-gray load-bearing steel, cool-gray armor panels, black seals, tiny neutral identifiers; no purple\nMaterials/textures: painted metal, limited exposed steel at believable chips, black rubber seals, restrained roughness variation, broad surfaces remain calm\nConstraints: change surface treatment only; keep the doorway fully open; no room, floor, ceiling, character, door leaf, text, logo, watermark, hanging cable, organic growth, purple energy, excessive greebles, random dots, or geometry outside the existing envelope\nTargeted regeneration after camera-drift rejection: treat the input as pixel-registered; do not crop, zoom, recenter, rotate, reshape, or move any edge, recess, opening, or module boundary; replace only material pixels.",
+      "PromptSha256": "9af88c1c92331ad75da4a2fd46b790b547011f13ee027ff83db7506530d9e869",
+      "OutputSha256": "ce024fb003baaa3f9a6766442d762972ebd089dc499d1a465a6736daac1e248b",
+      "CreatedAt": "2026-08-03T13:20:50.9272639+08:00",
+      "DurationSeconds": 64,
+      "Status": "StyleReferenceOnly",
+      "Outcome": "Rejected as a geometry-bound candidate because normalized frame width remained approximately 59.2%; retained only for surface color, roughness, edge-wear, and material mood reference.",
+      "Notes": "Original audit path: Saved/Automation/ProjectRiftShipHubWallDoor/ImageGen/Base-rejected-camera-drift-regeneration.png",
+      "CommercialReview": "RequiredBeforeUEImport"
+    }
+  ]
 }

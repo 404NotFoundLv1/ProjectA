@@ -13,6 +13,9 @@ from Scripts.ProjectRift.ArtPipeline.shiphub.wall_door_contract import (
     load_contract,
     validate_contract,
 )
+from Scripts.ProjectRift.ArtPipeline.shiphub.build_wall_door_first_article import (
+    _validated_appearance_approval,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -36,6 +39,31 @@ class WallDoorContractTests(unittest.TestCase):
         fixture_path = directory / "contract.json"
         fixture_path.write_text(json.dumps(payload), encoding="utf-8")
         return fixture_path
+
+    def test_approved_appearance_rejects_non_zero_padded_date(self) -> None:
+        """An approved ledger date must use the exact YYYY-MM-DD lexical form."""
+        with tempfile.TemporaryDirectory() as temp:
+            output_root = Path(temp)
+            briefs_root = output_root / "Briefs"
+            briefs_root.mkdir()
+            approval = {
+                "Schema": "projectrift.shiphub.wall-door-approval.v1",
+                "AssetId": "SM_ShipHub_WallDoor_400_A",
+                "Appearance": {
+                    "Status": "Approved",
+                    "Date": "2026-8-3",
+                    "Evidence": [
+                        "Concept/SM_ShipHub_WallDoor_400_A_AppearanceLock.png",
+                        "Reports/appearance-validation.json",
+                    ],
+                },
+            }
+            (briefs_root / "SM_ShipHub_WallDoor_400_A.approval.json").write_text(
+                json.dumps(approval), encoding="utf-8"
+            )
+
+            with self.assertRaisesRegex(ValueError, "YYYY-MM-DD"):
+                _validated_appearance_approval(output_root)
 
     def test_load_contract_exposes_the_approved_g3_values(self) -> None:
         """A changed approved wall-door value must be rejected by consumers."""
