@@ -1,0 +1,7 @@
+{
+  "Schema": "projectrift.shiphub.wall-door-approval.v1",
+  "AssetId": "SM_ShipHub_WallDoor_400_A",
+  "Appearance": {"Status": "Pending", "Evidence": []},
+  "DCC": {"Status": "Pending", "Evidence": []},
+  "UE": {"Status": "Pending", "Evidence": []}
+}

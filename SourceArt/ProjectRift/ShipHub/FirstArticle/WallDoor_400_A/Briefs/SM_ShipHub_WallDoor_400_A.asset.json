@@ -1,0 +1,21 @@
+{
+  "Schema": "projectrift.shiphub.wall-door-first-article.v1",
+  "AssetId": "SM_ShipHub_WallDoor_400_A",
+  "Stage": "G3",
+  "Units": "cm",
+  "BoundsCm": [400, 30, 400],
+  "DoorOpeningCm": [240, 280],
+  "DoorOpeningMinCm": [80, 0, 0],
+  "SnapCm": 50,
+  "Pivot": "BottomLeftBack",
+  "MaterialSlotLimit": 2,
+  "TextureSize": 2048,
+  "TextureChannels": ["BC", "N", "ORM", "StateMask"],
+  "States": ["Damaged", "Patched", "Online"],
+  "BaseMesh": "SM_ShipHub_WallDoor_400_A",
+  "CollisionPieces": ["LeftJamb", "RightJamb", "Lintel"],
+  "References": [
+    "SourceArt/ProjectRift/ShipHub/CompleteDesign/Blender/SM_ShipHub_Complete_White_v1.blend",
+    "SourceArt/ProjectRift/ShipHub/CompleteDesign/Drawings/FinalPNG/D05_WallBayInterface.png"
+  ]
+}
