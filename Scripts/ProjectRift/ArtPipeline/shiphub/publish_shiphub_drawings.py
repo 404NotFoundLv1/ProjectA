@@ -5,7 +5,9 @@ import hashlib
 import html
 import json
 import os
+import re
 import shutil
+import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
@@ -252,7 +254,98 @@ def _stage_handoff(stage: Path, pdf_path: Path, contact_path: Path) -> tuple[Pat
     return pdf_copy, png_copy
 
 
+def _enable_stage_tree_inheritance(stage: Path) -> None:
+    if os.name != "nt":
+        return
+    result = subprocess.run(
+        [
+            "icacls.exe",
+            str(stage),
+            "/inheritance:e",
+            "/T",
+            "/Q",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    detail = "\n".join(
+        output.strip() for output in (result.stdout, result.stderr) if output.strip()
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Publish stage ACL inheritance failed with code {result.returncode}: {detail}"
+        )
+    failed_count = re.search(
+        r"Failed processing\s+([0-9]+)\s+files?", detail, flags=re.IGNORECASE
+    )
+    if failed_count and int(failed_count.group(1)) > 0:
+        raise RuntimeError(f"Publish stage ACL inheritance reported: {detail}")
+
+    escaped_stage = str(stage.resolve()).replace("'", "''")
+    verify_script = f"""
+$ErrorActionPreference = 'Stop'
+$target = '{escaped_stage}'
+$ordinaryUserSids = @('S-1-5-11', 'S-1-5-32-545')
+$items = @((Get-Item -LiteralPath $target -Force)) + @(
+    Get-ChildItem -LiteralPath $target -Recurse -Force -ErrorAction Stop
+)
+$failures = @(
+    foreach ($item in $items) {{
+        $acl = Get-Acl -LiteralPath $item.FullName -ErrorAction Stop
+        if ($acl.AreAccessRulesProtected) {{
+            "protected: $($item.FullName)"
+            continue
+        }}
+        $inheritedOrdinaryAllow = @(
+            foreach ($rule in $acl.Access) {{
+                if (
+                    $rule.IsInherited -and
+                    $rule.AccessControlType -eq [System.Security.AccessControl.AccessControlType]::Allow
+                ) {{
+                    try {{
+                        $sid = $rule.IdentityReference.Translate(
+                            [System.Security.Principal.SecurityIdentifier]
+                        ).Value
+                    }} catch {{
+                        $sid = $rule.IdentityReference.Value
+                    }}
+                    if ($ordinaryUserSids -contains $sid) {{
+                        $rule
+                    }}
+                }}
+            }}
+        )
+        if ($inheritedOrdinaryAllow.Count -eq 0) {{
+            "missing inherited ordinary-user allow rule: $($item.FullName)"
+        }}
+    }}
+)
+if ($failures.Count -gt 0) {{
+    [Console]::Error.WriteLine(($failures -join [Environment]::NewLine))
+    exit 1
+}}
+"""
+    verification = subprocess.run(
+        ["powershell.exe", "-NoProfile", "-Command", verify_script],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if verification.returncode != 0:
+        verification_detail = "\n".join(
+            output.strip()
+            for output in (verification.stdout, verification.stderr)
+            if output.strip()
+        )
+        raise RuntimeError(
+            "Publish stage ACL inheritance postcondition failed "
+            f"with code {verification.returncode}: {verification_detail}"
+        )
+
+
 def _commit(stage: Path, drawings_root: Path) -> None:
+    _enable_stage_tree_inheritance(stage)
     backup = Path(tempfile.mkdtemp(prefix=".shiphub-publish-backup-", dir=drawings_root))
     targets = (
         "SVG",

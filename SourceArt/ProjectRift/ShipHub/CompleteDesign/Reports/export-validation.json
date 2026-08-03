@@ -69,8 +69,8 @@
     "Passed": true
   },
   "InputSHA256": {
-    "BLEND": "bd29ae2833c5e728ca94aecfe8542d3f61d50bc122f3c68332880727b4d1dbcd",
-    "FBX": "df8bc36e55ca8ddb1ba062bac5f23cc453aed5346f17a23038f1f9ee5b4883c3",
+    "BLEND": "04c599ba5178936ce3841a1089c037e26636b11ed1a102b9f0ec780e5a7d11a9",
+    "FBX": "eb87fb17098cf4d0ed4c4e94e628011243e2c26cea9a6a0e3c5167c524bb623d",
     "GLB": "ab48b11d98678871b3de37bd278b4a0ac5b88a9c6d039f393f0e5e92f4803862",
     "Manifest": "3df4f054f7ddf8f2c5523ecd673c4b3a2e4f6e7b4db7c27d0a23ee0c412a30d8"
   },

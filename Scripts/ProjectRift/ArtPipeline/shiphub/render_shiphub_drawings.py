@@ -424,6 +424,11 @@ def _write_300dpi_phys(path: Path) -> None:
     for chunk_type, payload in chunks:
         if chunk_type == b"pHYs":
             continue
+        if chunk_type == b"tEXt" and payload.partition(b"\x00")[0] in {
+            b"Date",
+            b"RenderTime",
+        }:
+            continue
         rebuilt.extend(_png_chunk(chunk_type, payload))
         if chunk_type == b"IHDR":
             phys = struct.pack(">IIB", PIXELS_PER_METER_300_DPI, PIXELS_PER_METER_300_DPI, 1)

@@ -27,6 +27,27 @@ SHEET_IDS = (
 )
 
 
+def _grant_test_ordinary_user_inheritance(path: Path) -> None:
+    """Model the real Drawings handoff ACL instead of inheriting Windows Temp defaults."""
+    if sys.platform != "win32":
+        return
+    result = subprocess.run(
+        [
+            "icacls.exe",
+            str(path),
+            "/inheritance:e",
+            "/grant:r",
+            "*S-1-5-11:(OI)(CI)M",
+            "/Q",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise AssertionError(result.stdout + result.stderr)
+
+
 class ShipHubPublishTests(unittest.TestCase):
     def test_publisher_script_supports_the_runner_file_path_contract(self) -> None:
         """Removing direct-script import compatibility must break the runner contract."""
@@ -105,6 +126,8 @@ class ShipHubPublishTests(unittest.TestCase):
         brief_path = root / "brief.json"
         manifest_path = root / "layout-manifest.json"
         drawings_root = root / "Drawings"
+        drawings_root.mkdir()
+        _grant_test_ordinary_user_inheritance(drawings_root)
         png_root = drawings_root / "PNG"
         perspectives_root = png_root / "Perspectives"
         perspectives_root.mkdir(parents=True)
@@ -127,6 +150,7 @@ class ShipHubPublishTests(unittest.TestCase):
     def _write_commit_fixture(root: Path) -> tuple[Path, Path, dict[str, str]]:
         drawings_root = root / "Drawings"
         drawings_root.mkdir()
+        _grant_test_ordinary_user_inheritance(drawings_root)
         stage = drawings_root / ".stage"
         old_values = {
             "SVG": "old-svg",
@@ -161,6 +185,39 @@ class ShipHubPublishTests(unittest.TestCase):
             if path.is_dir():
                 path = path / "payload.txt"
             self.assertEqual(value, path.read_text(encoding="utf-8"), name)
+
+    @staticmethod
+    def _run_icacls(*arguments: str) -> None:
+        result = subprocess.run(
+            ["icacls.exe", *arguments],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise AssertionError(result.stdout + result.stderr)
+
+    @staticmethod
+    def _acl_snapshot(path: Path) -> dict:
+        escaped_path = str(path).replace("'", "''")
+        script = f"$target = '{escaped_path}'\n" + r"""
+$acl = Get-Acl -LiteralPath $target
+$access = @($acl.Access | ForEach-Object {
+    try { $sid = $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value }
+    catch { $sid = $_.IdentityReference.Value }
+    [pscustomobject]@{ Sid = $sid; Inherited = $_.IsInherited; Type = $_.AccessControlType.ToString() }
+})
+[pscustomobject]@{ Protected = $acl.AreAccessRulesProtected; Access = $access } | ConvertTo-Json -Depth 4 -Compress
+"""
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", script],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise AssertionError(result.stdout + result.stderr)
+        return json.loads(result.stdout)
 
     def test_all_sheets_use_semantically_oriented_annotations(self) -> None:
         """Replacing any explicit sheet layout with the generic grid must fail."""
@@ -578,6 +635,7 @@ class ShipHubPublishTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary_directory:
             drawings_root = Path(temporary_directory) / "Drawings"
             drawings_root.mkdir()
+            _grant_test_ordinary_user_inheritance(drawings_root)
             stage = drawings_root / ".stage"
             (stage / "SVG").mkdir(parents=True)
             (stage / "SVG" / "new.svg").write_text("new", encoding="utf-8")
@@ -614,6 +672,140 @@ class ShipHubPublishTests(unittest.TestCase):
             self.assertEqual("old-contact", (drawings_root / "ProjectRift_ShipHub_ContactSheet_v1.png").read_text(encoding="utf-8"))
             self.assertEqual("old-handoff-pdf", (drawings_root / "Handoff" / "old.pdf").read_text(encoding="utf-8"))
             self.assertEqual("old-handoff-png", (drawings_root / "Handoff" / "old.png").read_text(encoding="utf-8"))
+            self.assertFalse(list(drawings_root.glob(".shiphub-publish-backup-*")))
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows DACL contract")
+    def test_commit_enables_inheritance_for_every_published_stage_artifact(self) -> None:
+        """Moving a protected stage DACL into Drawings must fail the ordinary-user access contract."""
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            stage, drawings_root, _ = self._write_commit_fixture(Path(temporary_directory))
+            authenticated_users = "*S-1-5-11"
+            self._run_icacls(
+                str(drawings_root),
+                "/inheritance:e",
+                "/grant:r",
+                f"{authenticated_users}:(OI)(CI)M",
+                "/T",
+                "/C",
+                "/Q",
+            )
+            self._run_icacls(str(stage), "/inheritance:d", "/T", "/C", "/Q")
+            self._run_icacls(
+                str(stage), "/remove:g", authenticated_users, "/T", "/C", "/Q"
+            )
+            before = self._acl_snapshot(stage)
+            self.assertTrue(before["Protected"])
+            self.assertNotIn("S-1-5-11", {entry["Sid"] for entry in before["Access"]})
+
+            _commit(stage, drawings_root)
+
+            targets = (
+                drawings_root / "SVG",
+                drawings_root / "SVG" / "payload.txt",
+                drawings_root / "FinalPNG",
+                drawings_root / "FinalPNG" / "payload.txt",
+                drawings_root / "ProjectRift_ShipHub_CompleteDesign_v1.pdf",
+                drawings_root / "ProjectRift_ShipHub_ContactSheet_v1.png",
+                drawings_root / "Handoff",
+                drawings_root / "Handoff" / "payload.txt",
+            )
+            for target in targets:
+                acl = self._acl_snapshot(target)
+                self.assertFalse(acl["Protected"], target)
+                authenticated = [
+                    entry for entry in acl["Access"]
+                    if entry["Sid"] == "S-1-5-11" and entry["Type"] == "Allow"
+                ]
+                self.assertTrue(authenticated, target)
+                self.assertTrue(all(entry["Inherited"] for entry in authenticated), target)
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows ACL command contract")
+    def test_commit_acl_failure_does_not_begin_replacement(self) -> None:
+        """Ignoring a stage-inheritance failure must fail the pre-commit transaction boundary."""
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            stage, drawings_root, old_values = self._write_commit_fixture(
+                Path(temporary_directory)
+            )
+            failure = subprocess.CompletedProcess(
+                args=["icacls.exe"], returncode=5, stdout="", stderr="access denied"
+            )
+
+            with patch("subprocess.run", return_value=failure):
+                with self.assertRaisesRegex(RuntimeError, "inheritance"):
+                    _commit(stage, drawings_root)
+
+            self.assertTrue(stage.is_dir())
+            self._assert_old_commit_fixture(drawings_root, old_values)
+            self.assertFalse(list(drawings_root.glob(".shiphub-publish-backup-*")))
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows ACL command contract")
+    def test_commit_acl_zero_exit_with_failed_file_count_does_not_replace(self) -> None:
+        """icacls /C can report failed files while returning zero; publication must still stop."""
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            stage, drawings_root, old_values = self._write_commit_fixture(
+                Path(temporary_directory)
+            )
+            misleading_success = subprocess.CompletedProcess(
+                args=["icacls.exe"],
+                returncode=0,
+                stdout="Successfully processed 0 files; Failed processing 1 files",
+                stderr="",
+            )
+
+            with patch("subprocess.run", return_value=misleading_success):
+                with patch.object(publisher.os, "replace") as replace:
+                    with self.assertRaisesRegex(RuntimeError, "Failed processing"):
+                        _commit(stage, drawings_root)
+
+            replace.assert_not_called()
+            self.assertTrue(stage.is_dir())
+            self._assert_old_commit_fixture(drawings_root, old_values)
+            self.assertFalse(list(drawings_root.glob(".shiphub-publish-backup-*")))
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows DACL contract")
+    def test_commit_rejects_stage_without_inherited_ordinary_user_allow(self) -> None:
+        """SYSTEM/Administrators/current-user inheritance alone is not a desktop handoff."""
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            stage, drawings_root, old_values = self._write_commit_fixture(
+                Path(temporary_directory)
+            )
+            identity = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-Command",
+                    "[Security.Principal.WindowsIdentity]::GetCurrent().User.Value",
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+            self._run_icacls(
+                str(drawings_root),
+                "/inheritance:d",
+                "/grant:r",
+                f"*{identity}:(OI)(CI)F",
+                "/T",
+                "/C",
+                "/Q",
+            )
+            for ordinary_user_sid in ("*S-1-5-11", "*S-1-5-32-545"):
+                self._run_icacls(
+                    str(drawings_root),
+                    "/remove:g",
+                    ordinary_user_sid,
+                    "/T",
+                    "/C",
+                    "/Q",
+                )
+
+            with patch.object(publisher.os, "replace") as replace:
+                with self.assertRaisesRegex(RuntimeError, "postcondition"):
+                    _commit(stage, drawings_root)
+
+            replace.assert_not_called()
+            self.assertTrue(stage.is_dir())
+            self._assert_old_commit_fixture(drawings_root, old_values)
             self.assertFalse(list(drawings_root.glob(".shiphub-publish-backup-*")))
 
     def test_commit_backup_move_failure_restores_all_old_outputs_without_backup_leak(self) -> None:
