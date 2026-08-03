@@ -623,19 +623,41 @@ public static class ProjectRiftFailingPythonProbe {
                 Assert-True ($validRenderLog[1] -like 'blender:--background --factory-startup --python *render_shiphub_drawings.py -- --project-root * --blend *SM_ShipHub_Complete_White_v1.blend --manifest *layout-manifest.json --output-root *Drawings\PNG') "RenderDrawings should invoke the exact background renderer contract. Actual log: $($validRenderLog[1])"
             }
 
-            foreach ($blenderStage in @('Validate')) {
-                $wrongVersionResult = Invoke-ProjectRiftRunnerForTest -RunnerPath $runnerPath -Stage $blenderStage -BlenderExe $wrongBlenderProbe -PythonExe $pythonProbe
-                Assert-True ($wrongVersionResult.ExitCode -ne 0) "$blenderStage should fail for a non-5.2 Blender executable."
-                Assert-True ($wrongVersionResult.Text -match 'requires Blender 5\.2\.x LTS') "$blenderStage should check Blender 5.2 LTS before checking its deferred stage script."
-                Assert-True ($wrongVersionResult.Text -notmatch 'missing its required script') "$blenderStage should not inspect its deferred script before the Blender version gate."
+            $wrongValidateVersionResult = Invoke-ProjectRiftRunnerForTest -RunnerPath $runnerPath -Stage 'Validate' -BlenderExe $wrongBlenderProbe -PythonExe $pythonProbe
+            Assert-True ($wrongValidateVersionResult.ExitCode -ne 0) 'Validate should fail for a non-5.2 Blender executable.'
+            Assert-True ($wrongValidateVersionResult.Text -match 'requires Blender 5\.2\.x LTS') 'Validate should check Blender 5.2 LTS before invoking either validator.'
 
-                Remove-Item -LiteralPath $toolLog -Force -ErrorAction SilentlyContinue
-                $validVersionResult = Invoke-ProjectRiftRunnerForTest -RunnerPath $runnerPath -Stage $blenderStage -BlenderExe $validBlenderProbe -PythonExe $pythonProbe
-                Assert-True ($validVersionResult.ExitCode -ne 0) "$blenderStage should fail closed while its deferred script is absent."
-                Assert-True ($validVersionResult.Text -match 'missing its required script') "$blenderStage should report its missing deferred script after Blender validation."
-                $validStageLog = if (Test-Path -LiteralPath $toolLog) { @(Get-Content -LiteralPath $toolLog) } else { @() }
-                $validStageFirstLine = ([string]($validStageLog | Select-Object -First 1)).Trim()
-                Assert-True ($validStageFirstLine -eq 'blender:--version') "$blenderStage should invoke the supplied Blender version check before the missing-script error. Actual log: $($validStageLog -join ' | ')"
+            Remove-Item -LiteralPath $toolLog -Force -ErrorAction SilentlyContinue
+            $failingBlenderValidateResult = Invoke-ProjectRiftRunnerForTest -RunnerPath $runnerPath -Stage 'Validate' -BlenderExe $failingBuildBlenderProbe -PythonExe $pythonProbe
+            Assert-True ($failingBlenderValidateResult.ExitCode -ne 0) 'Validate should propagate a nonzero Blender validator exit.'
+            Assert-True ($failingBlenderValidateResult.Text -match 'Blender validator failed with exit code 9') 'Validate should report the exact Blender validator exit code.'
+            $failingBlenderValidateLog = if (Test-Path -LiteralPath $toolLog) { @(Get-Content -LiteralPath $toolLog) } else { @() }
+            Assert-Equal $failingBlenderValidateLog.Count 2 'Validate Blender failure should stop before package validation.'
+            if ($failingBlenderValidateLog.Count -eq 2) {
+                Assert-Equal $failingBlenderValidateLog[0] 'blender:--version' 'Validate should run the Blender version gate first.'
+                Assert-True ($failingBlenderValidateLog[1] -like 'blender:--background --factory-startup --python *validate_shiphub_blender.py -- --project-root * --blend *SM_ShipHub_Complete_White_v1.blend --fbx *SM_ShipHub_Complete_White_v1.fbx --glb *SM_ShipHub_Complete_White_v1.glb --manifest *layout-manifest.json --report *export-validation.json') 'Validate should invoke the exact Blender-native validator contract.'
+            }
+
+            Remove-Item -LiteralPath $toolLog -Force -ErrorAction SilentlyContinue
+            $failingPackageValidateResult = Invoke-ProjectRiftRunnerForTest -RunnerPath $runnerPath -Stage 'Validate' -BlenderExe $validBlenderProbe -PythonExe $failingPythonProbe
+            Assert-True ($failingPackageValidateResult.ExitCode -ne 0) 'Validate should propagate a nonzero package-validator exit.'
+            Assert-True ($failingPackageValidateResult.Text -match 'package validator failed with exit code 7') 'Validate should report the exact package-validator exit code.'
+            $failingPackageValidateLog = if (Test-Path -LiteralPath $toolLog) { @(Get-Content -LiteralPath $toolLog) } else { @() }
+            Assert-Equal $failingPackageValidateLog.Count 2 'Validate package failure should occur after the Blender version gate and Blender-native validation.'
+            if ($failingPackageValidateLog.Count -eq 2) {
+                Assert-Equal $failingPackageValidateLog[0] 'blender:--version' 'Validate package failure should still run the Blender version gate first.'
+                Assert-True ($failingPackageValidateLog[1] -like 'blender:--background --factory-startup --python *validate_shiphub_blender.py*') 'Validate package failure should occur only after Blender-native validation.'
+            }
+
+            Remove-Item -LiteralPath $toolLog -Force -ErrorAction SilentlyContinue
+            $validValidateResult = Invoke-ProjectRiftRunnerForTest -RunnerPath $runnerPath -Stage 'Validate' -BlenderExe $validBlenderProbe -PythonExe $pythonProbe
+            Assert-Equal $validValidateResult.ExitCode 0 'Validate should run both validators successfully.'
+            $validValidateLog = if (Test-Path -LiteralPath $toolLog) { @(Get-Content -LiteralPath $toolLog) } else { @() }
+            Assert-Equal $validValidateLog.Count 3 'Validate should run the version gate and both validators.'
+            if ($validValidateLog.Count -eq 3) {
+                Assert-Equal $validValidateLog[0] 'blender:--version' 'Validate should invoke the supplied Blender version check first.'
+                Assert-True ($validValidateLog[1] -like 'blender:--background --factory-startup --python *validate_shiphub_blender.py -- --project-root * --blend *SM_ShipHub_Complete_White_v1.blend --fbx *SM_ShipHub_Complete_White_v1.fbx --glb *SM_ShipHub_Complete_White_v1.glb --manifest *layout-manifest.json --report *export-validation.json') 'Validate should run Blender-native export validation before package validation.'
+                Assert-True ($validValidateLog[2] -like 'python:*validate_shiphub_package.py --project-root * --brief *ShipHubCompleteDesign_v1.json --output-root *CompleteDesign --export-report *export-validation.json --report *validation-report.json --sha256 *SHA256SUMS.txt') 'Validate should invoke the exact package-validator contract second.'
             }
 
             $missingPublishPython = Join-Path $runnerTestRoot 'missing-python.exe'
@@ -654,12 +676,11 @@ public static class ProjectRiftFailingPythonProbe {
 
             Remove-Item -LiteralPath $toolLog -Force -ErrorAction SilentlyContinue
             $allResult = Invoke-ProjectRiftRunnerForTest -RunnerPath $runnerPath -Stage 'All' -BlenderExe $validBlenderProbe -PythonExe $pythonProbe
-            Assert-True ($allResult.ExitCode -ne 0) 'All should fail closed at the first absent deferred stage.'
-            Assert-True ($allResult.Text -match 'Validate stage is missing its required script') "All should complete Publish and stop at the absent Validate stage. Actual output: $($allResult.Text)"
+            Assert-Equal $allResult.ExitCode 0 'All should complete through package validation.'
             Assert-True ($allResult.Text -match 'Publish stage committed Handoff filenames: ProjectRift_ShipHub_CompleteDesign_v1r2_12345678\.pdf; ProjectRift_ShipHub_ContactSheet_v1r2_87654321\.png') 'All should report both committed Handoff filenames after Publish.'
             $allLog = if (Test-Path -LiteralPath $toolLog) { @(Get-Content -LiteralPath $toolLog) } else { @() }
-            Assert-Equal $allLog.Count 9 "All should invoke Preflight, ValidateContract, BuildWhiteModel, RenderDrawings, Publish, then the Validate version gate in exact order. Actual log: $($allLog -join ' | ')"
-            if ($allLog.Count -eq 9) {
+            Assert-Equal $allLog.Count 11 "All should invoke Preflight, ValidateContract, BuildWhiteModel, RenderDrawings, Publish, then both validators in exact order. Actual log: $($allLog -join ' | ')"
+            if ($allLog.Count -eq 11) {
                 Assert-Equal $allLog[0] 'blender:--version' 'All should invoke Preflight first with the explicit Blender executable.'
                 Assert-True ($allLog[1] -like 'python:-c import PIL, reportlab, pypdf*') 'All should forward the explicit Python executable to Preflight.'
                 Assert-True ($allLog[2] -like 'python:*shiphub_contract.py*') 'All should forward the explicit Python executable to ValidateContract.'
@@ -668,7 +689,9 @@ public static class ProjectRiftFailingPythonProbe {
                 Assert-Equal $allLog[5] 'blender:--version' 'All should reach the RenderDrawings Blender gate only after BuildWhiteModel.'
                 Assert-True ($allLog[6] -like 'blender:--background --factory-startup --python *render_shiphub_drawings.py*') 'All should run the background drawing renderer before reaching Publish.'
                 Assert-True ($allLog[7] -like 'python:*publish_shiphub_drawings.py --brief *ShipHubCompleteDesign_v1.json --manifest *layout-manifest.json --drawings-root *CompleteDesign\Drawings') 'All should forward the explicit Python executable to Publish after RenderDrawings.'
-                Assert-Equal $allLog[8] 'blender:--version' 'All should invoke the Validate Blender version gate after Publish before reporting its absent script.'
+                Assert-Equal $allLog[8] 'blender:--version' 'All should invoke the Validate Blender version gate after Publish.'
+                Assert-True ($allLog[9] -like 'blender:--background --factory-startup --python *validate_shiphub_blender.py*') 'All should run Blender-native validation before package validation.'
+                Assert-True ($allLog[10] -like 'python:*validate_shiphub_package.py*') 'All should finish with package validation.'
             }
         }
         finally {
@@ -717,6 +740,9 @@ public static class ProjectRiftFailingPythonProbe {
             $fbxPath = Join-Path $outputRoot 'Exports\SM_ShipHub_Complete_White_v1.fbx'
             $glbPath = Join-Path $outputRoot 'Exports\SM_ShipHub_Complete_White_v1.glb'
             $manifestPath = Join-Path $outputRoot 'Reports\layout-manifest.json'
+            $exportValidationReportPath = Join-Path $outputRoot 'Reports\export-validation.json'
+            $validationReportPath = Join-Path $outputRoot 'Reports\validation-report.json'
+            $sha256SumsPath = Join-Path $outputRoot 'Reports\SHA256SUMS.txt'
             $drawingsRoot = Join-Path $outputRoot 'Drawings'
             $pngRoot = Join-Path $outputRoot 'Drawings\PNG'
             $perspectivesRoot = Join-Path $pngRoot 'Perspectives'
@@ -742,7 +768,7 @@ public static class ProjectRiftFailingPythonProbe {
             foreach ($handoffFailure in @($strictHandoffResult.Failures)) {
                 $script:Failures.Add($handoffFailure)
             }
-            $requiredArtifacts = @($blendPath, $fbxPath, $glbPath, $manifestPath, $pdfPath, $contactSheetPath) + $requiredPngPaths + $expectedSvgPaths + $expectedFinalPngPaths + $expectedHandoffPaths
+            $requiredArtifacts = @($blendPath, $fbxPath, $glbPath, $manifestPath, $exportValidationReportPath, $validationReportPath, $sha256SumsPath, $pdfPath, $contactSheetPath) + $requiredPngPaths + $expectedSvgPaths + $expectedFinalPngPaths + $expectedHandoffPaths
 
             $rendererPath = Join-Path $projectRoot 'Scripts\ProjectRift\ArtPipeline\shiphub\render_shiphub_drawings.py'
             $realBlenderPath = 'D:\Blender5.2\blender.exe'
@@ -824,6 +850,36 @@ public static class ProjectRiftFailingPythonProbe {
                 Assert-True $artifactExists "Required generated artifact is missing: $artifactPath"
                 if ($artifactExists) {
                     Assert-True ((Get-Item -LiteralPath $artifactPath).Length -gt 0) "Required generated artifact is empty: $artifactPath"
+                }
+            }
+
+            if ((Test-Path -LiteralPath $validationReportPath -PathType Leaf) -and (Get-Item -LiteralPath $validationReportPath).Length -gt 0) {
+                $validationReport = Get-Content -LiteralPath $validationReportPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                Assert-Equal $validationReport.Passed $true 'Complete-package validation report must pass.'
+                Assert-Equal $validationReport.IssueCount 0 'Complete-package validation report issue count mismatch.'
+                Assert-Equal $validationReport.SheetCount 15 'Complete-package validation report sheet count mismatch.'
+                Assert-Equal $validationReport.PdfPageCount 15 'Complete-package validation report PDF page count mismatch.'
+                Assert-Equal $validationReport.CryopodCount 5 'Complete-package validation report cryopod count mismatch.'
+                Assert-Equal $validationReport.ConstructDockCount 4 'Complete-package validation report construct-dock count mismatch.'
+                Assert-Equal $validationReport.NavigationTableCount 1 'Complete-package validation report navigation-table count mismatch.'
+                Assert-SequenceEqual @($validationReport.Dimensions.RoomClearM) @(28.0, 24.0, 7.0) 'Complete-package room clear dimensions'
+                Assert-Equal $validationReport.Dimensions.NominalHeightM 8.0 'Complete-package nominal height mismatch.'
+                Assert-Equal $validationReport.Dimensions.NavigationTableDiameterM 8.0 'Complete-package navigation-table diameter mismatch.'
+                Assert-Equal $validationReport.Dimensions.CryopodReclineDegrees 18.0 'Complete-package cryopod recline mismatch.'
+                Assert-Equal $validationReport.Dimensions.MinimumMainPathWidthM 5.0 'Complete-package minimum main-path width mismatch.'
+                Assert-Equal $validationReport.Dimensions.CeilingRingLowestZM 6.2 'Complete-package ceiling-ring lowest Z mismatch.'
+            }
+
+            if ((Test-Path -LiteralPath $exportValidationReportPath -PathType Leaf) -and (Get-Item -LiteralPath $exportValidationReportPath).Length -gt 0) {
+                $exportValidationReport = Get-Content -LiteralPath $exportValidationReportPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                Assert-Equal $exportValidationReport.InputSHA256.BLEND ((Get-FileHash -LiteralPath $blendPath -Algorithm SHA256).Hash.ToLowerInvariant()) 'Blender evidence BLEND SHA-256 mismatch.'
+                Assert-Equal $exportValidationReport.InputSHA256.Manifest ((Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()) 'Blender evidence manifest SHA-256 mismatch.'
+                Assert-Equal $exportValidationReport.InputSHA256.FBX ((Get-FileHash -LiteralPath $fbxPath -Algorithm SHA256).Hash.ToLowerInvariant()) 'Blender evidence FBX SHA-256 mismatch.'
+                Assert-Equal $exportValidationReport.InputSHA256.GLB ((Get-FileHash -LiteralPath $glbPath -Algorithm SHA256).Hash.ToLowerInvariant()) 'Blender evidence GLB SHA-256 mismatch.'
+                foreach ($exportFormat in @('FBX', 'GLB')) {
+                    $formatEvidence = $exportValidationReport.$exportFormat
+                    Assert-Equal $formatEvidence.Isolation.ExclusiveTemporaryCollection $true "$exportFormat import must be exclusively linked to its owned temporary collection."
+                    Assert-Equal $formatEvidence.Isolation.CleanupVerified $true "$exportFormat temporary import data cleanup must be verified."
                 }
             }
 

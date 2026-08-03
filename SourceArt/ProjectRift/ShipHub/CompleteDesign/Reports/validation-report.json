@@ -1,0 +1,40 @@
+{
+  "BriefSHA256": "fd21285d447e3410d0f0f19ec966b86d93d947d898a815d6a0c3c895e9b6303d",
+  "ConstructDockCount": 4,
+  "CryopodCount": 5,
+  "Dimensions": {
+    "CeilingRingLowestZM": 6.2,
+    "CryopodReclineDegrees": 18.0,
+    "MinimumMainPathWidthM": 5.0,
+    "NavigationTableDiameterM": 8.0,
+    "NominalHeightM": 8.0,
+    "RoomClearM": [
+      28.0,
+      24.0,
+      7.0
+    ]
+  },
+  "ExpectedArtifactCount": 62,
+  "ExportValidationPassed": true,
+  "IssueCount": 0,
+  "Issues": [],
+  "ManifestExportBoundsM": {
+    "Max": [
+      15.0,
+      12.8,
+      8.0
+    ],
+    "Min": [
+      -14.8,
+      -12.8,
+      -0.4
+    ]
+  },
+  "NavigationTableCount": 1,
+  "Passed": true,
+  "PdfPageCount": 15,
+  "PngCount": 38,
+  "Schema": "projectrift.shiphub.package-validation.v1",
+  "SheetCount": 15,
+  "SvgCount": 15
+}

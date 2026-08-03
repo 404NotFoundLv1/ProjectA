@@ -1,0 +1,97 @@
+{
+  "BlenderVersion": "5.2.0 LTS",
+  "BoundsToleranceM": 0.01,
+  "CollectionCount": 10,
+  "FBX": {
+    "BoundsDeltaM": {
+      "Max": [
+        0.0,
+        0.0,
+        1e-06
+      ],
+      "Min": [
+        0.0,
+        0.0,
+        -2e-06
+      ]
+    },
+    "BoundsM": {
+      "Max": [
+        15.0,
+        12.8,
+        8.000001
+      ],
+      "Min": [
+        -14.8,
+        -12.8,
+        -0.400002
+      ]
+    },
+    "Isolation": {
+      "CleanupVerified": true,
+      "ExclusiveTemporaryCollection": true,
+      "TemporaryCollection": "_SHIPHUB_VALIDATION_FBX"
+    },
+    "ObjectCount": 54,
+    "Passed": true
+  },
+  "GLB": {
+    "BoundsDeltaM": {
+      "Max": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "Min": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "BoundsM": {
+      "Max": [
+        15.0,
+        12.8,
+        8.0
+      ],
+      "Min": [
+        -14.8,
+        -12.8,
+        -0.4
+      ]
+    },
+    "Isolation": {
+      "CleanupVerified": true,
+      "ExclusiveTemporaryCollection": true,
+      "TemporaryCollection": "_SHIPHUB_VALIDATION_GLB"
+    },
+    "ObjectCount": 54,
+    "Passed": true
+  },
+  "InputSHA256": {
+    "BLEND": "bd29ae2833c5e728ca94aecfe8542d3f61d50bc122f3c68332880727b4d1dbcd",
+    "FBX": "df8bc36e55ca8ddb1ba062bac5f23cc453aed5346f17a23038f1f9ee5b4883c3",
+    "GLB": "ab48b11d98678871b3de37bd278b4a0ac5b88a9c6d039f393f0e5e92f4803862",
+    "Manifest": "3df4f054f7ddf8f2c5523ecd673c4b3a2e4f6e7b4db7c27d0a23ee0c412a30d8"
+  },
+  "IssueCount": 0,
+  "Issues": [],
+  "Passed": true,
+  "SceneMeshObjectCount": 69,
+  "Schema": "projectrift.shiphub.export-validation.v1",
+  "Source": {
+    "BoundsM": {
+      "Max": [
+        15.0,
+        12.8,
+        8.0
+      ],
+      "Min": [
+        -14.8,
+        -12.8,
+        -0.4
+      ]
+    },
+    "ObjectCount": 54
+  }
+}

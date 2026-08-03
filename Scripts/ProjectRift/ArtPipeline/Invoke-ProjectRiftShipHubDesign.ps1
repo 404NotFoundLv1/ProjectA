@@ -166,35 +166,50 @@ function Invoke-ProjectRiftPublish {
     Write-Output "Publish stage committed Handoff filenames: $($Matches.Pdf); $($Matches.Png)"
 }
 
-function Invoke-ProjectRiftDeferredStage {
-    param(
-        [Parameter(Mandatory)][string]$DeferredStage,
-        [switch]$RequireBlender,
-        [switch]$RequirePython
-    )
+function Invoke-ProjectRiftValidation {
+    $blender = Resolve-ProjectRiftValidatedBlender -StageName 'Validate'
+    $python = Resolve-ProjectRiftPythonExecutable -ExplicitPath $PythonExe
+    $blenderValidator = Join-Path $projectRoot 'Scripts\ProjectRift\ArtPipeline\shiphub\validate_shiphub_blender.py'
+    $packageValidator = Join-Path $projectRoot 'Scripts\ProjectRift\ArtPipeline\shiphub\validate_shiphub_package.py'
+    $briefPath = Join-Path $projectRoot 'SourceArt\ProjectRift\ShipHub\Briefs\ShipHubCompleteDesign_v1.json'
+    $blendPath = Join-Path $generatedOutputRoot 'Blender\SM_ShipHub_Complete_White_v1.blend'
+    $fbxPath = Join-Path $generatedOutputRoot 'Exports\SM_ShipHub_Complete_White_v1.fbx'
+    $glbPath = Join-Path $generatedOutputRoot 'Exports\SM_ShipHub_Complete_White_v1.glb'
+    $manifestPath = Join-Path $generatedOutputRoot 'Reports\layout-manifest.json'
+    $exportReportPath = Join-Path $generatedOutputRoot 'Reports\export-validation.json'
+    $validationReportPath = Join-Path $generatedOutputRoot 'Reports\validation-report.json'
+    $sha256Path = Join-Path $generatedOutputRoot 'Reports\SHA256SUMS.txt'
 
-    if ($RequireBlender) {
-        Resolve-ProjectRiftValidatedBlender -StageName $DeferredStage | Out-Null
+    foreach ($requiredPath in @($blenderValidator, $packageValidator, $briefPath, $blendPath, $fbxPath, $glbPath, $manifestPath)) {
+        if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
+            throw "Validate is missing its required input: $requiredPath"
+        }
     }
-    if ($RequirePython) {
-        Resolve-ProjectRiftPythonExecutable -ExplicitPath $PythonExe | Out-Null
+    foreach ($projectPath in @($blenderValidator, $packageValidator, $briefPath)) {
+        if (-not (Test-ProjectRiftContainedArtPath -Candidate $projectPath -AllowedRoot $projectRoot)) {
+            throw "Validate path is outside ProjectA: $projectPath"
+        }
+    }
+    foreach ($generatedPath in @($blendPath, $fbxPath, $glbPath, $manifestPath, $exportReportPath, $validationReportPath, $sha256Path)) {
+        if (-not (Test-ProjectRiftContainedArtPath -Candidate $generatedPath -AllowedRoot $generatedOutputRoot)) {
+            throw "Validate path is outside the approved output root: $generatedPath"
+        }
     }
 
-    $stageScript = Join-Path $PSScriptRoot ("{0}-ProjectRiftShipHubDesign.ps1" -f $DeferredStage)
-    if (-not (Test-Path -LiteralPath $stageScript -PathType Leaf)) {
-        throw "$DeferredStage stage is missing its required script: $stageScript"
+    & $blender --background --factory-startup --python $blenderValidator -- `
+        --project-root $projectRoot --blend $blendPath --fbx $fbxPath --glb $glbPath `
+        --manifest $manifestPath --report $exportReportPath
+    $blenderValidationExitCode = $LASTEXITCODE
+    if ($blenderValidationExitCode -ne 0) {
+        throw "Validate Blender validator failed with exit code $blenderValidationExitCode."
     }
 
-    $stageArguments = @{}
-    if (-not [string]::IsNullOrWhiteSpace($BlenderExe)) {
-        $stageArguments.BlenderExe = $BlenderExe
-    }
-    if (-not [string]::IsNullOrWhiteSpace($PythonExe)) {
-        $stageArguments.PythonExe = $PythonExe
-    }
-    & $stageScript @stageArguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "$DeferredStage stage failed: required script exited with code $LASTEXITCODE."
+    & $python $packageValidator --project-root $projectRoot --brief $briefPath `
+        --output-root $generatedOutputRoot --export-report $exportReportPath `
+        --report $validationReportPath --sha256 $sha256Path
+    $packageValidationExitCode = $LASTEXITCODE
+    if ($packageValidationExitCode -ne 0) {
+        throw "Validate package validator failed with exit code $packageValidationExitCode."
     }
 }
 
@@ -217,7 +232,7 @@ switch ($Stage) {
     'BuildWhiteModel' { Invoke-ProjectRiftBuildWhiteModel }
     'RenderDrawings' { Invoke-ProjectRiftRenderDrawings }
     'Publish' { Invoke-ProjectRiftPublish }
-    'Validate' { Invoke-ProjectRiftDeferredStage -DeferredStage 'Validate' -RequireBlender -RequirePython }
+    'Validate' { Invoke-ProjectRiftValidation }
     'All' {
         Invoke-ProjectRiftRecursiveStage -RecursiveStage 'Preflight'
         Invoke-ProjectRiftRecursiveStage -RecursiveStage 'ValidateContract'
